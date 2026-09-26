@@ -1,0 +1,1077 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+enum Role {
+  CANDIDATE
+  EMPLOYEE
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum CandidateStatus {
+  ONBOARDING
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ApplicationAuthorizationMode {
+  MANAGED
+  REVIEW_REQUIRED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum WorkAuthorizationStatus {
+  CITIZEN
+  PERMANENT_RESIDENT
+  WORK_VISA
+  STUDENT_VISA
+  REQUIRES_SPONSORSHIP
+  OTHER
+}
+
+enum RemotePreference {
+  REMOTE_ONLY
+  HYBRID
+  ONSITE
+  FLEXIBLE
+}
+
+enum DocumentType {
+  RESUME
+  COVER_LETTER
+  TRANSCRIPT
+  CERTIFICATE
+  OTHER
+}
+
+enum ApplicationStatus {
+  DISCOVERED
+  QUALIFIED
+  PREPARING
+  REVIEW
+  AWAITING_APPROVAL
+  READY
+  SUBMITTED
+  SUBMISSION_ISSUE
+  REVIEW_REQUIRED
+  CORRECTION_APPROVED
+  RESUBMISSION
+  REJECTED
+  WITHDRAWN
+  FAILED
+}
+
+enum JobStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum JobEmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  TEMPORARY
+}
+
+enum ApplicationApprovalStatus {
+  PENDING
+  APPROVED
+  REVISION_REQUESTED
+}
+
+enum TaskCategory {
+  CANDIDATE
+  JOB
+  APPLICATION
+  QA
+  OPERATIONAL
+}
+
+enum TaskType {
+  COMPLETE_PROFILE
+  UPLOAD_DOCUMENT
+  VERIFY_INFORMATION
+  APPROVE_APPLICATION
+  PROVIDE_MISSING_INFO
+  REVIEW_JOB
+  QUALIFY_JOB
+  PREPARE_RESUME
+  PREPARE_COVER_LETTER
+  PREPARE_SCREENING_ANSWERS
+  COMPLETE_APPLICATION
+  VERIFY_APPLICATION
+  SUBMIT_APPLICATION
+  RESUME_QA
+  APPLICATION_QA
+  SUBMISSION_QA
+  CANDIDATE_ASSIGNMENT
+  CANDIDATE_REASSIGNMENT
+  ESCALATION_HANDLING
+  SUBMISSION_CORRECTION
+}
+
+enum TaskStatus {
+  BACKLOG
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  READY_FOR_REVIEW
+  QA
+  COMPLETED
+  BLOCKED
+  CANCELED
+  REASSIGNED
+  ESCALATED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AuditAction {
+  USER_REGISTERED
+  USER_LOGIN
+  USER_LOGOUT
+  USER_INVITED
+  MEMBERSHIP_CREATED
+  ROLE_CHANGED
+  MEMBERSHIP_ACTIVATED
+  MEMBERSHIP_DEACTIVATED
+  ACCESS_DENIED
+  SECURITY_ALERT
+  CANDIDATE_CREATED
+  CANDIDATE_PROFILE_UPDATED
+  CANDIDATE_EXPERIENCE_UPDATED
+  CANDIDATE_EDUCATION_UPDATED
+  CANDIDATE_SKILLS_UPDATED
+  CANDIDATE_DOCUMENT_UPLOADED
+  CANDIDATE_DOCUMENT_DELETED
+  CANDIDATE_ASSIGNED
+  CANDIDATE_VERIFIED
+  CANDIDATE_STATUS_CHANGED
+
+  // Phase 3 Application Core Actions
+  JOB_CREATED
+  JOB_UPDATED
+  APPLICATION_CREATED
+  APPLICATION_STATUS_CHANGED
+  APPLICATION_ASSIGNED
+  APPLICATION_MATERIAL_UPDATED
+  APPLICATION_APPROVAL_REQUESTED
+  APPLICATION_APPROVED
+  APPLICATION_APPROVAL_REJECTED
+  APPLICATION_SUBMITTED
+  APPLICATION_SUBMISSION_ISSUE
+  APPLICATION_CORRECTION_APPROVED
+  APPLICATION_RESUBMITTED
+  APPLICATION_WITHDRAWN
+  APPLICATION_BULK_WITHDRAWN_CONSENT_REVOKED
+
+  // Phase 4 Task Core Actions
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_ASSIGNED
+  TASK_REASSIGNED
+  TASK_STATUS_CHANGED
+  TASK_CHECKLIST_UPDATED
+  TASK_COMPLETED
+  TASK_CANCELED
+  TASK_ESCALATED
+
+  // Phase 5 QA & Candidate Approval Actions
+  APPLICATION_SUBMITTED_FOR_QA
+  APPLICATION_QA_PASSED
+  APPLICATION_QA_FAILED
+  APPLICATION_APPROVED_BY_CANDIDATE
+  APPLICATION_REVISION_REQUESTED_BY_CANDIDATE
+
+  // Phase 6 Submission Core Actions
+  APPLICATION_SUBMISSION_ISSUE_RECORDED
+  APPLICATION_CORRECTION_REVIEW_STARTED
+  APPLICATION_RESUBMISSION_STAGED
+  APPLICATION_SUBMISSION_EVIDENCE_UPLOADED
+
+  // Phase 7 Communication & Notification Actions
+  CONVERSATION_CREATED
+  MESSAGE_SENT
+  INTERNAL_NOTE_CREATED
+  NOTIFICATION_CREATED
+  NOTIFICATION_READ
+  EMAIL_NOTIFICATION_DISPATCHED
+
+  // Phase 8 Admin & Privacy Actions
+  EMPLOYEE_CREATED
+  EMPLOYEE_ACTIVATED
+  EMPLOYEE_DEACTIVATED
+  EMPLOYEE_ROLE_UPDATED
+  OPERATIONAL_WORK_REASSIGNED
+  PRIVACY_REQUEST_CREATED
+  PRIVACY_REQUEST_VERIFIED
+  PRIVACY_REQUEST_COMPLETED
+  PRIVACY_REQUEST_REJECTED
+  CANDIDATE_DATA_EXPORTED
+  CANDIDATE_DATA_CORRECTED
+  CANDIDATE_DATA_DELETED
+
+  // Optional Candidate Approval Actions
+  CANDIDATE_MANAGED_AUTHORIZATION_GRANTED
+  CANDIDATE_AUTHORIZATION_MODE_CHANGED
+  APPLICATION_ADVANCED_TO_READY_MANAGED
+
+  // Employee Onboarding & Organizational Identity Actions
+  EMPLOYEE_INVITATION_SENT
+  EMPLOYEE_INVITATION_RESENT
+  EMPLOYEE_DESIGNATION_CHANGED
+  EMPLOYEE_DEPARTMENT_CHANGED
+  EMPLOYEE_TEAM_CHANGED
+  EMPLOYEE_MANAGER_CHANGED
+  EMPLOYEE_SESSIONS_REVOKED
+  DESIGNATION_CREATED
+  DESIGNATION_UPDATED
+  DESIGNATION_ARCHIVED
+  DESIGNATION_REACTIVATED
+
+  // Task Governance Actions
+  TASK_GOVERNANCE_POLICY_UPDATED
+  EMPLOYEE_TEAM_LEAD_CHANGED
+  TASK_CREATION_DENIED
+}
+
+enum DesignationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum PrivacyRequestType {
+  DATA_EXPORT
+  DATA_CORRECTION
+  DATA_DELETION
+}
+
+enum PrivacyRequestStatus {
+  PENDING
+  IDENTITY_VERIFIED
+  IN_REVIEW
+  COMPLETED
+  REJECTED
+}
+
+model Organization {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String             @db.VarChar(255)
+  slug        String             @unique @db.VarChar(100)
+  status      OrganizationStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(6)
+
+  memberships           Membership[]
+  designations          Designation[]
+  staffActivationTokens StaffActivationToken[]
+  auditEvents           AuditEvent[]
+  candidates            Candidate[]
+  jobs                  Job[]
+  applications          Application[]
+  tasks                 Task[]
+  taskGovernancePolicy  TaskGovernancePolicy?
+  qaReviews             ApplicationQaReview[]
+  conversations         Conversation[]
+  internalNotes         InternalNote[]
+  notifications         Notification[]
+  emailDeliveryLogs     EmailDeliveryLog[]
+  privacyRequests       PrivacyRequest[]
+
+  @@map("organizations")
+}
+
+model TaskGovernancePolicy {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String       @unique @map("organization_id") @db.Uuid
+  canCreateRoles   Json         @default("[\"ADMIN\", \"MANAGER\", \"TEAM_LEAD\"]") @map("can_create_roles") @db.JsonB
+  canAssignRoles   Json         @default("[\"ADMIN\", \"MANAGER\", \"TEAM_LEAD\"]") @map("can_assign_roles") @db.JsonB
+  canCancelRoles   Json         @default("[\"ADMIN\", \"MANAGER\", \"TEAM_LEAD\"]") @map("can_cancel_roles") @db.JsonB
+  canEscalateRoles Json         @default("[\"ADMIN\", \"MANAGER\", \"TEAM_LEAD\"]") @map("can_escalate_roles") @db.JsonB
+  canCompleteRoles Json         @default("[\"ADMIN\", \"MANAGER\", \"TEAM_LEAD\", \"EMPLOYEE\"]") @map("can_complete_roles") @db.JsonB
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId], name: "idx_task_governance_org")
+  @@map("task_governance_policies")
+}
+
+model User {
+  id                   String                    @id @db.Uuid // Matches Supabase auth.users.id
+  email                String                    @unique @db.VarChar(255)
+  firstName            String?                   @db.VarChar(100)
+  lastName             String?                   @db.VarChar(100)
+  status               UserStatus                @default(ACTIVE)
+  createdAt            DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                  @updatedAt @db.Timestamptz(6)
+
+  memberships          Membership[]
+  subordinates         Membership[]              @relation("ReportingManager")
+  auditEvents          AuditEvent[]              @relation("ActorAuditEvents")
+  candidate            Candidate?
+  assignedCandidates   Candidate[]               @relation("AssignedCandidateEmployee")
+  verifiedCandidates   Candidate[]               @relation("CandidateVerifier")
+  uploadedDocuments    CandidateDocument[]       @relation("DocumentUploader")
+  createdJobs          Job[]                     @relation("JobCreator")
+  assignedApplications Application[]             @relation("ApplicationAssignee")
+  approvedApplications     Application[]             @relation("ApplicationApprover")
+  createdMaterials         ApplicationMaterial[]     @relation("MaterialCreator")
+  submittedApps            ApplicationSubmission[]   @relation("AppSubmissions")
+  stateHistoryChanges      ApplicationStateHistory[] @relation("StateHistoryChanger")
+  assignedTasks            Task[]                    @relation("TaskAssignee")
+  completedTasks           Task[]                    @relation("TaskCompleter")
+  createdTasks             Task[]                    @relation("TaskCreator")
+  completedChecklistItems  TaskChecklistItem[]       @relation("ChecklistItemCompleter")
+  changedTaskStateHistories TaskStateHistory[]       @relation("TaskStateChanger")
+  qaReviews                ApplicationQaReview[]     @relation("QaReviewer")
+  sentMessages             Message[]                 @relation("MessageSender")
+  authoredNotes            InternalNote[]            @relation("NoteAuthor")
+  receivedNotifications    Notification[]            @relation("NotificationRecipient")
+  privacyRequestsSubmitted PrivacyRequest[]          @relation("PrivacyRequestedBy")
+  privacyRequestsVerified  PrivacyRequest[]          @relation("PrivacyVerifiedBy")
+  privacyRequestsCompleted PrivacyRequest[]          @relation("PrivacyCompletedBy")
+
+  @@map("users")
+}
+
+model Membership {
+  id                 String           @id @default(uuid()) @db.Uuid
+  organizationId     String           @db.Uuid
+  userId             String           @db.Uuid
+  role               Role             @default(CANDIDATE)
+  status             MembershipStatus @default(ACTIVE)
+  employeeId         String?          @map("employee_id") @db.VarChar(50)
+  designationId      String?          @map("designation_id") @db.Uuid
+  department         String?          @db.VarChar(100)
+  team               String?          @db.VarChar(100)
+  reportingManagerId String?          @map("reporting_manager_id") @db.Uuid
+  isTeamLead         Boolean          @default(false) @map("is_team_lead")
+  teamLeadOf         String?          @map("team_lead_of") @db.VarChar(100)
+  employmentType     String?          @map("employment_type") @db.VarChar(50)
+  joiningDate        DateTime?        @map("joining_date") @db.Timestamptz(6)
+  workLocation       String?          @map("work_location") @db.VarChar(100)
+  workMode           String?          @map("work_mode") @db.VarChar(50)
+  phone              String?          @db.VarChar(50)
+  personalEmail      String?          @map("personal_email") @db.VarChar(255)
+  activatedAt        DateTime?        @map("activated_at") @db.Timestamptz(6)
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @db.Timestamptz(6)
+
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  designation        Designation?     @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  reportingManager   User?            @relation("ReportingManager", fields: [reportingManagerId], references: [id], onDelete: SetNull)
+  staffActivationTokens StaffActivationToken[]
+
+  @@unique([organizationId, userId], name: "org_user_unique")
+  @@unique([organizationId, employeeId], name: "org_employee_id_unique")
+  @@index([userId, status])
+  @@index([organizationId, role, status])
+  @@index([organizationId, designationId])
+  @@index([organizationId, isTeamLead])
+  @@index([reportingManagerId])
+  @@map("memberships")
+}
+
+model Designation {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  name           String            @db.VarChar(100)
+  code           String?           @db.VarChar(50)
+  description    String?           @db.Text
+  status         DesignationStatus @default(ACTIVE) @map("status")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships    Membership[]
+
+  @@unique([organizationId, name], name: "org_designation_name_unique")
+  @@index([organizationId, status], name: "idx_designations_org_status")
+  @@map("designations")
+}
+
+model StaffActivationToken {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  membershipId   String       @map("membership_id") @db.Uuid
+  tokenHash      String       @unique @map("token_hash") @db.VarChar(64)
+  expiresAt      DateTime     @map("expires_at") @db.Timestamptz(6)
+  reservedUntil  DateTime?    @map("reserved_until") @db.Timestamptz(6)
+  usedAt         DateTime?    @map("used_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membership     Membership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId, expiresAt], name: "idx_staff_tokens_membership_expires")
+  @@index([organizationId], name: "idx_staff_tokens_organization")
+  @@map("staff_activation_tokens")
+}
+
+model Candidate {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  organizationId       String                  @db.Uuid
+  userId               String                  @unique @db.Uuid
+  assignedEmployeeId   String?                 @db.Uuid
+  status               CandidateStatus         @default(ONBOARDING)
+  verificationStatus   VerificationStatus      @default(UNVERIFIED)
+  
+  // Contact & Location (V1 PRD §18)
+  phone                String?                 @db.VarChar(50)
+  city                 String?                 @db.VarChar(100)
+  state                String?                 @db.VarChar(100)
+  country              String                  @default("US") @db.VarChar(100)
+  postalCode           String?                 @db.VarChar(20)
+  timezone             String?                 @db.VarChar(50)
+  linkedinUrl          String?                 @db.VarChar(500)
+  githubUrl            String?                 @db.VarChar(500)
+  portfolioUrl         String?                 @db.VarChar(500)
+  
+  // Professional Summary (V1 PRD §18)
+  headline             String?                 @db.VarChar(255)
+  professionalSummary  String?                 @db.Text
+  totalYearsExperience Decimal?                @db.Decimal(4, 1)
+  
+  // Work Authorization (V1 PRD §18)
+  workAuthorization    WorkAuthorizationStatus @default(CITIZEN)
+  requiresSponsorship  Boolean                 @default(false)
+  visaDetails          String?                 @db.VarChar(255)
+  
+  // Preferences & Compensation Expectations (V1 PRD §18)
+  targetRoles          String[]                @default([])
+  targetLocations      String[]                @default([])
+  remotePreference     RemotePreference        @default(FLEXIBLE)
+  desiredSalaryMin     Int?
+  desiredSalaryMax     Int?
+  salaryCurrency       String                  @default("USD") @db.VarChar(10)
+  applicationAuthorizationMode ApplicationAuthorizationMode @default(MANAGED) @map("application_authorization_mode")
+  
+  // Operational & Verification Tracking (V1 PRD §17, §18)
+  verifiedAt           DateTime?               @db.Timestamptz(6)
+  verifiedBy           String?                 @db.Uuid
+  verificationNotes    String?                 @db.Text
+  
+  // Timestamps
+  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
+
+  // Relationships
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedEmployee     User?                   @relation("AssignedCandidateEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  verifier             User?                   @relation("CandidateVerifier", fields: [verifiedBy], references: [id], onDelete: SetNull)
+  
+  experiences          CandidateExperience[]
+  educations           CandidateEducation[]
+  skills               CandidateSkill[]
+  projects             CandidateProject[]
+  certifications       CandidateCertification[]
+  documents            CandidateDocument[]
+  applications         Application[]
+  tasks                Task[]
+  conversations        Conversation[]
+  internalNotes        InternalNote[]
+  privacyRequests      PrivacyRequest[]
+
+  @@index([organizationId, status])
+  @@index([assignedEmployeeId, status])
+  @@index([verificationStatus])
+  @@map("candidates")
+}
+
+model CandidateExperience {
+  id              String    @id @default(uuid()) @db.Uuid
+  candidateId     String    @db.Uuid
+  companyName     String    @db.VarChar(200)
+  jobTitle        String    @db.VarChar(200)
+  location        String?   @db.VarChar(100)
+  isCurrent       Boolean   @default(false)
+  startDate       DateTime  @db.Date
+  endDate         DateTime? @db.Date
+  description     String?   @db.Text
+  achievements    String[]  @default([])
+  technologies    String[]  @default([])
+  orderIndex      Int       @default(0)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, orderIndex])
+  @@map("candidate_experiences")
+}
+
+model CandidateEducation {
+  id             String    @id @default(uuid()) @db.Uuid
+  candidateId    String    @db.Uuid
+  institution    String    @db.VarChar(255)
+  degree         String    @db.VarChar(200)
+  fieldOfStudy   String?   @db.VarChar(200)
+  startDate      DateTime? @db.Date
+  endDate        DateTime? @db.Date
+  graduationYear Int?
+  gpa            String?   @db.VarChar(20)
+  honors         String?   @db.VarChar(255)
+  orderIndex     Int       @default(0)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+
+  candidate      Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, orderIndex])
+  @@map("candidate_educations")
+}
+
+model CandidateSkill {
+  id              String    @id @default(uuid()) @db.Uuid
+  candidateId     String    @db.Uuid
+  name            String    @db.VarChar(100) // Candidate-provided skill name
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, name], name: "candidate_skill_unique")
+  @@index([candidateId])
+  @@map("candidate_skills")
+}
+
+model CandidateProject {
+  id           String    @id @default(uuid()) @db.Uuid
+  candidateId  String    @db.Uuid
+  title        String    @db.VarChar(200)
+  role         String?   @db.VarChar(100)
+  url          String?   @db.VarChar(500)
+  description  String?   @db.Text
+  highlights   String[]  @default([])
+  technologies String[]  @default([])
+  startDate    DateTime? @db.Date
+  endDate      DateTime? @db.Date
+  orderIndex   Int       @default(0)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, orderIndex])
+  @@map("candidate_projects")
+}
+
+model CandidateCertification {
+  id                String    @id @default(uuid()) @db.Uuid
+  candidateId       String    @db.Uuid
+  name              String    @db.VarChar(200)
+  issuingAuthority  String    @db.VarChar(200)
+  credentialId      String?   @db.VarChar(200)
+  credentialUrl     String?   @db.VarChar(500)
+  issueDate         DateTime? @db.Date
+  expirationDate    DateTime? @db.Date
+  doesNotExpire     Boolean   @default(false)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(6)
+
+  candidate         Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@map("candidate_certifications")
+}
+
+model CandidateDocument {
+  id                   String                @id @default(uuid()) @db.Uuid
+  candidateId          String                @db.Uuid
+  documentType         DocumentType          @default(RESUME)
+  title                String                @db.VarChar(255)
+  storagePath          String                @db.VarChar(1024) // Path in private Supabase Storage bucket
+  fileSizeBytes        Int
+  mimeType             String                @db.VarChar(100)
+  versionNumber        Int                   @default(1)
+  isDefault            Boolean               @default(false)
+  uploadedBy           String                @db.Uuid
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @db.Timestamptz(6)
+
+  candidate            Candidate             @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  uploader             User                  @relation("DocumentUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+  applicationMaterials ApplicationMaterial[]
+
+  @@index([candidateId, documentType, isDefault])
+  @@map("candidate_documents")
+}
+
+model Job {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String            @db.Uuid
+  title              String            @db.VarChar(255)
+  companyName        String            @db.VarChar(255)
+  jobDescription     String            @db.Text
+  location           String?           @db.VarChar(255)
+  isRemote           Boolean           @default(false)
+  employmentType     JobEmploymentType @default(FULL_TIME)
+  salaryMin          Int?
+  salaryMax          Int?
+  salaryCurrency     String?           @default("USD") @db.VarChar(10)
+  source             String?           @db.VarChar(100)
+  externalUrl        String?           @db.VarChar(1024)
+  qualificationNotes String?           @db.Text
+  status             JobStatus         @default(OPEN)
+  createdById        String            @db.Uuid
+  createdAt          DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy          User              @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  applications       Application[]
+  tasks              Task[]
+
+  @@index([organizationId, status])
+  @@map("jobs")
+}
+
+model Application {
+  id                   String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String                     @db.Uuid
+  candidateId          String                     @db.Uuid
+  jobId                String                     @db.Uuid
+  status               ApplicationStatus          @default(DISCOVERED)
+  assignedEmployeeId   String?                    @db.Uuid
+  approvalStatus       ApplicationApprovalStatus?
+  approvalRequestedAt  DateTime?                  @db.Timestamptz(6)
+  approvedAt           DateTime?                  @db.Timestamptz(6)
+  approvedBy           String?                    @db.Uuid
+  approvalNotes        String?                    @db.Text
+  rejectionReason      String?                    @db.Text
+  failureReason        String?                    @db.Text
+  withdrawalReason     String?                    @db.Text
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                   @default(now()) @updatedAt @db.Timestamptz(6)
+
+  organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate            Candidate                  @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  job                  Job                        @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  assignedEmployee     User?                      @relation("ApplicationAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  approver             User?                      @relation("ApplicationApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  materials            ApplicationMaterial[]
+  submissions          ApplicationSubmission[]
+  stateHistory         ApplicationStateHistory[]
+  tasks                Task[]
+  qaReviews            ApplicationQaReview[]
+  conversations        Conversation[]
+  internalNotes        InternalNote[]
+
+  @@index([organizationId, status])
+  @@index([assignedEmployeeId, status])
+  @@index([candidateId, status])
+  @@map("applications")
+}
+
+model ApplicationMaterial {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId       String             @db.Uuid
+  candidateDocumentId String?            @db.Uuid
+  documentVersion     Int?
+  coverLetterText     String?            @db.Text
+  screeningAnswers    Json?              @db.JsonB
+  customNotes         String?            @db.Text
+  isCurrent           Boolean            @default(true)
+  createdById         String             @db.Uuid
+  createdAt           DateTime           @default(now()) @db.Timestamptz(6)
+
+  application         Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateDocument   CandidateDocument? @relation(fields: [candidateDocumentId], references: [id], onDelete: Restrict)
+  createdBy           User               @relation("MaterialCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, isCurrent])
+  @@map("application_materials")
+}
+
+model ApplicationSubmission {
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId        String      @db.Uuid
+  attemptNumber        Int         @default(1)
+  submittedAt          DateTime    @default(now()) @db.Timestamptz(6)
+  submittedById        String      @db.Uuid
+  externalReference    String?     @db.VarChar(255)
+  externalUrl          String?     @db.VarChar(1024)
+  confirmationEvidence String?     @db.Text
+  storagePath          String?     @db.VarChar(1024)
+  submissionNotes      String?     @db.Text
+  createdAt            DateTime    @default(now()) @db.Timestamptz(6)
+
+  application          Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  submittedBy          User        @relation("AppSubmissions", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  @@unique([applicationId, attemptNumber])
+  @@index([applicationId, attemptNumber])
+  @@index([submittedById])
+  @@map("application_submissions")
+}
+
+model ApplicationStateHistory {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId  String             @db.Uuid
+  fromStatus     ApplicationStatus?
+  toStatus       ApplicationStatus
+  changedById    String             @db.Uuid
+  reason         String?            @db.Text
+  createdAt      DateTime           @default(now()) @db.Timestamptz(6)
+
+  application    Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy      User               @relation("StateHistoryChanger", fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@map("application_state_history")
+}
+
+model AuditEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String?      @db.Uuid
+  actorId        String?      @db.Uuid
+  actorType      String       @default("USER") @db.VarChar(50) // "USER", "SYSTEM", "ANONYMOUS"
+  action         AuditAction
+  entityType     String       @db.VarChar(100)
+  entityId       String?      @db.VarChar(255)
+  details        Json?        @db.JsonB
+  ipAddress      String?      @db.VarChar(45)
+  userAgent      String?      @db.VarChar(512)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor          User?         @relation("ActorAuditEvents", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_events")
+}
+
+model Task {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String              @db.Uuid
+  title              String              @db.VarChar(255)
+  description        String?             @db.Text
+  category           TaskCategory
+  type               TaskType
+  status             TaskStatus          @default(BACKLOG)
+  priority           TaskPriority        @default(NORMAL)
+  dueDate            DateTime?           @db.Timestamptz(6)
+  
+  assignedEmployeeId String?             @db.Uuid
+  candidateId        String?             @db.Uuid
+  jobId              String?             @db.Uuid
+  applicationId      String?             @db.Uuid
+
+  waitingReason      String?             @db.VarChar(500)
+  blockedReason      String?             @db.VarChar(500)
+  escalationReason   String?             @db.VarChar(500)
+  
+  completedAt        DateTime?           @db.Timestamptz(6)
+  completedById      String?             @db.Uuid
+  createdById        String              @db.Uuid
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignedEmployee   User?               @relation("TaskAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  candidate          Candidate?          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job                Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  application        Application?        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  completedBy        User?               @relation("TaskCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  createdBy          User                @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  checklistItems     TaskChecklistItem[]
+  stateHistory       TaskStateHistory[]
+  internalNotes      InternalNote[]
+
+  @@index([organizationId, status])
+  @@index([assignedEmployeeId, status])
+  @@index([candidateId, status])
+  @@index([applicationId, status])
+  @@index([category, status])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+model TaskChecklistItem {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId        String    @db.Uuid
+  description   String    @db.VarChar(500)
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime? @db.Timestamptz(6)
+  completedById String?   @db.Uuid
+  orderIndex    Int       @default(0)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  completedBy   User?     @relation("ChecklistItemCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@index([taskId, orderIndex])
+  @@map("task_checklist_items")
+}
+
+model TaskStateHistory {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId      String     @db.Uuid
+  fromStatus  TaskStatus
+  toStatus    TaskStatus
+  changedById String     @db.Uuid
+  reason      String?    @db.Text
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  changedBy   User       @relation("TaskStateChanger", fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([taskId, createdAt])
+  @@map("task_state_history")
+}
+
+// ==========================================
+// PHASE 5: QA ENUMS & MODELS
+// ==========================================
+
+enum QaDecision {
+  PASS
+  FAIL
+}
+
+enum QaCriterionKey {
+  CANDIDATE_JOB_ALIGNMENT
+  RESUME_ACCURACY
+  JOB_REQUIREMENTS_MATCH
+  SALARY_ALIGNMENT
+  LOCATION_AUTHORIZATION
+  WORK_AUTHORIZATION
+  SCREENING_ANSWERS
+  APPLICATION_COMPLETENESS
+  CANDIDATE_CONSENT_ACTIVE
+}
+
+model ApplicationQaReview {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String                  @db.Uuid
+  applicationId   String                  @db.Uuid
+  reviewerId      String                  @db.Uuid
+  decision        QaDecision
+  notes           String?                 @db.Text
+  checklistItems  ApplicationQaChecklist[]
+  createdAt       DateTime                @default(now()) @db.Timestamptz(6)
+
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  application     Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewer        User                    @relation("QaReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, applicationId])
+  @@index([applicationId, createdAt])
+  @@map("application_qa_reviews")
+}
+
+model ApplicationQaChecklist {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  qaReviewId      String                  @db.Uuid
+  criterionKey    QaCriterionKey
+  isVerified      Boolean                 @default(false)
+  createdAt       DateTime                @default(now()) @db.Timestamptz(6)
+
+  qaReview        ApplicationQaReview     @relation(fields: [qaReviewId], references: [id], onDelete: Cascade)
+
+  @@unique([qaReviewId, criterionKey])
+  @@index([qaReviewId])
+  @@map("application_qa_checklists")
+}
+
+// ==========================================
+// PHASE 7: COMMUNICATION & NOTIFICATION MODELS
+// ==========================================
+
+enum NotificationType {
+  NEW_MESSAGE
+  APPLICATION_STATUS_CHANGED
+  CANDIDATE_APPROVAL_REQUESTED
+  CANDIDATE_REVISION_REQUESTED
+  APPLICATION_SUBMITTED
+  SUBMISSION_ISSUE_REPORTED
+  CORRECTION_REVIEW_STARTED
+  TASK_ASSIGNED
+}
+
+enum EmailDeliveryStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+model Conversation {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  candidateId     String        @map("candidate_id") @db.Uuid
+  applicationId   String?       @map("application_id") @db.Uuid
+  subject         String        @db.VarChar(200)
+  lastMessageAt   DateTime      @default(now()) @map("last_message_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate       Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  application     Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  messages        Message[]
+
+  @@index([organizationId, candidateId], name: "idx_conversations_org_candidate")
+  @@index([organizationId, applicationId], name: "idx_conversations_org_application")
+  @@index([organizationId, lastMessageAt(sort: Desc)], name: "idx_conversations_org_last_message")
+  @@map("conversations")
+}
+
+model Message {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId  String        @map("conversation_id") @db.Uuid
+  senderId        String        @map("sender_id") @db.Uuid
+  senderRole      Role          @map("sender_role")
+  body            String        @db.Text
+  readAt          DateTime?     @map("read_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt(sort: Asc)], name: "idx_messages_conversation_created")
+  @@index([conversationId, readAt], name: "idx_messages_conversation_unread")
+  @@map("messages")
+}
+
+model InternalNote {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  candidateId     String?       @map("candidate_id") @db.Uuid
+  applicationId   String?       @map("application_id") @db.Uuid
+  taskId          String?       @map("task_id") @db.Uuid
+  authorId        String        @map("author_id") @db.Uuid
+  body            String        @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate       Candidate?    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  application     Application?  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  task            Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  author          User          @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, candidateId], name: "idx_internal_notes_candidate")
+  @@index([organizationId, applicationId], name: "idx_internal_notes_application")
+  @@index([organizationId, taskId], name: "idx_internal_notes_task")
+  @@index([organizationId, createdAt(sort: Desc)], name: "idx_internal_notes_created")
+  @@map("internal_notes")
+}
+
+model Notification {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  recipientId       String            @map("recipient_id") @db.Uuid
+  type              NotificationType  @map("type")
+  title             String            @db.VarChar(200)
+  body              String            @db.Text
+  relatedEntityType String?           @map("related_entity_type") @db.VarChar(50)
+  relatedEntityId   String?           @map("related_entity_id") @db.Uuid
+  readAt            DateTime?         @map("read_at") @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  recipient         User              @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, recipientId, readAt], name: "idx_notifications_recipient_unread")
+  @@index([organizationId, recipientId, createdAt(sort: Desc)], name: "idx_notifications_recipient_created")
+  @@map("notifications")
+}
+
+model EmailDeliveryLog {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String               @map("organization_id") @db.Uuid
+  recipientEmail    String               @map("recipient_email") @db.VarChar(255)
+  templateId        String               @map("template_id") @db.VarChar(100)
+  subject           String               @db.VarChar(255)
+  status            EmailDeliveryStatus  @default(QUEUED) @map("status")
+  providerMessageId String?              @map("provider_message_id") @db.VarChar(255)
+  failureReason     String?              @map("failure_reason") @db.Text
+  attempts          Int                  @default(0) @map("attempts")
+  sentAt            DateTime?            @map("sent_at") @db.Timestamptz(6)
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, createdAt], name: "idx_email_delivery_org_status")
+  @@index([recipientEmail, createdAt(sort: Desc)], name: "idx_email_delivery_recipient")
+  @@map("email_delivery_logs")
+}
+
+model PrivacyRequest {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  candidateId     String               @map("candidate_id") @db.Uuid
+  requestType     PrivacyRequestType   @map("request_type")
+  status          PrivacyRequestStatus @default(PENDING) @map("status")
+  
+  requestedById   String               @map("requested_by_id") @db.Uuid
+  verifiedById    String?              @map("verified_by_id") @db.Uuid
+  completedById   String?              @map("completed_by_id") @db.Uuid
+  
+  requestedAt     DateTime             @default(now()) @map("requested_at") @db.Timestamptz(6)
+  verifiedAt      DateTime?            @map("verified_at") @db.Timestamptz(6)
+  completedAt     DateTime?            @map("completed_at") @db.Timestamptz(6)
+  
+  scopeDetails    String?              @map("scope_details") @db.Text
+  resolutionNotes String?              @map("resolution_notes") @db.Text
+  
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate       Candidate            @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  requestedBy     User                 @relation("PrivacyRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  verifiedBy      User?                @relation("PrivacyVerifiedBy", fields: [verifiedById], references: [id], onDelete: Restrict)
+  completedBy     User?                @relation("PrivacyCompletedBy", fields: [completedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status], name: "idx_privacy_requests_org_status")
+  @@index([organizationId, candidateId], name: "idx_privacy_requests_org_candidate")
+  @@index([organizationId, createdAt], name: "idx_privacy_requests_org_created")
+  @@map("privacy_requests")
+}
+
+

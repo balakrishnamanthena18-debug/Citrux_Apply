@@ -1,0 +1,50 @@
+{
+  "name": "apply_citrux",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.18.0 <21.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate && node -e \"import('fs').then(fs => fs.writeFileSync('src/generated/prisma/index.ts', 'export * from \\\"./client\\\";\\nexport * from \\\"./enums\\\";\\nexport * from \\\"./models\\\";\\nexport * from \\\"./commonInputTypes\\\";\\n'))\"",
+    "prisma:validate": "prisma validate"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "@supabase/ssr": "0.5.2",
+    "@supabase/supabase-js": "2.49.1",
+    "dotenv": "16.4.7",
+    "next": "16.3.6",
+    "nodemailer": "^10.0.10",
+    "pg": "8.13.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "xlsx": "^0.18.5",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.19",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "8.11.11",
+    "@types/react": "19.0.10",
+    "@types/react-dom": "19.0.4",
+    "autoprefixer": "10.4.20",
+    "eslint": "9.21.0",
+    "eslint-config-next": "16.3.6",
+    "postcss": "8.5.3",
+    "prisma": "7.10.0",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.7.3",
+    "vitest": "2.1.8"
+  }
+}
