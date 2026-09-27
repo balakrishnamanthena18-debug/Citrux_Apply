@@ -11,20 +11,18 @@ export default async function AdminSettingsPage() {
       where: { id: ctx.organizationId },
     });
 
-    const [activeDesignationsCount, archivedDesignationsCount, activeStaffCount, invitedStaffCount] = await Promise.all([
-      tx.designation.count({
-        where: { organizationId: ctx.organizationId, status: "ACTIVE" },
-      }),
-      tx.designation.count({
-        where: { organizationId: ctx.organizationId, status: "ARCHIVED" },
-      }),
-      tx.membership.count({
-        where: { organizationId: ctx.organizationId, status: "ACTIVE", role: { in: ["EMPLOYEE", "ADMIN"] } },
-      }),
-      tx.membership.count({
-        where: { organizationId: ctx.organizationId, status: "INVITED", role: { in: ["EMPLOYEE", "ADMIN"] } },
-      }),
-    ]);
+    const activeDesignationsCount = await tx.designation.count({
+      where: { organizationId: ctx.organizationId, status: "ACTIVE" },
+    });
+    const archivedDesignationsCount = await tx.designation.count({
+      where: { organizationId: ctx.organizationId, status: "ARCHIVED" },
+    });
+    const activeStaffCount = await tx.membership.count({
+      where: { organizationId: ctx.organizationId, status: "ACTIVE", role: { in: ["EMPLOYEE", "ADMIN"] } },
+    });
+    const invitedStaffCount = await tx.membership.count({
+      where: { organizationId: ctx.organizationId, status: "INVITED", role: { in: ["EMPLOYEE", "ADMIN"] } },
+    });
 
     return {
       organization: org,

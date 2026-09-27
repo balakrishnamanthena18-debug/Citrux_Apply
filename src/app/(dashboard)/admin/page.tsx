@@ -12,203 +12,168 @@ export default async function AdminDashboardPage() {
       where: { id: ctx.organizationId },
     });
 
-    const [
-      // Primary Metrics
-      activeCandidatesCount,
-      activeApplicationsCount,
-      submittedApplicationsCount,
-      activeEmployeesCount,
+    // Primary Metrics
+    const activeCandidatesCount = await tx.candidate.count({
+      where: { organizationId: ctx.organizationId, status: "ACTIVE" },
+    });
+    const activeApplicationsCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: {
+          notIn: [
+            ApplicationStatus.SUBMITTED,
+            ApplicationStatus.WITHDRAWN,
+            ApplicationStatus.REJECTED,
+            ApplicationStatus.FAILED,
+          ],
+        },
+      },
+    });
+    const submittedApplicationsCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: ApplicationStatus.SUBMITTED,
+      },
+    });
+    const activeEmployeesCount = await tx.membership.count({
+      where: {
+        organizationId: ctx.organizationId,
+        role: { in: [Role.ADMIN, Role.EMPLOYEE] },
+        status: MembershipStatus.ACTIVE,
+      },
+    });
 
-      // Needs Attention
-      awaitingCandidateCount,
-      escalatedTasksCount,
-      qaReviewTasksCount,
-      submissionIssuesCount,
-      blockedTasksCount,
+    // Needs Attention
+    const awaitingCandidateCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: {
+          in: [
+            ApplicationStatus.AWAITING_APPROVAL,
+            ApplicationStatus.REVIEW_REQUIRED,
+          ],
+        },
+      },
+    });
+    const escalatedTasksCount = await tx.task.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: TaskStatus.ESCALATED,
+      },
+    });
+    const qaReviewTasksCount = await tx.task.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: {
+          in: [TaskStatus.READY_FOR_REVIEW, TaskStatus.QA],
+        },
+      },
+    });
+    const submissionIssuesCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: ApplicationStatus.SUBMISSION_ISSUE,
+      },
+    });
+    const blockedTasksCount = await tx.task.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: TaskStatus.BLOCKED,
+      },
+    });
 
-      // Application Operations Breakdown
-      totalApplicationsCount,
-      readyApplicationsCount,
-      inProgressApplicationsCount,
+    // Application Operations Breakdown
+    const totalApplicationsCount = await tx.application.count({
+      where: { organizationId: ctx.organizationId },
+    });
+    const readyApplicationsCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: ApplicationStatus.READY,
+      },
+    });
+    const inProgressApplicationsCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: {
+          in: [
+            ApplicationStatus.DISCOVERED,
+            ApplicationStatus.QUALIFIED,
+            ApplicationStatus.PREPARING,
+            ApplicationStatus.REVIEW,
+          ],
+        },
+      },
+    });
 
-      // Operational Funnel
-      totalCandidatesCount,
-      openJobsCount,
-      preparedApplicationsCount,
+    // Funnel
+    const totalCandidatesCount = await tx.candidate.count({
+      where: { organizationId: ctx.organizationId },
+    });
+    const openJobsCount = await tx.job.count({
+      where: { organizationId: ctx.organizationId, status: "OPEN" },
+    });
+    const preparedApplicationsCount = await tx.application.count({
+      where: {
+        organizationId: ctx.organizationId,
+        status: {
+          in: [ApplicationStatus.READY, ApplicationStatus.SUBMITTED],
+        },
+      },
+    });
 
-      // Active Staff for Workload
-      activeStaffMembers,
+    // Staff for Workload
+    const activeStaffMembers = await tx.membership.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        role: { in: [Role.ADMIN, Role.EMPLOYEE] },
+        status: MembershipStatus.ACTIVE,
+      },
+      include: {
+        user: true,
+        designation: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
 
-      // Task and Application Assignments for Workload
-      allTasks,
-      allApplications,
+    // Tasks for workload mapping
+    const allTasks = await tx.task.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        assignedEmployeeId: { not: null },
+      },
+      select: {
+        assignedEmployeeId: true,
+        status: true,
+      },
+    });
 
-      // Recent Audit Events
-      recentAuditEvents,
-    ] = await Promise.all([
-      // Primary Metrics
-      tx.candidate.count({
-        where: { organizationId: ctx.organizationId, status: "ACTIVE" },
-      }),
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: {
-            notIn: [
-              ApplicationStatus.SUBMITTED,
-              ApplicationStatus.WITHDRAWN,
-              ApplicationStatus.REJECTED,
-              ApplicationStatus.FAILED,
-            ],
-          },
+    // Applications for workload mapping
+    const allApplications = await tx.application.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        assignedEmployeeId: { not: null },
+        status: {
+          notIn: [
+            ApplicationStatus.SUBMITTED,
+            ApplicationStatus.WITHDRAWN,
+            ApplicationStatus.REJECTED,
+            ApplicationStatus.FAILED,
+          ],
         },
-      }),
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-        },
-      }),
-      tx.membership.count({
-        where: {
-          organizationId: ctx.organizationId,
-          role: { in: [Role.ADMIN, Role.EMPLOYEE] },
-          status: MembershipStatus.ACTIVE,
-        },
-      }),
+      },
+      select: {
+        assignedEmployeeId: true,
+      },
+    });
 
-      // Needs Attention
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: {
-            in: [
-              ApplicationStatus.AWAITING_APPROVAL,
-              ApplicationStatus.REVIEW_REQUIRED,
-            ],
-          },
-        },
-      }),
-      tx.task.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: TaskStatus.ESCALATED,
-        },
-      }),
-      tx.task.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: {
-            in: [TaskStatus.READY_FOR_REVIEW, TaskStatus.QA],
-          },
-        },
-      }),
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMISSION_ISSUE,
-        },
-      }),
-      tx.task.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: TaskStatus.BLOCKED,
-        },
-      }),
-
-      // Application Operations Breakdown
-      tx.application.count({
-        where: { organizationId: ctx.organizationId },
-      }),
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.READY,
-        },
-      }),
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: {
-            in: [
-              ApplicationStatus.DISCOVERED,
-              ApplicationStatus.QUALIFIED,
-              ApplicationStatus.PREPARING,
-              ApplicationStatus.REVIEW,
-            ],
-          },
-        },
-      }),
-
-      // Funnel
-      tx.candidate.count({
-        where: { organizationId: ctx.organizationId },
-      }),
-      tx.job.count({
-        where: { organizationId: ctx.organizationId, status: "OPEN" },
-      }),
-      tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: {
-            in: [ApplicationStatus.READY, ApplicationStatus.SUBMITTED],
-          },
-        },
-      }),
-
-      // Staff for Workload
-      tx.membership.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          role: { in: [Role.ADMIN, Role.EMPLOYEE] },
-          status: MembershipStatus.ACTIVE,
-        },
-        include: {
-          user: true,
-          designation: true,
-        },
-        orderBy: { createdAt: "asc" },
-      }),
-
-      // Tasks for workload mapping
-      tx.task.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          assignedEmployeeId: { not: null },
-        },
-        select: {
-          assignedEmployeeId: true,
-          status: true,
-        },
-      }),
-
-      // Applications for workload mapping
-      tx.application.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          assignedEmployeeId: { not: null },
-          status: {
-            notIn: [
-              ApplicationStatus.SUBMITTED,
-              ApplicationStatus.WITHDRAWN,
-              ApplicationStatus.REJECTED,
-              ApplicationStatus.FAILED,
-            ],
-          },
-        },
-        select: {
-          assignedEmployeeId: true,
-        },
-      }),
-
-      // Recent Audit Activity
-      tx.auditEvent.findMany({
-        where: { organizationId: ctx.organizationId },
-        include: { actor: true },
-        orderBy: { createdAt: "desc" },
-        take: 7,
-      }),
-    ]);
+    // Recent Audit Activity
+    const recentAuditEvents = await tx.auditEvent.findMany({
+      where: { organizationId: ctx.organizationId },
+      include: { actor: true },
+      orderBy: { createdAt: "desc" },
+      take: 7,
+    });
 
     // Calculate per-employee workload
     const staffWorkload = activeStaffMembers.map((staff) => {

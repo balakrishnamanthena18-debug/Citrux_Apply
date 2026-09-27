@@ -95,6 +95,25 @@ export class Logger {
   error(message: string, context?: Record<string, unknown>): void {
     process.stderr.write(this.formatLog("ERROR", message, context) + "\n");
   }
+
+  security(event: string, context?: Record<string, unknown>): void {
+    const enrichedContext = {
+      event: "SECURITY_ALERT",
+      alertType: event,
+      ...context,
+    };
+    process.stderr.write(this.formatLog("WARN", `[SECURITY_ALERT] ${event}`, enrichedContext) + "\n");
+  }
+
+  apiError(endpoint: string, error: unknown, context?: Record<string, unknown>): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const enrichedContext = {
+      endpoint,
+      error: errorMessage,
+      ...context,
+    };
+    process.stderr.write(this.formatLog("ERROR", `[API_ERROR] ${endpoint}: ${errorMessage}`, enrichedContext) + "\n");
+  }
 }
 
 export const logger = new Logger();

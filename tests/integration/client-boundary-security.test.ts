@@ -38,6 +38,10 @@ describe("Server/Client Boundary Security Inspection (tests/integration/client-b
       expect(content).not.toContain("@prisma/adapter-pg");
       expect(content).not.toContain("process.env.DATABASE_URL");
       expect(content).not.toContain("process.env.DIRECT_URL");
+      expect(content).not.toContain("process.env.SUPABASE_SERVICE_ROLE_KEY");
+      expect(content).not.toContain("process.env.CRON_SECRET");
+      expect(content).not.toContain("process.env.SMTP_PASS");
+      expect(content).not.toContain("@/lib/supabase/admin");
     }
   });
 
@@ -54,6 +58,16 @@ describe("Server/Client Boundary Security Inspection (tests/integration/client-b
 
     for (const v of publicVarMatches) {
       expect(allowedPublicVars).toContain(v);
+    }
+  });
+
+  it("ensures .env.example contains only generic sanitized placeholder values", () => {
+    const envExamplePath = path.resolve(__dirname, "../../.env.example");
+    if (fs.existsSync(envExamplePath)) {
+      const content = fs.readFileSync(envExamplePath, "utf-8");
+      expect(content).not.toMatch(/postgres:[a-zA-Z0-9_-]+@/);
+      expect(content).toContain("[PROJECT_REF]");
+      expect(content).toContain("[YOUR_PASSWORD]");
     }
   });
 

@@ -1074,4 +1074,20 @@ model PrivacyRequest {
   @@map("privacy_requests")
 }
 
+model RateLimitBucket {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keyHash      String    @unique @map("key_hash") @db.VarChar(64)
+  action       String    @map("action") @db.VarChar(50)
+  windowStart  DateTime  @map("window_start") @db.Timestamptz(6)
+  attemptCount Int       @default(0) @map("attempt_count")
+  lockedUntil  DateTime? @map("locked_until") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([action], name: "idx_rate_limit_buckets_action")
+  @@index([lockedUntil], name: "idx_rate_limit_buckets_locked_until")
+  @@index([windowStart], name: "idx_rate_limit_buckets_window_start")
+  @@map("rate_limit_buckets")
+}
+
 

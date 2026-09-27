@@ -29,21 +29,20 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
     });
     if (!candidate) return null;
 
-    const [app, existingConv] = await Promise.all([
-      tx.application.findFirst({
-        where: { id, candidateId: candidate.id },
-        include: {
-          job: true,
-          materials: { where: { isCurrent: true }, include: { candidateDocument: true } },
-          submissions: { orderBy: { attemptNumber: "desc" } },
-          stateHistory: { orderBy: { createdAt: "desc" }, include: { changedBy: true } },
-        },
-      }),
-      tx.conversation.findFirst({
-        where: { candidateId: candidate.id, applicationId: id, organizationId: ctx.organizationId },
-        orderBy: { updatedAt: "desc" },
-      }),
-    ]);
+    const app = await tx.application.findFirst({
+      where: { id, candidateId: candidate.id },
+      include: {
+        job: true,
+        materials: { where: { isCurrent: true }, include: { candidateDocument: true } },
+        submissions: { orderBy: { attemptNumber: "desc" } },
+        stateHistory: { orderBy: { createdAt: "desc" }, include: { changedBy: true } },
+      },
+    });
+
+    const existingConv = await tx.conversation.findFirst({
+      where: { candidateId: candidate.id, applicationId: id, organizationId: ctx.organizationId },
+      orderBy: { updatedAt: "desc" },
+    });
 
     return { application: app, candidate, existingConv };
   });

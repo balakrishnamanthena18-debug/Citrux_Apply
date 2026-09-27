@@ -1377,46 +1377,44 @@ export async function getCandidateLogSummaryAction(
       const dayOfWeek = now.getDay();
       const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
 
-      const [todayCount, weekCount, totalSubmittedCount, recentApps] = await Promise.all([
-        tx.application.count({
-          where: {
-            candidateId: candidate.id,
-            organizationId: ctx.organizationId,
-            status: ApplicationStatus.SUBMITTED,
-            createdAt: { gte: startOfToday },
+      const todayCount = await tx.application.count({
+        where: {
+          candidateId: candidate.id,
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfToday },
+        },
+      });
+      const weekCount = await tx.application.count({
+        where: {
+          candidateId: candidate.id,
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfWeek },
+        },
+      });
+      const totalSubmittedCount = await tx.application.count({
+        where: {
+          candidateId: candidate.id,
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+        },
+      });
+      const recentApps = await tx.application.findMany({
+        where: {
+          candidateId: candidate.id,
+          organizationId: ctx.organizationId,
+        },
+        include: {
+          job: true,
+          submissions: {
+            orderBy: { attemptNumber: "desc" },
+            take: 1,
           },
-        }),
-        tx.application.count({
-          where: {
-            candidateId: candidate.id,
-            organizationId: ctx.organizationId,
-            status: ApplicationStatus.SUBMITTED,
-            createdAt: { gte: startOfWeek },
-          },
-        }),
-        tx.application.count({
-          where: {
-            candidateId: candidate.id,
-            organizationId: ctx.organizationId,
-            status: ApplicationStatus.SUBMITTED,
-          },
-        }),
-        tx.application.findMany({
-          where: {
-            candidateId: candidate.id,
-            organizationId: ctx.organizationId,
-          },
-          include: {
-            job: true,
-            submissions: {
-              orderBy: { attemptNumber: "desc" },
-              take: 1,
-            },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 10,
-        }),
-      ]);
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      });
 
       return {
         candidate: {

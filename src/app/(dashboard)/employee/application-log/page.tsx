@@ -54,45 +54,42 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
       );
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const [todayCount, weekCount, monthCount, activeCandidates, submittedApps] =
-        await Promise.all([
-          tx.application.count({
-            where: {
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfToday },
-            },
-          }),
-          tx.application.count({
-            where: {
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfWeek },
-            },
-          }),
-          tx.application.count({
-            where: {
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfMonth },
-            },
-          }),
-          tx.application.findMany({
-            where: {
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-            },
-            distinct: ["candidateId"],
-            select: { candidateId: true },
-          }),
-          tx.application.findMany({
-            where: {
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-            },
-            include: { job: { select: { source: true } } },
-          }),
-        ]);
+      const todayCount = await tx.application.count({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfToday },
+        },
+      });
+      const weekCount = await tx.application.count({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfWeek },
+        },
+      });
+      const monthCount = await tx.application.count({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfMonth },
+        },
+      });
+      const activeCandidates = await tx.application.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+        },
+        distinct: ["candidateId"],
+        select: { candidateId: true },
+      });
+      const submittedApps = await tx.application.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.SUBMITTED,
+        },
+        include: { job: { select: { source: true } } },
+      });
 
       const sourceCounts: Record<string, number> = {};
       for (const app of submittedApps) {
@@ -113,46 +110,44 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
       if (selectedCandidateId) {
         const targetCand = candRecords.find((c) => c.id === selectedCandidateId);
         if (targetCand) {
-          const [cToday, cWeek, cTotal, cRecent] = await Promise.all([
-            tx.application.count({
-              where: {
-                candidateId: targetCand.id,
-                organizationId: ctx.organizationId,
-                status: ApplicationStatus.SUBMITTED,
-                createdAt: { gte: startOfToday },
+          const cToday = await tx.application.count({
+            where: {
+              candidateId: targetCand.id,
+              organizationId: ctx.organizationId,
+              status: ApplicationStatus.SUBMITTED,
+              createdAt: { gte: startOfToday },
+            },
+          });
+          const cWeek = await tx.application.count({
+            where: {
+              candidateId: targetCand.id,
+              organizationId: ctx.organizationId,
+              status: ApplicationStatus.SUBMITTED,
+              createdAt: { gte: startOfWeek },
+            },
+          });
+          const cTotal = await tx.application.count({
+            where: {
+              candidateId: targetCand.id,
+              organizationId: ctx.organizationId,
+              status: ApplicationStatus.SUBMITTED,
+            },
+          });
+          const cRecent = await tx.application.findMany({
+            where: {
+              candidateId: targetCand.id,
+              organizationId: ctx.organizationId,
+            },
+            include: {
+              job: true,
+              submissions: {
+                orderBy: { attemptNumber: "desc" },
+                take: 1,
               },
-            }),
-            tx.application.count({
-              where: {
-                candidateId: targetCand.id,
-                organizationId: ctx.organizationId,
-                status: ApplicationStatus.SUBMITTED,
-                createdAt: { gte: startOfWeek },
-              },
-            }),
-            tx.application.count({
-              where: {
-                candidateId: targetCand.id,
-                organizationId: ctx.organizationId,
-                status: ApplicationStatus.SUBMITTED,
-              },
-            }),
-            tx.application.findMany({
-              where: {
-                candidateId: targetCand.id,
-                organizationId: ctx.organizationId,
-              },
-              include: {
-                job: true,
-                submissions: {
-                  orderBy: { attemptNumber: "desc" },
-                  take: 1,
-                },
-              },
-              orderBy: { createdAt: "desc" },
-              take: 10,
-            }),
-          ]);
+            },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+          });
 
           candSummary = {
             candidate: {

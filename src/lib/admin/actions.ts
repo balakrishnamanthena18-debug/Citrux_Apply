@@ -886,36 +886,34 @@ export async function getEmployeeWorkloadImpactAction(
     requireAdmin(ctx);
 
     const counts = await withRlsContext(ctx.userId, async (tx) => {
-      const [assignedCandidatesCount, activeApplicationsCount, openTasksCount] = await Promise.all([
-        tx.candidate.count({
-          where: {
-            organizationId: ctx.organizationId,
-            assignedEmployeeId: employeeUserId,
+      const assignedCandidatesCount = await tx.candidate.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: employeeUserId,
+        },
+      });
+      const activeApplicationsCount = await tx.application.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: employeeUserId,
+          status: {
+            notIn: [
+              ApplicationStatus.SUBMITTED,
+              ApplicationStatus.WITHDRAWN,
+              ApplicationStatus.REJECTED,
+            ],
           },
-        }),
-        tx.application.count({
-          where: {
-            organizationId: ctx.organizationId,
-            assignedEmployeeId: employeeUserId,
-            status: {
-              notIn: [
-                ApplicationStatus.SUBMITTED,
-                ApplicationStatus.WITHDRAWN,
-                ApplicationStatus.REJECTED,
-              ],
-            },
+        },
+      });
+      const openTasksCount = await tx.task.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: employeeUserId,
+          status: {
+            notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED],
           },
-        }),
-        tx.task.count({
-          where: {
-            organizationId: ctx.organizationId,
-            assignedEmployeeId: employeeUserId,
-            status: {
-              notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED],
-            },
-          },
-        }),
-      ]);
+        },
+      });
 
       return { assignedCandidatesCount, activeApplicationsCount, openTasksCount };
     });
@@ -1237,20 +1235,18 @@ export async function listAuditLogsAction(
         if (endDate) whereClause.createdAt.lte = new Date(endDate);
       }
 
-      const [logs, totalCount] = await Promise.all([
-        tx.auditEvent.findMany({
-          where: whereClause,
-          include: {
-            actor: {
-              select: { id: true, firstName: true, lastName: true, email: true },
-            },
+      const logs = await tx.auditEvent.findMany({
+        where: whereClause,
+        include: {
+          actor: {
+            select: { id: true, firstName: true, lastName: true, email: true },
           },
-          orderBy: { createdAt: "desc" },
-          skip,
-          take: limit,
-        }),
-        tx.auditEvent.count({ where: whereClause }),
-      ]);
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      });
+      const totalCount = await tx.auditEvent.count({ where: whereClause });
 
       return { logs, totalCount };
     });

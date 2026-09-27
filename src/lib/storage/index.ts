@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { sanitizeFilename } from "@/lib/utils/sanitization";
 
 export const CANDIDATE_DOCUMENTS_BUCKET = "candidate-documents";
 
@@ -13,10 +14,8 @@ export function generateCandidateDocumentPath(
   versionNumber: number,
   originalFilename: string
 ): string {
-  const sanitizedFilename = originalFilename
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, "_");
-  return `tenants/${organizationId}/candidates/${candidateId}/documents/${documentId}-v${versionNumber}-${sanitizedFilename}`;
+  const sanitized = sanitizeFilename(originalFilename).toLowerCase();
+  return `tenants/${organizationId}/candidates/${candidateId}/documents/${documentId}-v${versionNumber}-${sanitized}`;
 }
 
 /**
@@ -70,10 +69,8 @@ export function generateSubmissionEvidencePath(
   submissionId: string,
   originalFilename: string
 ): string {
-  const sanitizedFilename = originalFilename
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, "_");
-  return `tenants/${organizationId}/applications/${applicationId}/submissions/${submissionId}-${sanitizedFilename}`;
+  const sanitized = sanitizeFilename(originalFilename).toLowerCase();
+  return `tenants/${organizationId}/applications/${applicationId}/submissions/${submissionId}-${sanitized}`;
 }
 
 /**

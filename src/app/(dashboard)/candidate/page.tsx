@@ -31,48 +31,48 @@ export default async function CandidatePortalPage() {
       };
     }
 
-    const [awaitingApprovalApps, activeApplicationsCount, submittedApplicationsCount, recentApplications] =
-      await Promise.all([
-        tx.application.findMany({
-          where: {
-            candidateId: candidate.id,
-            status: ApplicationStatus.AWAITING_APPROVAL,
-          },
-          include: { job: true },
-          orderBy: { updatedAt: "desc" },
-        }),
-        tx.application.count({
-          where: {
-            candidateId: candidate.id,
-            status: {
-              in: [
-                ApplicationStatus.DISCOVERED,
-                ApplicationStatus.QUALIFIED,
-                ApplicationStatus.PREPARING,
-                ApplicationStatus.REVIEW,
-                ApplicationStatus.AWAITING_APPROVAL,
-                ApplicationStatus.READY,
-                ApplicationStatus.SUBMISSION_ISSUE,
-                ApplicationStatus.REVIEW_REQUIRED,
-                ApplicationStatus.CORRECTION_APPROVED,
-                ApplicationStatus.RESUBMISSION,
-              ],
-            },
-          },
-        }),
-        tx.application.count({
-          where: {
-            candidateId: candidate.id,
-            status: ApplicationStatus.SUBMITTED,
-          },
-        }),
-        tx.application.findMany({
-          where: { candidateId: candidate.id },
-          include: { job: true },
-          orderBy: { updatedAt: "desc" },
-          take: 4,
-        }),
-      ]);
+    const awaitingApprovalApps = await tx.application.findMany({
+      where: {
+        candidateId: candidate.id,
+        status: ApplicationStatus.AWAITING_APPROVAL,
+      },
+      include: { job: true },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const activeApplicationsCount = await tx.application.count({
+      where: {
+        candidateId: candidate.id,
+        status: {
+          in: [
+            ApplicationStatus.DISCOVERED,
+            ApplicationStatus.QUALIFIED,
+            ApplicationStatus.PREPARING,
+            ApplicationStatus.REVIEW,
+            ApplicationStatus.AWAITING_APPROVAL,
+            ApplicationStatus.READY,
+            ApplicationStatus.SUBMISSION_ISSUE,
+            ApplicationStatus.REVIEW_REQUIRED,
+            ApplicationStatus.CORRECTION_APPROVED,
+            ApplicationStatus.RESUBMISSION,
+          ],
+        },
+      },
+    });
+
+    const submittedApplicationsCount = await tx.application.count({
+      where: {
+        candidateId: candidate.id,
+        status: ApplicationStatus.SUBMITTED,
+      },
+    });
+
+    const recentApplications = await tx.application.findMany({
+      where: { candidateId: candidate.id },
+      include: { job: true },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+    });
 
     return {
       candidate,

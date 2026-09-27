@@ -29,6 +29,13 @@ const serverEnvSchema = z.object({
   EMAIL_FROM: z
     .string()
     .default("notifications@citrux.com"),
+  CRON_SECRET: z
+    .string()
+    .min(16, "CRON_SECRET must be at least 16 characters")
+    .optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .optional(),
 });
 
 const publicEnvSchema = z.object({

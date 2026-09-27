@@ -47,4 +47,48 @@ describe("Structured Logger & Sanitization (src/lib/logger/index.ts)", () => {
 
     stdoutSpy.mockRestore();
   });
+
+  it("formats security alert logs with enriched event metadata and sanitization", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    logger.security("SUSPICIOUS_BRUTE_FORCE_ATTEMPT", {
+      ip: "198.51.100.99",
+      targetEmail: "victim@example.com",
+      secretToken: "forbidden-token",
+    });
+
+    expect(stderrSpy).toHaveBeenCalled();
+    const lastCallArg = stderrSpy.mock.calls[0]?.[0] as string;
+    const parsed = JSON.parse(lastCallArg.trim());
+
+    expect(parsed.level).toBe("WARN");
+    expect(parsed.message).toContain("[SECURITY_ALERT] SUSPICIOUS_BRUTE_FORCE_ATTEMPT");
+    expect(parsed.context.event).toBe("SECURITY_ALERT");
+    expect(parsed.context.alertType).toBe("SUSPICIOUS_BRUTE_FORCE_ATTEMPT");
+    expect(parsed.context.ip).toBe("198.51.100.99");
+    expect(parsed.context.secretToken).toBe("[REDACTED]");
+
+    stderrSpy.mockRestore();
+  });
+
+  it("formats API error logs with endpoint and error message", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    logger.apiError("/api/notifications", new Error("Database query timeout"), {
+      userId: "user-123",
+      dbPassword: "secret-password",
+    });
+
+    expect(stderrSpy).toHaveBeenCalled();
+    const lastCallArg = stderrSpy.mock.calls[0]?.[0] as string;
+    const parsed = JSON.parse(lastCallArg.trim());
+
+    expect(parsed.level).toBe("ERROR");
+    expect(parsed.message).toContain("[API_ERROR] /api/notifications: Database query timeout");
+    expect(parsed.context.endpoint).toBe("/api/notifications");
+    expect(parsed.context.error).toBe("Database query timeout");
+    expect(parsed.context.dbPassword).toBe("[REDACTED]");
+
+    stderrSpy.mockRestore();
+  });
 });

@@ -1,7 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isKnownMaliciousBot } from "@/lib/security/bot-detector";
 
 export async function middleware(request: NextRequest) {
+  // Early Bot & Automated Scraper Defense
+  const userAgent = request.headers.get("user-agent");
+  if (isKnownMaliciousBot(userAgent)) {
+    return new NextResponse(
+      JSON.stringify({ error: "Access denied by security policy." }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,

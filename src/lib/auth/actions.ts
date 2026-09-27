@@ -1,6 +1,7 @@
 "use server";
 
 import crypto from "crypto";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
@@ -19,7 +20,13 @@ import {
   ResetPasswordSchema,
   ActivateStaffAccountSchema,
 } from "@/lib/validation/auth.schemas";
-import { AuthenticationError, AuthorizationError, ValidationError } from "@/lib/errors";
+import {
+  checkRateLimit,
+  recordFailedAttempt,
+  recordSuccessfulAttempt,
+  extractClientIp,
+} from "@/lib/auth/rate-limiter";
+import { AuthorizationError, ValidationError } from "@/lib/errors";
 
 export interface ActionResult<T = unknown> {
   success: boolean;
@@ -28,7 +35,20 @@ export interface ActionResult<T = unknown> {
 }
 
 /**
- * Signs in a user with email and password, setting secure Supabase auth cookies.
+ * Helper to safely extract client IP in server action context
+ */
+async function getClientIp(): Promise<string> {
+  try {
+    const headerStore = await headers();
+    return extractClientIp(headerStore);
+  } catch {
+    return "127.0.0.1";
+  }
+}
+
+/**
+ * Signs in a user with email and password, setting secure HTTP-only Supabase auth cookies.
+ * Enforces rate limiting against brute-force attacks and logs audit events.
  */
 export async function signInAction(formData: FormData): Promise<ActionResult<{ redirectUrl: string }>> {
   const rawData = {
@@ -41,23 +61,57 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
     return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
   }
 
+  const normalizedEmail = parsed.data.email.toLowerCase().trim();
+  const clientIp = await getClientIp();
+  const rateLimitParams = { email: normalizedEmail, ip: clientIp };
+
+  // 1. Enforce Distributed Database-Backed Rate Limiting against Brute-Force Attacks
+  const rateLimitCheck = await checkRateLimit("LOGIN", rateLimitParams);
+  if (!rateLimitCheck.allowed) {
+    await logSystemAuditEvent({
+      action: AuditAction.SECURITY_ALERT,
+      actorType: "ANONYMOUS",
+      entityType: "User",
+      details: {
+        reason: "Login rate limit exceeded",
+        email: normalizedEmail,
+        ip: clientIp,
+        retryAfterSeconds: rateLimitCheck.retryAfterSeconds,
+      },
+    });
+
+    const retryMin = Math.ceil((rateLimitCheck.retryAfterSeconds || 60) / 60);
+    return {
+      success: false,
+      error: `Too many failed login attempts. Please try again in ${retryMin} minute(s).`,
+    };
+  }
+
   const supabase = await createServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
+    email: normalizedEmail,
     password: parsed.data.password,
   });
 
   if (error || !data.user) {
+    // Record failed attempt atomically in PostgreSQL
+    await recordFailedAttempt("LOGIN", rateLimitParams);
+
     await logSystemAuditEvent({
-      action: "ACCESS_DENIED",
+      action: AuditAction.ACCESS_DENIED,
       actorType: "ANONYMOUS",
       entityType: "User",
-      details: { email: parsed.data.email, reason: error?.message ?? "Invalid credentials" },
+      details: {
+        email: normalizedEmail,
+        ip: clientIp,
+        reason: error?.message ?? "Invalid credentials",
+      },
     });
+
     return { success: false, error: "Invalid email or password" };
   }
 
-  // Resolve membership to determine redirect target and verify active status
+  // 2. Resolve membership within transaction-local RLS context to verify active status
   try {
     const membership = await withRlsContext(data.user.id, async (tx) => {
       return tx.membership.findFirst({
@@ -71,16 +125,21 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
     });
 
     if (!membership) {
+      await recordFailedAttempt("LOGIN", rateLimitParams);
       await supabase.auth.signOut();
       return { success: false, error: "Account is inactive or pending organization approval" };
     }
 
+    // 3. Reset rate limit counter on successful authentication
+    await recordSuccessfulAttempt("LOGIN", rateLimitParams);
+
     await logUserAuditEvent({
       userId: data.user.id,
       organizationId: membership.organizationId,
-      action: "USER_LOGIN",
+      action: AuditAction.USER_LOGIN,
       entityType: "User",
       entityId: data.user.id,
+      details: { ip: clientIp },
     });
 
     let redirectUrl = "/candidate";
@@ -97,8 +156,22 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
 /**
  * Registers a new Candidate.
  * Tenancy: Candidates belong to the company's operating organization as customer records.
+ * Distributed rate limiting by client IP to prevent account creation abuse.
  */
 export async function signUpCandidateAction(formData: FormData): Promise<ActionResult<{ redirectUrl: string }>> {
+  const clientIp = await getClientIp();
+  const rateLimitParams = { ip: clientIp };
+  const rateLimitCheck = await checkRateLimit("REGISTER", rateLimitParams);
+  if (!rateLimitCheck.allowed) {
+    await logSystemAuditEvent({
+      action: AuditAction.SECURITY_ALERT,
+      actorType: "ANONYMOUS",
+      entityType: "User",
+      details: { reason: "Registration rate limit exceeded", ip: clientIp },
+    });
+    return { success: false, error: "Registration rate limit exceeded. Please try again later." };
+  }
+
   const rawData = {
     email: formData.get("email"),
     password: formData.get("password"),
@@ -115,7 +188,7 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
   const operatingOrgId = process.env.OPERATING_ORGANIZATION_ID;
   if (!operatingOrgId) {
     await logSystemAuditEvent({
-      action: "SECURITY_ALERT",
+      action: AuditAction.SECURITY_ALERT,
       actorType: "SYSTEM",
       entityType: "Organization",
       details: { error: "Missing OPERATING_ORGANIZATION_ID server configuration" },
@@ -129,7 +202,7 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
 
   if (!operatingOrg || operatingOrg.status !== "ACTIVE") {
     await logSystemAuditEvent({
-      action: "SECURITY_ALERT",
+      action: AuditAction.SECURITY_ALERT,
       actorType: "SYSTEM",
       entityType: "Organization",
       entityId: operatingOrgId,
@@ -152,6 +225,7 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
   });
 
   if (authError || !authData.user) {
+    await recordFailedAttempt("REGISTER", rateLimitParams);
     return { success: false, error: authError?.message ?? "Registration failed" };
   }
 
@@ -183,10 +257,10 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
     await logUserAuditEvent({
       userId,
       organizationId: operatingOrg.id,
-      action: "USER_REGISTERED",
+      action: AuditAction.USER_REGISTERED,
       entityType: "User",
       entityId: userId,
-      details: { role: "CANDIDATE" },
+      details: { role: "CANDIDATE", ip: clientIp },
     });
 
     return { success: true, data: { redirectUrl: "/candidate" } };
@@ -196,7 +270,7 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
 }
 
 /**
- * Signs out the current user and clears session cookies.
+ * Signs out the current user, logs audit event, and clears session cookies.
  */
 export async function signOutAction(): Promise<void> {
   const supabase = await createServerClient();
@@ -206,7 +280,7 @@ export async function signOutAction(): Promise<void> {
     try {
       await logUserAuditEvent({
         userId: user.id,
-        action: "USER_LOGOUT",
+        action: AuditAction.USER_LOGOUT,
         entityType: "User",
         entityId: user.id,
       });
@@ -231,20 +305,18 @@ export async function inviteEmployeeAction(input: unknown): Promise<ActionResult
     return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
   }
 
-  if (parsed.data.organizationId !== ctx.organizationId) {
+  if (parsed.data.organizationId && parsed.data.organizationId !== ctx.organizationId) {
     throw new AuthorizationError("Cannot invite employees to a different organization");
   }
 
   // Execute within Admin's RLS context
   try {
     await withRlsContext(ctx.userId, async (tx) => {
-      // Find or create User record
       let targetUser = await tx.user.findUnique({
         where: { email: parsed.data.email },
       });
 
       if (!targetUser) {
-        // Generate placeholder user UUID until Supabase auth acceptance
         const syntheticUserId = crypto.randomUUID();
         targetUser = await tx.user.create({
           data: {
@@ -270,7 +342,7 @@ export async function inviteEmployeeAction(input: unknown): Promise<ActionResult
     await logUserAuditEvent({
       userId: ctx.userId,
       organizationId: ctx.organizationId,
-      action: "USER_INVITED",
+      action: AuditAction.USER_INVITED,
       entityType: "Membership",
       details: { email: parsed.data.email, role: parsed.data.role },
     });
@@ -312,7 +384,7 @@ export async function updateMemberRoleAction(input: unknown): Promise<ActionResu
     await logUserAuditEvent({
       userId: ctx.userId,
       organizationId: ctx.organizationId,
-      action: "ROLE_CHANGED",
+      action: AuditAction.ROLE_CHANGED,
       entityType: "Membership",
       entityId: parsed.data.membershipId,
       details: { newRole: parsed.data.role },
@@ -326,7 +398,7 @@ export async function updateMemberRoleAction(input: unknown): Promise<ActionResu
 
 /**
  * Admin Action: Deactivates an employee or candidate membership.
- * Access is revoked immediately; historical attribution remains intact.
+ * Access is revoked immediately, active sessions terminated, and audit logged.
  */
 export async function deactivateMemberAction(input: unknown): Promise<ActionResult> {
   const ctx = await getAuthenticatedContext();
@@ -338,6 +410,8 @@ export async function deactivateMemberAction(input: unknown): Promise<ActionResu
   }
 
   try {
+    let targetUserId = "";
+
     await withRlsContext(ctx.userId, async (tx) => {
       const membership = await tx.membership.findUnique({
         where: { id: parsed.data.membershipId },
@@ -351,16 +425,28 @@ export async function deactivateMemberAction(input: unknown): Promise<ActionResu
         throw new ValidationError("Administrators cannot deactivate their own membership");
       }
 
+      targetUserId = membership.userId;
+
       await tx.membership.update({
         where: { id: parsed.data.membershipId },
         data: { status: "DEACTIVATED" },
       });
     });
 
+    // Invalidate active authentication sessions for the deactivated user
+    if (targetUserId) {
+      try {
+        const supabaseAdmin = getSupabaseAdminClient();
+        await supabaseAdmin.auth.admin.signOut(targetUserId);
+      } catch {
+        // Fallback or non-blocking session termination
+      }
+    }
+
     await logUserAuditEvent({
       userId: ctx.userId,
       organizationId: ctx.organizationId,
-      action: "MEMBERSHIP_DEACTIVATED",
+      action: AuditAction.MEMBERSHIP_DEACTIVATED,
       entityType: "Membership",
       entityId: parsed.data.membershipId,
       details: { reason: parsed.data.reason },
@@ -374,6 +460,7 @@ export async function deactivateMemberAction(input: unknown): Promise<ActionResu
 
 /**
  * Sends a password reset email via Supabase Auth.
+ * Protected against account enumeration and email flooding rate limits.
  */
 export async function requestPasswordResetAction(formData: FormData): Promise<ActionResult> {
   const rawEmail = formData.get("email");
@@ -383,18 +470,37 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
     return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
   }
 
-  const supabase = await createServerClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email);
+  const normalizedEmail = parsed.data.email.toLowerCase().trim();
+  const clientIp = await getClientIp();
+  const rateLimitParams = { email: normalizedEmail, ip: clientIp };
 
-  if (error) {
-    return { success: false, error: error.message };
+  // 1. Rate limiting against password reset spam / email flooding
+  const rateLimitCheck = await checkRateLimit("PASSWORD_RESET", rateLimitParams);
+  if (!rateLimitCheck.allowed) {
+    await logSystemAuditEvent({
+      action: AuditAction.SECURITY_ALERT,
+      actorType: "ANONYMOUS",
+      entityType: "User",
+      details: { reason: "Password reset rate limit exceeded", email: normalizedEmail, ip: clientIp },
+    });
+    return { success: false, error: "Too many password reset requests. Please try again later." };
   }
 
+  await recordFailedAttempt("PASSWORD_RESET", rateLimitParams);
+
+  try {
+    const supabase = await createServerClient();
+    await supabase.auth.resetPasswordForEmail(normalizedEmail);
+  } catch {
+    // Non-leaking catch
+  }
+
+  // Always return success to prevent account enumeration
   return { success: true };
 }
 
 /**
- * Resets user password.
+ * Resets user password for an authenticated session.
  */
 export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
   const rawData = {
@@ -408,6 +514,12 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
   }
 
   const supabase = await createServerClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { success: false, error: "Authentication required to reset password. Please use the reset link from your email." };
+  }
+
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
   });
@@ -415,6 +527,14 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
   if (error) {
     return { success: false, error: error.message };
   }
+
+  await logUserAuditEvent({
+    userId: user.id,
+    action: AuditAction.USER_LOGIN,
+    entityType: "User",
+    entityId: user.id,
+    details: { event: "PASSWORD_UPDATED" },
+  });
 
   return { success: true };
 }
@@ -432,12 +552,20 @@ export interface ValidatedActivationTokenData {
 /**
  * Validates a staff activation token for the unauthenticated activation page.
  * Returns non-sensitive details needed to present the activation screen.
+ * Rate limited to prevent token brute-forcing.
  */
 export async function validateStaffActivationTokenAction(
   token: string
 ): Promise<ActionResult<ValidatedActivationTokenData>> {
   if (!token || typeof token !== "string" || !token.trim()) {
     return { success: false, error: "Invalid activation token." };
+  }
+
+  const clientIp = await getClientIp();
+  const rateLimitParams = { token, ip: clientIp };
+  const rateLimitCheck = await checkRateLimit("ACTIVATION", rateLimitParams);
+  if (!rateLimitCheck.allowed) {
+    return { success: false, error: "Too many activation attempts. Please try again later." };
   }
 
   try {
@@ -457,6 +585,7 @@ export async function validateStaffActivationTokenAction(
     });
 
     if (!activationToken) {
+      await recordFailedAttempt("ACTIVATION", rateLimitParams);
       return { success: false, error: "This activation link is invalid or has expired." };
     }
 
@@ -486,7 +615,7 @@ export async function validateStaffActivationTokenAction(
         team: activationToken.membership.team,
       },
     };
-  } catch (err: any) {
+  } catch {
     return { success: false, error: "An unexpected error occurred while validating the activation link." };
   }
 }
@@ -494,11 +623,10 @@ export async function validateStaffActivationTokenAction(
 /**
  * Executes the secure 3-Phase Staff Account Activation Protocol.
  * 
- * Invariant: Zero database locks are held during external Supabase Auth network calls.
- * 
- * Phase 1: PostgreSQL Reservation (atomic, 60s timeout, short tx)
- * Phase 2: Supabase Auth Password Update (outside all DB transactions)
- * Phase 3: PostgreSQL Finalization (consume token, activate membership, audit event, short tx)
+ * Invariants:
+ * - Passwords are secure (validated for minimum 8, max 128 characters).
+ * - Zero database locks during external Supabase Auth network calls.
+ * - Activation tokens are single-use, hashed with SHA-256, and atomically consumed.
  */
 export async function activateStaffAccountAction(
   input: unknown
@@ -506,6 +634,13 @@ export async function activateStaffAccountAction(
   const parsed = ActivateStaffAccountSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  const clientIp = await getClientIp();
+  const rateLimitParams = { token: parsed.data.token, ip: clientIp };
+  const rateLimitCheck = await checkRateLimit("ACTIVATION", rateLimitParams);
+  if (!rateLimitCheck.allowed) {
+    return { success: false, error: "Too many activation attempts. Please try again later." };
   }
 
   const tokenHash = crypto.createHash("sha256").update(parsed.data.token.trim()).digest("hex");
@@ -546,7 +681,6 @@ export async function activateStaffAccountAction(
         throw new ValidationError("This account has already been activated or is not eligible for activation.");
       }
 
-      // Check if another activation request has an active reservation
       if (token.reservedUntil && token.reservedUntil > now) {
         throw new ValidationError("Activation is already being processed. Please try again in a moment.");
       }
@@ -568,6 +702,7 @@ export async function activateStaffAccountAction(
       };
     });
   } catch (err: any) {
+    await recordFailedAttempt("ACTIVATION", rateLimitParams);
     return { success: false, error: err.message || "Failed to initiate activation" };
   }
 
@@ -584,9 +719,8 @@ export async function activateStaffAccountAction(
   );
 
   if (authError) {
-    // If Supabase Auth fails, the DB record is untouched: usedAt remains null and reservedUntil expires in 60s.
     await logSystemAuditEvent({
-      action: "ACCESS_DENIED",
+      action: AuditAction.ACCESS_DENIED,
       actorType: "SYSTEM",
       entityType: "Membership",
       entityId: reservation.membershipId,
@@ -664,6 +798,8 @@ export async function activateStaffAccountAction(
       });
     });
 
+    await recordSuccessfulAttempt("ACTIVATION", rateLimitParams);
+
     return {
       success: true,
       data: {
@@ -671,10 +807,8 @@ export async function activateStaffAccountAction(
       },
     };
   } catch (err: any) {
-    // If Phase 3 crashes, Supabase password was updated, but token.usedAt is still null.
-    // The user can retry after reservedUntil expires, safely converging state.
     await logSystemAuditEvent({
-      action: "ACCESS_DENIED",
+      action: AuditAction.ACCESS_DENIED,
       actorType: "SYSTEM",
       entityType: "Membership",
       entityId: reservation.membershipId,

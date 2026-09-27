@@ -147,10 +147,8 @@ export async function verifyTaskPermission(
     );
   }
 
-  const [policy, userRoles] = await Promise.all([
-    getTaskGovernancePolicy(tx, ctx.organizationId),
-    resolveOperationalRoles(tx, ctx),
-  ]);
+  const policy = await getTaskGovernancePolicy(tx, ctx.organizationId);
+  const userRoles = await resolveOperationalRoles(tx, ctx);
 
   let allowedRoles: OperationalRole[] = [];
   let actionLabel = action;

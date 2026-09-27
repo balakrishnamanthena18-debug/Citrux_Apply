@@ -13,7 +13,6 @@ import {
   NotificationType,
 } from "@/generated/prisma";
 import { emailNotificationService } from "@/lib/email";
-import { prisma } from "@/lib/db/prisma";
 import {
   GenerateSubmissionEvidenceUploadUrlSchema,
   RecordApplicationSubmissionSchema,
@@ -147,7 +146,13 @@ export async function recordApplicationSubmissionAction(
       where: { id: parsed.data.applicationId, organizationId: ctx.organizationId },
       include: {
         job: true,
-        candidate: true,
+        candidate: {
+          include: {
+            user: {
+              select: { email: true, firstName: true },
+            },
+          },
+        },
       },
     });
 
@@ -248,10 +253,13 @@ export async function recordApplicationSubmissionAction(
       });
     }
 
+    const candidateUser = (application.candidate as any)?.user;
+
     return {
       submission,
       application: updatedApp,
       candidateUserId: application.candidate?.userId,
+      candidateUser: candidateUser ? { email: candidateUser.email, firstName: candidateUser.firstName } : null,
       jobTitle: application.job?.title || "Job Application",
       companyName: application.job?.companyName || "Company",
     };
@@ -260,28 +268,22 @@ export async function recordApplicationSubmissionAction(
   // Post-commit side effects: cache revalidation & non-blocking email notification
   revalidateSubmissionViews(result.application.id);
 
-  if (result.candidateUserId) {
+  if (result.candidateUser?.email) {
     try {
-      const candidateUser = await prisma.user.findUnique({
-        where: { id: result.candidateUserId },
-        select: { email: true, firstName: true },
-      });
-      if (candidateUser?.email) {
-        await emailNotificationService
-          .sendTransactionalNotification({
-            organizationId: ctx.organizationId,
-            recipientEmail: candidateUser.email,
-            templateId: "APPLICATION_SUBMITTED",
-            subject: `Application Submitted: ${result.jobTitle} at ${result.companyName}`,
-            textBody: `Hello ${candidateUser.firstName || "Candidate"},\n\nAn operational team member has submitted your application for ${result.jobTitle} at ${result.companyName} on your behalf.\n\nConfirmation Reference: ${result.submission.externalReference || "Recorded"}\n\nYou can view the submission details and confirmation evidence in your OOS portal.\n\nBest regards,\nOperations Team`,
-          })
-          .catch((err) => {
-            logger.warn(`[EmailNotification] Post-commit submission email notification failed`, {
-              error: err?.message,
-              applicationId: result.application.id,
-            });
+      await emailNotificationService
+        .sendTransactionalNotification({
+          organizationId: ctx.organizationId,
+          recipientEmail: result.candidateUser.email,
+          templateId: "APPLICATION_SUBMITTED",
+          subject: `Application Submitted: ${result.jobTitle} at ${result.companyName}`,
+          textBody: `Hello ${result.candidateUser.firstName || "Candidate"},\n\nAn operational team member has submitted your application for ${result.jobTitle} at ${result.companyName} on your behalf.\n\nConfirmation Reference: ${result.submission.externalReference || "Recorded"}\n\nYou can view the submission details and confirmation evidence in your OOS portal.\n\nBest regards,\nOperations Team`,
+        })
+        .catch((err) => {
+          logger.warn(`[EmailNotification] Post-commit submission email notification failed`, {
+            error: err?.message,
+            applicationId: result.application.id,
           });
-      }
+        });
     } catch (err: any) {
       logger.warn(`[EmailNotification] Error resolving candidate user for email notification`, {
         error: err?.message,
