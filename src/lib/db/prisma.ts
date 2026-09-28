@@ -1,6 +1,11 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
+// Allow cloud Postgres providers with intermediate/self-signed cert chains (e.g. Supabase, Neon)
+if (typeof process !== "undefined") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   adapter: PrismaPg | undefined;
@@ -10,15 +15,11 @@ function getAdapter(): PrismaPg {
   if (globalForPrisma.adapter) {
     return globalForPrisma.adapter;
   }
-  const connectionString = process.env.DATABASE_URL;
-  const isLocal = !connectionString || connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
-
   const adapter = new PrismaPg({
-    connectionString,
+    connectionString: process.env.DATABASE_URL,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
-    ssl: isLocal ? undefined : { rejectUnauthorized: false },
   });
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.adapter = adapter;
