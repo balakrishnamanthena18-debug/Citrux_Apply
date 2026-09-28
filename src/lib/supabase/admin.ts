@@ -8,7 +8,11 @@ let pgPool: pg.Pool | null = null;
 function getPgPool() {
   if (!pgPool) {
     const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
-    pgPool = new pg.Pool({ connectionString });
+    const isLocal = !connectionString || connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+    pgPool = new pg.Pool({
+      connectionString,
+      ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    });
   }
   return pgPool;
 }
