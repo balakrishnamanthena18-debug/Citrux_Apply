@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@/lib/supabase/server";
 import { withRlsContext } from "@/lib/db/rls";
 import { AuthenticationError, AuthorizationError } from "@/lib/errors";
@@ -21,9 +22,9 @@ export type AuthContext = AuthenticatedContext;
  * Resolves the authenticated user session from Supabase SSR cookies and fetches
  * active organization membership strictly within a transaction-local RLS context.
  * 
- * Rejects deactivated users, suspended accounts, and inactive memberships immediately.
+ * Wrapped in React cache() to deduplicate calls across Server Components, Layout, and Pages.
  */
-export async function getAuthenticatedContext(): Promise<AuthenticatedContext> {
+export const getAuthenticatedContext = cache(async (): Promise<AuthenticatedContext> => {
   // 1. Verify Supabase Session from secure HTTP-only cookies
   const supabase = await createServerClient();
   const {
@@ -67,7 +68,7 @@ export async function getAuthenticatedContext(): Promise<AuthenticatedContext> {
     status: membership.user.status,
     membershipStatus: membership.status,
   };
-}
+});
 
 export function requireRole(ctx: AuthenticatedContext, allowedRoles: Role[]): void {
   if (!allowedRoles.includes(ctx.role)) {

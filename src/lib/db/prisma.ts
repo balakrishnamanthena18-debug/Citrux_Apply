@@ -17,37 +17,25 @@ function getAdapter(): PrismaPg {
   }
   const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL,
-    max: 20,
+    max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 15000,
+    connectionTimeoutMillis: 5000,
   });
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.adapter = adapter;
-  }
+  globalForPrisma.adapter = adapter;
   return adapter;
 }
 
 function createPrismaClient(): PrismaClient {
-  return new PrismaClient({
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
+  const client = new PrismaClient({
     adapter: getAdapter(),
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
+  globalForPrisma.prisma = client;
+  return client;
 }
 
-// In dev, if schema models were generated while server was running, ensure client has latest models
-export const prisma = (() => {
-  if (
-    globalForPrisma.prisma &&
-    (globalForPrisma.prisma as any).conversation &&
-    (globalForPrisma.prisma as any).privacyRequest &&
-    (globalForPrisma.prisma as any).taskGovernancePolicy
-  ) {
-    return globalForPrisma.prisma;
-  }
-  const client = createPrismaClient();
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
-  }
-  return client;
-})();
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
