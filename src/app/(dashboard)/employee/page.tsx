@@ -2,6 +2,7 @@ import { getAuthenticatedContext, requireEmployeeOrAdmin } from "@/lib/auth/cont
 import { withRlsContext } from "@/lib/db/rls";
 import { ApplicationStatus, TaskStatus, TaskPriority } from "@/generated/prisma";
 import Link from "next/link";
+import { TelemetryGauge } from "@/components/ui/TelemetryGauge";
 
 interface WorkItem {
   id: string;
@@ -272,232 +273,252 @@ export default async function EmployeeWorkspacePage() {
   });
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-16">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* 1. Operational Workspace Header */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Employee Workspace</h1>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Employee Command Center</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              OPERATIONAL WORK DESK
+            </span>
+          </div>
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            Your operational command surface for today&apos;s assignments, candidate workflows, and submissions.
+            Daily triage queue for assignments, priority action items, and submission handoffs.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-white border border-slate-200 shadow-2xs text-slate-700">
-            📅 {formattedCurrentDate}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs">
+            {formattedCurrentDate}
           </span>
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-            Active Staff
-          </span>
+          <Link
+            href="/employee/application-log"
+            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition"
+          >
+            + Fast Intake
+          </Link>
         </div>
       </div>
 
-      {/* Primary Metric Strip (Derived strictly from authoritative database records) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Metric 1: My Tasks */}
+      {/* 2. Compact Operational Pulse Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Link
           href="/employee/tasks?scope=mine"
-          className="bg-white overflow-hidden rounded-lg border border-slate-200 p-5 shadow-2xs hover:border-slate-300 hover:shadow-xs transition group"
+          className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 transition group"
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">My Tasks</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
-            {data.myTasksCount}
-          </div>
-          <div className="mt-2 text-xs font-semibold text-slate-600 group-hover:text-blue-600 transition inline-flex items-center gap-1">
-            <span>View Task Board</span>
-            <span>→</span>
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">My Active Tasks</div>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <div className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
+              {data.myTasksCount}
+            </div>
+            <span className="text-[11px] font-semibold text-blue-600">
+              View Tasks →
+            </span>
           </div>
         </Link>
 
-        {/* Metric 2: My Candidates */}
         <Link
           href="/employee/candidates?scope=mine"
-          className="bg-white overflow-hidden rounded-lg border border-slate-200 p-5 shadow-2xs hover:border-slate-300 hover:shadow-xs transition group"
+          className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 transition group"
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">My Candidates</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
-            {data.myCandidatesCount}
-          </div>
-          <div className="mt-2 text-xs font-semibold text-slate-600 group-hover:text-blue-600 transition inline-flex items-center gap-1">
-            <span>View Candidate Directory</span>
-            <span>→</span>
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assigned Candidates</div>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <div className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
+              {data.myCandidatesCount}
+            </div>
+            <span className="text-[11px] font-semibold text-blue-600">
+              Directory →
+            </span>
           </div>
         </Link>
 
-        {/* Metric 3: Active Applications */}
         <Link
           href="/employee/applications?scope=mine"
-          className="bg-white overflow-hidden rounded-lg border border-slate-200 p-5 shadow-2xs hover:border-slate-300 hover:shadow-xs transition group"
+          className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 transition group"
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Applications</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
-            {data.activeApplicationsCount}
-          </div>
-          <div className="mt-2 text-xs font-semibold text-slate-600 group-hover:text-blue-600 transition inline-flex items-center gap-1">
-            <span>View Application Queue</span>
-            <span>→</span>
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Applications</div>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <div className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
+              {data.activeApplicationsCount}
+            </div>
+            <span className="text-[11px] font-semibold text-blue-600">
+              Queue →
+            </span>
           </div>
         </Link>
 
-        {/* Metric 4: Due Today */}
         <Link
           href="/employee/tasks?scope=mine&filter=due_today"
-          className={`overflow-hidden rounded-lg border p-5 shadow-2xs hover:shadow-xs transition group ${
-            data.dueTodayTasksCount > 0 ? "bg-amber-50/50 border-amber-200" : "bg-white border-slate-200"
+          className={`rounded-xl border p-4 shadow-xs transition group ${
+            data.dueTodayTasksCount > 0
+              ? "bg-amber-50/70 border-amber-200"
+              : "bg-white border-slate-200/90 hover:border-slate-300"
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-amber-900">Due Today / Overdue</div>
-          <div className="mt-2 text-2xl font-bold text-amber-950 group-hover:text-amber-800 transition">
-            {data.dueTodayTasksCount}
+          <div className="text-[10px] font-bold uppercase tracking-wider text-amber-900">
+            Due Today / Overdue
           </div>
-          <div className="mt-2 text-xs font-semibold text-amber-800 group-hover:underline inline-flex items-center gap-1">
-            <span>Triage Deadlines</span>
-            <span>→</span>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <div className={`text-2xl font-bold ${data.dueTodayTasksCount > 0 ? "text-amber-950" : "text-slate-900"}`}>
+              {data.dueTodayTasksCount}
+            </div>
+            <span className="text-[11px] font-semibold text-amber-800">
+              Triage SLA →
+            </span>
           </div>
         </Link>
       </div>
 
-      {/* Dominant Primary Section: MY WORK */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>MY WORK</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-900 text-white font-mono font-semibold">
-                {workItems.length}
-              </span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Work that needs your attention — prioritized by deadlines, blockers, and operational status.
-            </p>
+      {/* 3. Primary Operational Workspace: MY WORK QUEUE */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden transition-all">
+        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">My Work Queue</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-slate-900 text-white font-mono font-bold">
+              {workItems.length}
+            </span>
+            <span className="text-[11px] text-slate-500 hidden sm:inline">
+              — Prioritized by SLA deadlines and operational dependencies
+            </span>
           </div>
           <Link
             href="/employee/tasks?scope=mine"
-            className="text-xs font-bold text-blue-600 hover:text-blue-800 transition inline-flex items-center gap-1"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition inline-flex items-center gap-1"
           >
-            <span>View All My Work</span>
+            <span>Open Task Board</span>
             <span>→</span>
           </Link>
         </div>
 
         {workItems.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
-            <div className="text-3xl mb-2">🎉</div>
-            <h3 className="text-sm font-bold text-slate-800">You&apos;re all caught up</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            <div className="text-2xl mb-1 text-slate-400">✓</div>
+            <h3 className="text-sm font-bold text-slate-800">All caught up</h3>
+            <p className="text-xs text-slate-500 mt-0.5 max-w-sm mx-auto">
               No pending tasks or urgent application actions are assigned to you right now.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {workItems.slice(0, 8).map((item) => (
-              <div
-                key={item.id}
-                className="p-4 sm:p-5 hover:bg-slate-50/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Priority Tag */}
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                        item.priority === "URGENT" || item.isOverdue
-                          ? "bg-rose-100 text-rose-800 border border-rose-200"
-                          : item.priority === "HIGH" || item.isDueToday
-                          ? "bg-amber-100 text-amber-800 border border-amber-200"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {item.isOverdue ? "OVERDUE" : item.isDueToday ? "DUE TODAY" : item.priority}
-                    </span>
+          <div className="p-4 space-y-2.5">
+            {workItems.slice(0, 8).map((item, idx) => {
+              const isTopItem = idx === 0;
 
-                    {/* Status Tag */}
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                        item.status === "READY"
-                          ? "bg-sky-100 text-sky-900 border border-sky-200"
-                          : item.status === "IN_PROGRESS"
-                          ? "bg-blue-100 text-blue-800"
-                          : item.status === "BLOCKED" || item.status === "ESCALATED"
-                          ? "bg-rose-100 text-rose-800"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {item.status.replace(/_/g, " ")}
-                    </span>
-
-                    {/* Due Context */}
-                    {item.dueDateContext && (
+              return (
+                <div
+                  key={item.id}
+                  className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                    isTopItem
+                      ? "border-blue-200 bg-blue-50/40 hover:bg-blue-50/60"
+                      : "border-slate-200/80 bg-slate-50/30 hover:bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className={`text-xs font-medium ${
-                          item.isOverdue ? "text-rose-700 font-semibold" : item.isDueToday ? "text-amber-800 font-semibold" : "text-slate-500"
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          item.priority === "URGENT" || item.isOverdue
+                            ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            : item.priority === "HIGH" || item.isDueToday
+                            ? "bg-amber-100 text-amber-900 border border-amber-200"
+                            : "bg-slate-100 text-slate-700 border border-slate-200"
                         }`}
                       >
-                        ⏱ {item.dueDateContext}
+                        {item.isOverdue ? "OVERDUE" : item.isDueToday ? "DUE TODAY" : item.priority}
                       </span>
-                    )}
-                  </div>
 
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    <Link href={item.actionUrl} className="hover:text-blue-600 transition">
-                      {item.title}
-                    </Link>
-                  </h3>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-                    {item.candidateName && (
-                      <span>
-                        Candidate:{" "}
-                        {item.candidateId ? (
-                          <Link href={`/employee/candidates/${item.candidateId}`} className="font-medium text-slate-700 hover:underline">
-                            {item.candidateName}
-                          </Link>
-                        ) : (
-                          <strong className="text-slate-700 font-medium">{item.candidateName}</strong>
-                        )}
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          item.status === "READY"
+                            ? "bg-sky-100 text-sky-800 border border-sky-200"
+                            : item.status === "IN_PROGRESS"
+                            ? "bg-blue-100 text-blue-800 border border-blue-200"
+                            : item.status === "BLOCKED" || item.status === "ESCALATED"
+                            ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            : "bg-slate-100 text-slate-700 border border-slate-200"
+                        }`}
+                      >
+                        {item.status.replace(/_/g, " ")}
                       </span>
-                    )}
-                    {item.jobTitle && (
-                      <>
-                        <span>•</span>
-                        <span>
-                          Role: <strong className="text-slate-700 font-medium">{item.jobTitle}</strong>
-                          {item.companyName && ` @ ${item.companyName}`}
+
+                      {item.dueDateContext && (
+                        <span
+                          className={`text-[11px] font-medium ${
+                            item.isOverdue ? "text-rose-700 font-semibold" : item.isDueToday ? "text-amber-800 font-semibold" : "text-slate-500"
+                          }`}
+                        >
+                          ⏱ {item.dueDateContext}
                         </span>
-                      </>
-                    )}
+                      )}
+                    </div>
+
+                    <h3 className="text-xs font-bold text-slate-900">
+                      <Link href={item.actionUrl} className="hover:text-blue-600 transition">
+                        {item.title}
+                      </Link>
+                    </h3>
+
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                      {item.candidateName && (
+                        <span>
+                          Candidate:{" "}
+                          {item.candidateId ? (
+                            <Link href={`/employee/candidates/${item.candidateId}`} className="font-semibold text-slate-700 hover:underline">
+                              {item.candidateName}
+                            </Link>
+                          ) : (
+                            <strong className="text-slate-700 font-semibold">{item.candidateName}</strong>
+                          )}
+                        </span>
+                      )}
+                      {item.jobTitle && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            Role: <strong className="text-slate-700 font-semibold">{item.jobTitle}</strong>
+                            {item.companyName && ` @ ${item.companyName}`}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    <Link
+                      href={item.actionUrl}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1 ${
+                        isTopItem
+                          ? "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "bg-slate-900 hover:bg-slate-800 text-white"
+                      }`}
+                    >
+                      {item.actionLabel}
+                    </Link>
                   </div>
                 </div>
-
-                <div className="shrink-0 flex items-center gap-2">
-                  <Link
-                    href={item.actionUrl}
-                    className="px-4 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1"
-                  >
-                    {item.actionLabel}
-                  </Link>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Two-Column Operational Surface: Ready for Submission & Dependencies (Waiting On) */}
+      {/* 4. Two-Column Operational Surface: Ready for Submission & Dependencies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Section: READY FOR EXTERNAL SUBMISSION */}
-        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
-          <div className="px-5 py-4 border-b border-slate-100 bg-sky-50/50 flex justify-between items-center">
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col">
+          <div className="px-5 py-3.5 border-b border-slate-100 bg-sky-50/40 flex justify-between items-center">
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-600 animate-pulse" />
-                <h2 className="text-sm font-bold text-sky-950">READY FOR EXTERNAL SUBMISSION</h2>
+                <span className="w-2 h-2 rounded-full bg-sky-600" />
+                <h2 className="text-xs font-bold text-sky-950 uppercase tracking-wider">Ready for External Submission</h2>
               </div>
-              <p className="text-xs text-sky-900/80 mt-0.5">
+              <p className="text-[11px] text-sky-900/80 mt-0.5">
                 Approved packages ready for manual external submission on employer portals.
               </p>
             </div>
             <Link
               href="/employee/applications?status=READY"
-              className="text-xs font-semibold text-sky-700 hover:text-sky-900 hover:underline"
+              className="text-xs font-semibold text-sky-700 hover:text-sky-900 hover:underline shrink-0"
             >
               View All ({data.readyApplications.length}) →
             </Link>
@@ -505,7 +526,7 @@ export default async function EmployeeWorkspacePage() {
 
           <div className="divide-y divide-slate-100 flex-1">
             {data.readyApplications.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
+              <div className="p-6 text-center text-xs text-slate-500">
                 No applications currently waiting for external submission.
               </div>
             ) : (
@@ -515,19 +536,19 @@ export default async function EmployeeWorkspacePage() {
                   app.candidate.user.email;
 
                 return (
-                  <div key={app.id} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-4">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Link href={`/employee/candidates/${app.candidateId}`} className="font-semibold text-xs text-slate-900 hover:underline truncate">
+                  <div key={app.id} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Link href={`/employee/candidates/${app.candidateId}`} className="font-semibold text-slate-900 hover:underline truncate">
                           {candName}
                         </Link>
-                        <span className="text-xs text-slate-400">→</span>
-                        <span className="text-xs text-slate-700 font-medium truncate">{app.job.title}</span>
+                        <span className="text-slate-400">→</span>
+                        <span className="text-slate-700 font-medium truncate">{app.job.title}</span>
                       </div>
-                      <p className="text-xs text-slate-500 truncate">
+                      <p className="text-[11px] text-slate-500 truncate">
                         {app.job.companyName} {app.job.location && `• ${app.job.location}`}
                       </p>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                      <div className="text-[10px] text-slate-400 flex items-center gap-2">
                         <span>QA: <strong className="text-emerald-700 font-semibold">Passed</strong></span>
                         <span>•</span>
                         <span>Mode: <strong className="text-slate-700">{app.candidate.applicationAuthorizationMode}</strong></span>
@@ -536,9 +557,9 @@ export default async function EmployeeWorkspacePage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <Link
                         href={`/employee/applications/${app.id}`}
-                        className="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs transition"
+                        className="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs transition"
                       >
-                        Open Submission →
+                        Submit →
                       </Link>
                     </div>
                   </div>
@@ -549,11 +570,11 @@ export default async function EmployeeWorkspacePage() {
         </div>
 
         {/* Section: WAITING ON (Dependency Tracking) */}
-        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
-          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center">
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col">
+          <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/75 flex justify-between items-center">
             <div>
-              <h2 className="text-sm font-bold text-slate-900">WAITING ON (DEPENDENCY TRACKING)</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Dependencies & Attention Items</h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 Work waiting on candidate authorization, QA decisions, or blocker resolutions.
               </p>
             </div>
@@ -561,7 +582,7 @@ export default async function EmployeeWorkspacePage() {
 
           <div className="divide-y divide-slate-100 flex-1">
             {data.awaitingApprovalApps.length === 0 && data.waitingOrBlockedTasks.length === 0 && data.qaReviewApps.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
+              <div className="p-6 text-center text-xs text-slate-500">
                 No active dependencies blocking your workflow.
               </div>
             ) : (
@@ -573,10 +594,10 @@ export default async function EmployeeWorkspacePage() {
                     app.candidate.user.email;
 
                   return (
-                    <div key={`wait-cand-${app.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-4 text-xs">
+                    <div key={`wait-cand-${app.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
                       <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px] uppercase">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-bold text-[10px] uppercase">
                             Candidate Sign-off
                           </span>
                           <span className="font-semibold text-slate-900 truncate">{candName}</span>
@@ -602,10 +623,10 @@ export default async function EmployeeWorkspacePage() {
                     app.candidate.user.email;
 
                   return (
-                    <div key={`wait-qa-${app.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-4 text-xs">
+                    <div key={`wait-qa-${app.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
                       <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-900 font-bold text-[10px] uppercase">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-200 font-bold text-[10px] uppercase">
                             QA Decision
                           </span>
                           <span className="font-semibold text-slate-900 truncate">{app.job.title}</span>
@@ -626,10 +647,10 @@ export default async function EmployeeWorkspacePage() {
 
                 {/* 3. Blocked / Waiting Tasks */}
                 {data.waitingOrBlockedTasks.map((t) => (
-                  <div key={`wait-task-${t.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-4 text-xs">
+                  <div key={`wait-task-${t.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
                     <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px] uppercase">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 font-bold text-[10px] uppercase">
                           {t.status}
                         </span>
                         <span className="font-semibold text-slate-900 truncate">{t.title}</span>
@@ -652,12 +673,51 @@ export default async function EmployeeWorkspacePage() {
         </div>
       </div>
 
-      {/* Operational History: Recent Submissions Recorded by You */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center">
+      {/* 5. Authoritative Operational Summary Strip (Replacing fake score gauges) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <TelemetryGauge
+          displayValue={`${data.dueTodayTasksCount} Due Today`}
+          title="SLA Execution Status"
+          subtitle="Real-time monitoring of tasks due today and overdue items across your worklist."
+          category="Operational SLA"
+          color={data.dueTodayTasksCount > 0 ? "amber" : "blue"}
+          metrics={[
+            { label: "Overdue / Due Today", value: `${data.dueTodayTasksCount} tasks` },
+            { label: "Total Assigned Tasks", value: `${data.myTasksCount} active` },
+          ]}
+        />
+
+        <TelemetryGauge
+          displayValue={`${data.readyApplications.length} Ready`}
+          title="Submission Readiness"
+          subtitle="Packages with complete tailored materials and passed QA sign-off staged for application."
+          category="Pipeline Staging"
+          color="emerald"
+          metrics={[
+            { label: "Ready to Submit", value: `${data.readyApplications.length} packages` },
+            { label: "Assigned Candidates", value: `${data.myCandidatesCount} active` },
+          ]}
+        />
+
+        <TelemetryGauge
+          displayValue={`${data.myRecentSubmissions.length} Submitted`}
+          title="Submission Throughput"
+          subtitle="Audit-recorded external portal submissions executed by you."
+          category="Audit History"
+          color="indigo"
+          metrics={[
+            { label: "Recent Submissions", value: `${data.myRecentSubmissions.length} recorded` },
+            { label: "Active Applications", value: `${data.activeApplicationsCount} in queue` },
+          ]}
+        />
+      </div>
+
+      {/* 6. Operational History: Recent Submissions Recorded by You */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/75 flex justify-between items-center">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">MY RECORDED EXTERNAL SUBMISSIONS</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Authoritative audit log of external job portal submissions recorded by you.</p>
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">My Recorded External Submissions</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">Authoritative audit log of external job portal submissions recorded by you.</p>
           </div>
           <Link href="/employee/applications?status=SUBMITTED" className="text-xs font-semibold text-slate-700 hover:underline">
             All Submitted Applications →
@@ -666,7 +726,7 @@ export default async function EmployeeWorkspacePage() {
 
         <div className="divide-y divide-slate-100">
           {data.myRecentSubmissions.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">
+            <div className="p-6 text-center text-xs text-slate-500">
               No external submissions recorded by you yet.
             </div>
           ) : (
@@ -676,8 +736,8 @@ export default async function EmployeeWorkspacePage() {
                 sub.application.candidate.user.email;
 
               return (
-                <div key={sub.id} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-4 text-xs">
-                  <div className="space-y-1 min-w-0">
+                <div key={sub.id} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-slate-900">{sub.application.job.companyName}</span>
                       <span className="text-slate-400">·</span>
@@ -694,15 +754,15 @@ export default async function EmployeeWorkspacePage() {
 
                   <div className="flex items-center gap-2 shrink-0">
                     {sub.externalReference && (
-                      <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-semibold">
+                      <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-slate-700">
                         Ref: {sub.externalReference}
                       </span>
                     )}
                     <Link
-                      href={`/employee/applications/${sub.applicationId}`}
-                      className="px-3 py-1 rounded border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
+                      href={`/employee/applications/${sub.application.id}`}
+                      className="text-xs font-semibold text-blue-600 hover:underline"
                     >
-                      View
+                      View Record →
                     </Link>
                   </div>
                 </div>

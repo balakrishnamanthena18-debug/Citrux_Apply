@@ -213,43 +213,38 @@ export function getSupabaseAdminClient(): ReturnType<typeof createClient> {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     "placeholder-service-role-key";
 
-  const rawClient = createClient(url, serviceRoleKey, {
+  const client = createClient(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
 
-  // Provide enhanced auth.admin interface with direct Postgres fallback
-  const customAdmin = {
-    ...rawClient,
-    auth: {
-      ...rawClient.auth,
-      admin: {
-        ...rawClient.auth.admin,
-        createUser: async (args: { email: string; email_confirm?: boolean; user_metadata?: any }) => {
-          return createAuthUser({
-            email: args.email,
-            firstName: args.user_metadata?.firstName,
-            lastName: args.user_metadata?.lastName,
-          });
-        },
-        updateUserById: async (userId: string, args: { password?: string; email_confirm?: boolean }) => {
-          if (args.password) {
-            return updateAuthUserPassword(userId, args.password);
-          }
-          return rawClient.auth.admin.updateUserById(userId, args);
-        },
-        deleteUser: async (userId: string) => {
-          return deleteAuthUser(userId);
-        },
-        signOut: async (userId: string) => {
-          return revokeAuthUserSessions(userId);
-        },
-      },
+  // Attach enhanced auth.admin interface with direct Postgres fallback while preserving client prototype & getters (.storage, etc.)
+  const originalAdmin = client.auth.admin;
+  client.auth.admin = {
+    ...originalAdmin,
+    createUser: async (args: { email: string; email_confirm?: boolean; user_metadata?: any }) => {
+      return createAuthUser({
+        email: args.email,
+        firstName: args.user_metadata?.firstName,
+        lastName: args.user_metadata?.lastName,
+      });
     },
-  };
+    updateUserById: async (userId: string, args: { password?: string; email_confirm?: boolean }) => {
+      if (args.password) {
+        return updateAuthUserPassword(userId, args.password);
+      }
+      return originalAdmin.updateUserById(userId, args);
+    },
+    deleteUser: async (userId: string) => {
+      return deleteAuthUser(userId);
+    },
+    signOut: async (userId: string) => {
+      return revokeAuthUserSessions(userId);
+    },
+  } as any;
 
-  adminClient = customAdmin as any;
+  adminClient = client as any;
   return adminClient!;
 }

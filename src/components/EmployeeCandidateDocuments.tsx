@@ -8,6 +8,7 @@ import {
   getDocumentDownloadUrlAction,
   deleteCandidateDocumentAction,
 } from "@/lib/candidate/actions";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 
 interface CandidateDocumentItem {
   id: string;
@@ -48,6 +49,10 @@ export function EmployeeCandidateDocuments({
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Document Viewer State
+  const [viewingDocId, setViewingDocId] = useState<string | null>(null);
+  const [viewingDocMeta, setViewingDocMeta] = useState<{ title: string; mimeType: string; sizeBytes: number } | null>(null);
 
   const formatFileSize = (bytes: number) => {
     if (!bytes || bytes === 0) return "0 B";
@@ -267,10 +272,27 @@ export function EmployeeCandidateDocuments({
                 <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => handleDownload(doc.id, doc.title)}
-                    className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition"
+                    onClick={() => {
+                      setViewingDocId(doc.id);
+                      setViewingDocMeta({ title: doc.title, mimeType: doc.mimeType, sizeBytes: doc.fileSizeBytes });
+                    }}
+                    className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition inline-flex items-center gap-1"
                   >
-                    View / Download
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(doc.id, doc.title)}
+                    className="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium transition inline-flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download
                   </button>
                   <button
                     type="button"
@@ -317,9 +339,26 @@ export function EmployeeCandidateDocuments({
                 <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => handleDownload(doc.id, doc.title)}
-                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition"
+                    onClick={() => {
+                      setViewingDocId(doc.id);
+                      setViewingDocMeta({ title: doc.title, mimeType: doc.mimeType, sizeBytes: doc.fileSizeBytes });
+                    }}
+                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition inline-flex items-center gap-1"
                   >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(doc.id, doc.title)}
+                    className="px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium transition inline-flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
                     Download
                   </button>
                   <button
@@ -456,6 +495,20 @@ export function EmployeeCandidateDocuments({
             )}
           </div>
         </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {viewingDocId && (
+        <DocumentPreviewModal
+          documentId={viewingDocId}
+          documentTitle={viewingDocMeta?.title}
+          documentMimeType={viewingDocMeta?.mimeType}
+          documentSizeBytes={viewingDocMeta?.sizeBytes}
+          onClose={() => {
+            setViewingDocId(null);
+            setViewingDocMeta(null);
+          }}
+        />
       )}
     </div>
   );

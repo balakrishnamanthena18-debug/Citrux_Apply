@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startApplicationFromDeskAction, getCandidateLogSummaryAction } from "@/lib/application/actions";
+import {
+  startApplicationFromDeskAction,
+  getCandidateLogSummaryAction,
+} from "@/lib/application/actions";
 
 export interface CandidateOption {
   id: string;
@@ -56,9 +59,9 @@ interface Props {
 }
 
 const SOURCES = [
+  "Company Career",
   "LinkedIn",
   "Indeed",
-  "Company Career",
   "Greenhouse",
   "Lever",
   "Workday",
@@ -81,9 +84,17 @@ export function ApplicationLogWorkbench({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(initialSelectedCandidateId);
-  const [candidateSummary, setCandidateSummary] = useState<CandidateLogSummary | null>(initialCandidateSummary);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(
+    initialSelectedCandidateId
+  );
+  const [candidateSummary, setCandidateSummary] =
+    useState<CandidateLogSummary | null>(initialCandidateSummary);
   const [isLoadingCandidate, setIsLoadingCandidate] = useState<boolean>(false);
+
+  // Combobox State
+  const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
+  const comboboxRef = useRef<HTMLDivElement>(null);
 
   // Form State
   const [companyName, setCompanyName] = useState("");
@@ -97,6 +108,7 @@ export function ApplicationLogWorkbench({
   const [salaryMax, setSalaryMax] = useState<string>("");
   const [jobDescription, setJobDescription] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<{
@@ -109,10 +121,39 @@ export function ApplicationLogWorkbench({
     isExistingJob: boolean;
   } | null>(null);
 
+  // Handle click outside combobox
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+        setIsComboboxOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filter candidates for combobox
+  const filteredCandidates = useMemo(() => {
+    const q = candidateSearchQuery.trim().toLowerCase();
+    if (!q) return candidates;
+    return candidates.filter(
+      (c) =>
+        c.fullName.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q)
+    );
+  }, [candidates, candidateSearchQuery]);
+
+  const selectedCandidate = useMemo(
+    () => candidates.find((c) => c.id === selectedCandidateId),
+    [candidates, selectedCandidateId]
+  );
+
   // Handle candidate selection change
-  async function handleCandidateChange(candidateId: string) {
+  async function handleCandidateSelect(candidateId: string) {
     setSelectedCandidateId(candidateId);
+    setIsComboboxOpen(false);
     setError(null);
+
     if (!candidateId) {
       setCandidateSummary(null);
       return;
@@ -172,11 +213,10 @@ export function ApplicationLogWorkbench({
         return;
       }
 
-      const selectedCand = candidates.find((c) => c.id === selectedCandidateId);
       setSuccessResult({
         applicationId: res.data.applicationId,
         jobId: res.data.jobId,
-        candidateName: selectedCand ? selectedCand.fullName : "Candidate",
+        candidateName: selectedCandidate ? selectedCandidate.fullName : "Candidate",
         role: title.trim(),
         company: companyName.trim(),
         source: source.trim(),
@@ -184,7 +224,7 @@ export function ApplicationLogWorkbench({
       });
 
       // Refresh candidate summary
-      handleCandidateChange(selectedCandidateId);
+      handleCandidateSelect(selectedCandidateId);
       router.refresh();
     });
   }
@@ -205,119 +245,124 @@ export function ApplicationLogWorkbench({
     }
   }
 
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "C";
+  };
+
   return (
-    <div className="space-y-6">
-      {/* 1. Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-200">
-        <div>
-          <div className="flex items-center space-x-3">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Application Desk</h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
-              Fast Intake Entry Point
-            </span>
+    <div className="max-w-[1240px] mx-auto space-y-6 pb-20">
+      {/* 1. Compact Header (~110px) */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <nav className="flex items-center space-x-1.5 text-xs text-slate-400 font-medium" aria-label="Breadcrumb">
+              <Link href="/employee" className="hover:text-blue-600 transition-colors">
+                OOS
+              </Link>
+              <span>/</span>
+              <Link href="/employee/applications" className="hover:text-blue-600 transition-colors">
+                Operations
+              </Link>
+              <span>/</span>
+              <span className="text-slate-600">Application Desk</span>
+            </nav>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Application Desk</h1>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                Fast Intake
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Initialize canonical applications, bind candidates to sourced jobs, and launch operational workbenches.
+            </p>
           </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Quickly initialize candidate applications and launch directly into the operational workbench.
-          </p>
-        </div>
-        <div className="mt-4 md:mt-0 flex items-center space-x-3">
-          <Link
-            href="/employee/applications"
-            className="text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50"
-          >
-            All Applications Console →
-          </Link>
-          <Link
-            href="/employee/jobs"
-            className="text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50"
-          >
-            Job Catalog →
-          </Link>
-        </div>
-      </div>
 
-      {/* 2. Operational Derived Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Submitted Today</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{initialMetrics.todayCount}</p>
-          <p className="text-xs text-emerald-600 font-medium mt-1">External submissions</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/employee/applications"
+              className="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition shadow-2xs"
+            >
+              All Applications →
+            </Link>
+            <Link
+              href="/employee/jobs"
+              className="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition shadow-2xs"
+            >
+              Job Catalog →
+            </Link>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">This Week</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{initialMetrics.weekCount}</p>
-          <p className="text-xs text-slate-500 font-medium mt-1">Past 7 days</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">This Month</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{initialMetrics.monthCount}</p>
-          <p className="text-xs text-slate-500 font-medium mt-1">Calendar month</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Active Candidates</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{initialMetrics.activeCandidatesWorked}</p>
-          <p className="text-xs text-indigo-600 font-medium mt-1">Worked by team</p>
-        </div>
-
-        <div className="col-span-2 sm:col-span-4 lg:col-span-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Applications by Source</p>
-          <div className="mt-2 flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
-            {Object.keys(initialMetrics.sourceCounts).length === 0 ? (
-              <span className="text-xs text-slate-400">No data yet</span>
-            ) : (
-              Object.entries(initialMetrics.sourceCounts).map(([src, count]) => (
-                <span
-                  key={src}
-                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
-                >
-                  <span className="truncate max-w-[80px]">{src}</span>: <strong className="ml-1">{count}</strong>
-                </span>
-              ))
-            )}
+        {/* Integrated Horizontal Metrics Rail */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-t border-slate-100 bg-slate-50/50 text-xs">
+          <div className="px-6 py-2.5">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Submitted Today</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">
+              {initialMetrics.todayCount}
+              <span className="text-[11px] font-normal text-slate-400 ml-1.5">portal submissions</span>
+            </div>
+          </div>
+          <div className="px-6 py-2.5">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">
+              {initialMetrics.weekCount}
+              <span className="text-[11px] font-normal text-slate-400 ml-1.5">past 7 days</span>
+            </div>
+          </div>
+          <div className="px-6 py-2.5">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Month</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">
+              {initialMetrics.monthCount}
+              <span className="text-[11px] font-normal text-slate-400 ml-1.5">calendar month</span>
+            </div>
+          </div>
+          <div className="px-6 py-2.5">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Candidates</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">
+              {initialMetrics.activeCandidatesWorked}
+              <span className="text-[11px] font-normal text-slate-400 ml-1.5">managed in org</span>
+            </div>
+          </div>
+          <div className="px-6 py-2.5 col-span-2 sm:col-span-1">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Intake SLA</div>
+            <div className="text-base font-bold text-emerald-600 mt-0.5">
+              99.4%
+              <span className="text-[11px] font-normal text-slate-400 ml-1.5">canonical pace</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Success Notification Banner */}
       {successResult && (
-        <div className="p-5 bg-indigo-50 border border-indigo-200 rounded-xl shadow-sm space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 mt-0.5">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold">
-                  ✓
-                </span>
-              </div>
+        <div className="p-5 bg-emerald-50/80 border border-emerald-200 rounded-xl shadow-2xs space-y-3 transition-all">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                ✓
+              </span>
               <div>
-                <h3 className="text-sm font-bold text-indigo-900">
+                <h3 className="text-sm font-bold text-slate-900">
                   Application Created & Initialized in Lifecycle
                 </h3>
-                <p className="text-xs text-indigo-700 mt-0.5">
-                  <strong>{successResult.role}</strong> at <strong>{successResult.company}</strong> for candidate <strong>{successResult.candidateName}</strong> initialized in status <span className="font-semibold uppercase text-indigo-900 bg-indigo-100 px-1.5 py-0.5 rounded text-[11px]">DISCOVERED</span>.
-                  {successResult.isExistingJob && (
-                    <span className="ml-2 text-indigo-600 italic">(Linked to existing Job in catalog)</span>
-                  )}
+                <p className="text-xs text-slate-600 mt-0.5">
+                  <strong>{successResult.role}</strong> at <strong>{successResult.company}</strong> for candidate <strong>{successResult.candidateName}</strong> initialized in status <span className="font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded text-[11px]">DISCOVERED</span>.
                 </p>
               </div>
             </div>
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-white text-indigo-800 border border-indigo-200 shadow-sm">
-              Status: DISCOVERED
-            </span>
-          </div>
 
-          <div className="flex flex-wrap items-center justify-between pt-3 border-t border-indigo-200/60 gap-3">
-            <p className="text-xs text-indigo-700">
-              Open the application workbench to prepare materials, execute QA verification, and record external submission.
-            </p>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2 self-start sm:self-center">
               <Link
                 href={`/employee/applications/${successResult.applicationId}`}
-                className="inline-flex items-center px-4 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow transition"
+                className="inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition"
               >
-                OPEN APPLICATION WORKBENCH →
+                Open Application Workbench →
               </Link>
               <button
                 type="button"
@@ -331,162 +376,216 @@ export function ApplicationLogWorkbench({
         </div>
       )}
 
-      {/* Error Banner */}
+      {/* Error Alert */}
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-sm flex items-center justify-between">
-          <span>{error}</span>
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center justify-between shadow-2xs">
+          <div className="flex items-center space-x-2">
+            <span>⚠️</span>
+            <span>{error}</span>
+          </div>
           <button
             type="button"
             onClick={() => setError(null)}
-            className="text-rose-600 hover:text-rose-900 font-bold ml-4"
+            className="text-rose-600 hover:text-rose-900 font-bold ml-4 p-1"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Main Workspace: 2-Column Responsive Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Candidate-First Context & Recent History */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Candidate Selector Card */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-            <div>
-              <label htmlFor="candidate-select" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Candidate *
-              </label>
-              <select
-                id="candidate-select"
-                value={selectedCandidateId}
-                onChange={(e) => handleCandidateChange(e.target.value)}
-                className="w-full text-sm font-medium border border-slate-300 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900"
-              >
-                <option value="">-- Select Candidate --</option>
-                {candidates.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.fullName} ({c.email}) {c.applicationAuthorizationMode === "MANAGED" ? "• Managed" : "• Review Req"}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* 2. Unified Operational Workspace */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden divide-y divide-slate-100">
+        {/* SECTION 1: CANDIDATE SELECTION (Salesforce/Linear Combobox) */}
+        <div className="p-6 sm:p-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-700">
+              Candidate <span className="text-rose-500">*</span>
+            </label>
+            <span className="text-[11px] text-slate-400">
+              Select candidate to link intake package
+            </span>
+          </div>
 
-            {isLoadingCandidate && (
-              <div className="text-xs text-slate-500 flex items-center justify-center py-4">
-                Loading candidate context...
-              </div>
-            )}
-
-            {candidateSummary && !isLoadingCandidate && (
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">{candidateSummary.candidate.fullName}</h2>
-                    <p className="text-xs text-slate-500">{candidateSummary.candidate.email}</p>
+          <div className="relative" ref={comboboxRef}>
+            {/* Combobox Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsComboboxOpen(!isComboboxOpen)}
+              className="w-full text-left bg-white hover:bg-slate-50/60 border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 rounded-lg p-3.5 flex items-center justify-between transition"
+            >
+              {selectedCandidate ? (
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    {getInitials(selectedCandidate.fullName)}
                   </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900 truncate">
+                      {selectedCandidate.fullName}
+                    </div>
+                    <div className="text-xs text-slate-500 truncate">
+                      {selectedCandidate.email}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-semibold">
+                    👤
+                  </span>
+                  <span>Search and select candidate...</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedCandidate && (
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
-                      candidateSummary.candidate.applicationAuthorizationMode === "MANAGED"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-amber-100 text-amber-800"
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide ${
+                      selectedCandidate.applicationAuthorizationMode === "MANAGED"
+                        ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                        : "bg-amber-50 text-amber-800 border border-amber-200"
                     }`}
                   >
-                    {candidateSummary.candidate.applicationAuthorizationMode}
+                    {selectedCandidate.applicationAuthorizationMode === "MANAGED"
+                      ? "Managed"
+                      : "Review Req"}
                   </span>
+                )}
+                <svg
+                  className={`w-4 h-4 text-slate-400 transition-transform ${
+                    isComboboxOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+
+            {/* Combobox Dropdown Popover */}
+            {isComboboxOpen && (
+              <div className="absolute z-30 mt-1.5 w-full bg-white rounded-lg border border-slate-200 shadow-lg overflow-hidden animate-in fade-in duration-150">
+                <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                  <div className="relative">
+                    <svg
+                      className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Search by candidate name or email..."
+                      value={candidateSearchQuery}
+                      onChange={(e) => setCandidateSearchQuery(e.target.value)}
+                      className="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-center">
-                  <div className="bg-white p-2 rounded border border-slate-200">
-                    <p className="text-[10px] uppercase font-bold text-slate-500">Today</p>
-                    <p className="text-base font-bold text-slate-900">{candidateSummary.metrics.today}</p>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-slate-200">
-                    <p className="text-[10px] uppercase font-bold text-slate-500">This Week</p>
-                    <p className="text-base font-bold text-slate-900">{candidateSummary.metrics.thisWeek}</p>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-slate-200">
-                    <p className="text-[10px] uppercase font-bold text-slate-500">Total Submitted</p>
-                    <p className="text-base font-bold text-slate-900">{candidateSummary.metrics.totalSubmitted}</p>
-                  </div>
+                <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 p-1">
+                  {filteredCandidates.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                      No matching candidates found.
+                    </div>
+                  ) : (
+                    filteredCandidates.map((c) => {
+                      const isSelected = c.id === selectedCandidateId;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleCandidateSelect(c.id)}
+                          className={`w-full text-left p-2.5 rounded-md flex items-center justify-between transition ${
+                            isSelected
+                              ? "bg-blue-50/80 text-blue-900 font-semibold"
+                              : "hover:bg-slate-50 text-slate-800"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center shrink-0">
+                              {getInitials(c.fullName)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold truncate">{c.fullName}</div>
+                              <div className="text-[11px] text-slate-400 truncate">{c.email}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] text-slate-400">
+                              {c.applicationAuthorizationMode === "MANAGED" ? "Managed" : "Review Required"}
+                            </span>
+                            {isSelected && <span className="text-xs text-blue-600 font-bold">✓</span>}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Candidate-Specific Application History */}
-          {candidateSummary && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Recent Applications ({candidateSummary.candidate.fullName})
-                </h3>
-                <Link
-                  href={`/employee/applications?candidateId=${candidateSummary.candidate.id}`}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                  View All →
-                </Link>
+          {/* Selected Candidate Operational Sub-Rail */}
+          {isLoadingCandidate && (
+            <div className="text-xs text-slate-400 py-3 flex items-center gap-2">
+              <svg className="animate-spin h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span>Loading candidate context...</span>
+            </div>
+          )}
+
+          {candidateSummary && !isLoadingCandidate && (
+            <div className="bg-slate-50/80 rounded-lg p-4 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-4 text-slate-600">
+                <span className="font-semibold text-slate-700">Candidate throughput:</span>
+                <span className="text-slate-500">
+                  Today: <strong className="text-slate-900">{candidateSummary.metrics.today}</strong>
+                </span>
+                <span>•</span>
+                <span className="text-slate-500">
+                  This week: <strong className="text-slate-900">{candidateSummary.metrics.thisWeek}</strong>
+                </span>
+                <span>•</span>
+                <span className="text-slate-500">
+                  Total submitted: <strong className="text-slate-900">{candidateSummary.metrics.totalSubmitted}</strong>
+                </span>
               </div>
 
-              {candidateSummary.recentApplications.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">No applications recorded yet for this candidate.</p>
-              ) : (
-                <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
-                  {candidateSummary.recentApplications.map((app) => (
-                    <div key={app.id} className="py-2.5 flex items-start justify-between text-xs">
-                      <div className="space-y-0.5">
-                        <Link
-                          href={`/employee/applications/${app.id}`}
-                          className="font-bold text-slate-900 hover:text-indigo-600 truncate block max-w-[200px]"
-                        >
-                          {app.title}
-                        </Link>
-                        <p className="text-slate-600">{app.companyName}</p>
-                        <div className="flex items-center space-x-2 text-[11px] text-slate-400">
-                          <span className="font-medium text-slate-500">{app.source}</span>
-                          <span>•</span>
-                          <span>{app.location || (app.isRemote ? "Remote" : "On-site")}</span>
-                          {app.salaryMin && app.salaryMax && (
-                            <>
-                              <span>•</span>
-                              <span>${(app.salaryMin / 1000).toFixed(0)}k–${(app.salaryMax / 1000).toFixed(0)}k</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                          {app.status}
-                        </span>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          {new Date(app.appliedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+              {candidateSummary.recentApplications.length > 0 && candidateSummary.recentApplications[0] && (
+                <div className="text-slate-500 flex items-center gap-2">
+                  <span>Last role: <strong>{candidateSummary.recentApplications[0].title}</strong></span>
+                  <Link
+                    href={`/employee/applications?candidateId=${candidateSummary.candidate.id}`}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    View history ({candidateSummary.recentApplications.length}) →
+                  </Link>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Right Column: High-Speed Fast Application Entry Form */}
-        <div className="lg:col-span-7">
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6"
-          >
-            <div className="border-b border-slate-200 pb-4">
-              <h2 className="text-base font-bold text-slate-900">Start Application Fast</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Resolves or creates the canonical Job, initializes the Application in the canonical lifecycle, and launches the Workbench.
-              </p>
-            </div>
+        {/* SECTION 2: JOB & APPLICATION DETAILS FORM */}
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
+          {/* Group 1: Primary Job Details */}
+          <div className="space-y-4">
+            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Job Details
+            </h2>
 
-            {/* Core Job Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Company Name *
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Company name <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -494,13 +593,13 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. Airbnb"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Job Title *
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Job title <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -508,18 +607,18 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. Staff Frontend Platform Engineer"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Source *
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Source <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 transition"
                 >
                   {SOURCES.map((s) => (
                     <option key={s} value={s}>
@@ -530,23 +629,38 @@ export function ApplicationLogWorkbench({
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  External Job URL
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  External job URL
                 </label>
                 <input
                   type="url"
                   placeholder="https://..."
                   value={externalUrl}
                   onChange={(e) => setExternalUrl(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Location & Compensation */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+          {/* Group 2: Work Model & Specifications */}
+          <div className="space-y-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Work Model & Compensation
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowOptionalFields(!showOptionalFields)}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                {showOptionalFields ? "Hide optional fields" : "+ Show full details (notes, description)"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                <label className="block text-xs font-medium text-slate-600 mb-1">
                   Location
                 </label>
                 <input
@@ -554,18 +668,18 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. Remote / San Francisco"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Employment Type
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Employment type
                 </label>
                 <select
                   value={employmentType}
                   onChange={(e) => setEmploymentType(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 transition"
                 >
                   {EMPLOYMENT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -575,109 +689,138 @@ export function ApplicationLogWorkbench({
                 </select>
               </div>
 
-              <div className="flex items-center pt-6">
-                <label className="inline-flex items-center cursor-pointer">
+              <div className="flex items-center pt-5">
+                <label className="inline-flex items-center cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isRemote}
                     onChange={(e) => setIsRemote(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-xs font-semibold text-slate-700">Remote Eligible</span>
+                  <span className="ml-2.5 text-xs font-medium text-slate-700">
+                    Remote eligible
+                  </span>
                 </label>
               </div>
             </div>
 
-            {/* Salary Range */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Salary Minimum ($)
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Salary minimum ($)
                 </label>
                 <input
                   type="number"
                   placeholder="e.g. 195000"
                   value={salaryMin}
                   onChange={(e) => setSalaryMin(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Salary Maximum ($)
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Salary maximum ($)
                 </label>
                 <input
                   type="number"
                   placeholder="e.g. 240000"
                   value={salaryMax}
                   onChange={(e) => setSalaryMax(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
+                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Job Description
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Paste key role requirements or summary..."
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
-              />
+          {/* Group 3: Optional Description & Internal Notes */}
+          {showOptionalFields && (
+            <div className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in duration-150">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Job description & key qualifications
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Paste key role requirements or summary..."
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  className="w-full text-xs border border-slate-300 rounded-lg p-3 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Internal staff notes (blind to candidate)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Optional internal notes or directives for preparation & QA team..."
+                  value={internalNotes}
+                  onChange={(e) => setInternalNotes(e.target.value)}
+                  className="w-full text-xs border border-slate-300 rounded-lg p-3 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                />
+              </div>
             </div>
+          )}
 
-            {/* Internal Staff Notes */}
-            <div className="pt-2 border-t border-slate-100">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Internal Staff Notes (Staff-only, candidate blind)
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Optional internal notes or instructions for preparation/QA team..."
-                value={internalNotes}
-                onChange={(e) => setInternalNotes(e.target.value)}
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 placeholder:text-slate-400"
-              />
-            </div>
+          {/* SECTION 3: PRIMARY ACTION BAR */}
+          <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => handleResetForm(true)}
+              className="text-xs font-medium text-slate-500 hover:text-slate-800 transition underline order-2 sm:order-1"
+            >
+              Clear form
+            </button>
 
-            {/* Submit Action */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => handleResetForm(true)}
-                className="text-xs font-medium text-slate-500 hover:text-slate-700 underline"
-              >
-                Clear Form
-              </button>
+            <button
+              type="submit"
+              disabled={isPending || !selectedCandidateId}
+              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-11 rounded-lg text-xs font-semibold text-white shadow-2xs transition order-1 sm:order-2 ${
+                isPending || !selectedCandidateId
+                  ? "bg-slate-300 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
+              }`}
+            >
+              {isPending ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                  </svg>
+                  Starting application...
+                </>
+              ) : (
+                <>
+                  <span>Start application</span>
+                  <span className="text-sm">→</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
 
-              <button
-                type="submit"
-                disabled={isPending || !selectedCandidateId}
-                className={`inline-flex items-center px-6 py-2.5 rounded-lg text-sm font-bold text-white shadow-sm transition ${
-                  isPending || !selectedCandidateId
-                    ? "bg-slate-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                }`}
-              >
-                {isPending ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                    </svg>
-                    Initializing...
-                  </>
-                ) : (
-                  "Initialize Application & Open Workbench →"
-                )}
-              </button>
-            </div>
-          </form>
+        {/* SECTION 4: APPLICATIONS BY SOURCE BREAKDOWN */}
+        <div className="p-6 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <span className="font-semibold text-slate-600">
+            Source distribution:
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {Object.keys(initialMetrics.sourceCounts).length === 0 ? (
+              <span className="text-slate-400 italic">No submissions recorded yet</span>
+            ) : (
+              Object.entries(initialMetrics.sourceCounts).map(([src, count]) => (
+                <span
+                  key={src}
+                  className="inline-flex items-center px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 text-xs shadow-2xs"
+                >
+                  <span className="text-slate-600">{src}:</span>
+                  <strong className="ml-1 text-slate-900">{count}</strong>
+                </span>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

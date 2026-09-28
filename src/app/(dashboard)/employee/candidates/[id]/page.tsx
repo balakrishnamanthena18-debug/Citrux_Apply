@@ -9,6 +9,7 @@ import {
 } from "@/lib/candidate/actions";
 import { InternalNotesWidget } from "@/components/InternalNotesWidget";
 import { EmployeeCandidateDocuments } from "@/components/EmployeeCandidateDocuments";
+import { RecordHeader } from "@/components/ui/RecordHeader";
 
 export default async function EmployeeCandidateDetailPage({
   params,
@@ -70,78 +71,93 @@ export default async function EmployeeCandidateDetailPage({
 
   const locationStr = [candidate.city, candidate.state, candidate.country].filter(Boolean).join(", ");
 
+  const assignedStaffName = candidate.assignedEmployee
+    ? [candidate.assignedEmployee.firstName, candidate.assignedEmployee.lastName].filter(Boolean).join(" ") || candidate.assignedEmployee.email
+    : "Unassigned";
+
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-16">
-      {/* Top Breadcrumb & Header Banner */}
-      <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-        <div>
-          <Link
-            href="/employee/candidates"
-            className="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center gap-1"
-          >
-            ← Back to Candidate Directory
-          </Link>
-        </div>
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{candidateName}</h1>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  candidate.status === "ACTIVE"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : candidate.status === "ONBOARDING"
-                    ? "bg-blue-100 text-blue-800"
-                    : candidate.status === "INACTIVE"
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-slate-100 text-slate-800"
-                }`}
-              >
-                {candidate.status}
-              </span>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  candidate.verificationStatus === "VERIFIED"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : candidate.verificationStatus === "PENDING_REVIEW"
-                    ? "bg-amber-100 text-amber-800"
-                    : candidate.verificationStatus === "REJECTED"
-                    ? "bg-rose-100 text-rose-800"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Verification: {candidate.verificationStatus.replace("_", " ")}
-              </span>
-            </div>
-
-            <div className="mt-1 flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-              {candidate.headline && <span className="font-medium text-slate-700">{candidate.headline}</span>}
-              {locationStr && (
-                <>
-                  <span>•</span>
-                  <span>{locationStr}</span>
-                </>
-              )}
-              <span>•</span>
-              <span>{candidate.user.email}</span>
-              {candidate.assignedEmployee && (
-                <>
-                  <span>•</span>
-                  <span>
-                    Assigned to:{" "}
-                    <strong className="text-slate-700">
-                      {[candidate.assignedEmployee.firstName, candidate.assignedEmployee.lastName]
-                        .filter(Boolean)
-                        .join(" ") || candidate.assignedEmployee.email}
-                    </strong>
-                  </span>
-                </>
-              )}
-            </div>
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* 1. Candidate 360 Record Header */}
+      <RecordHeader
+        breadcrumbs={[
+          { label: "Candidates Directory", href: "/employee/candidates" },
+          { label: candidateName },
+        ]}
+        title={candidateName}
+        subtitle={
+          <>
+            {candidate.headline && <span>{candidate.headline}</span>}
+            {locationStr && (
+              <>
+                <span>•</span>
+                <span>{locationStr}</span>
+              </>
+            )}
+            <span>•</span>
+            <span>{candidate.user.email}</span>
+          </>
+        }
+        statusBadge={
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                candidate.status === "ACTIVE"
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : candidate.status === "ONBOARDING"
+                  ? "bg-blue-50 text-blue-800 border border-blue-200"
+                  : candidate.status === "INACTIVE"
+                  ? "bg-amber-50 text-amber-800 border border-amber-200"
+                  : "bg-slate-100 text-slate-800 border border-slate-200"
+              }`}
+            >
+              {candidate.status}
+            </span>
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                candidate.verificationStatus === "VERIFIED"
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : candidate.verificationStatus === "PENDING_REVIEW"
+                  ? "bg-amber-50 text-amber-800 border border-amber-200"
+                  : candidate.verificationStatus === "REJECTED"
+                  ? "bg-rose-50 text-rose-800 border border-rose-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
+              }`}
+            >
+              Verification: {candidate.verificationStatus.replace("_", " ")}
+            </span>
           </div>
-        </div>
-      </div>
+        }
+        metaItems={[
+          {
+            label: "Specialist",
+            value: assignedStaffName,
+          },
+          {
+            label: "Auth Mode",
+            value: (
+              <span className={`font-semibold ${candidate.applicationAuthorizationMode === "MANAGED" ? "text-indigo-700" : "text-slate-700"}`}>
+                {candidate.applicationAuthorizationMode}
+              </span>
+            ),
+          },
+          {
+            label: "Work Auth",
+            value: candidate.workAuthorization.replace(/_/g, " "),
+          },
+          {
+            label: "Remote Pref",
+            value: candidate.remotePreference.replace(/_/g, " "),
+          },
+          {
+            label: "Applications",
+            value: `${candidate.applications.length} Staged`,
+          },
+          {
+            label: "Active Tasks",
+            value: `${candidate.tasks.length} Assigned`,
+          },
+        ]}
+      />
 
       {/* Staff Operational Controls Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

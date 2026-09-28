@@ -109,7 +109,18 @@ export const CandidateDocumentUploadSchema = z.object({
   documentType: z.enum(["RESUME", "COVER_LETTER", "TRANSCRIPT", "CERTIFICATE", "OTHER"]),
   title: z.string().trim().min(1, "Document title is required").max(255),
   storagePath: z.string().trim().min(1).max(1024),
-  fileSizeBytes: z.number().int().positive().max(50 * 1024 * 1024), // 50MB max
+  fileSizeBytes: z.number().int().positive().max(50 * 1024 * 1024, "File size exceeds 50 MB limit"),
+  mimeType: z.string().trim().min(1).max(100),
+  isDefault: z.boolean().default(false),
+});
+
+export const CandidateDocumentUploadSelfSchema = z.object({
+  documentId: z.string().uuid("Invalid document ID"),
+  filename: z.string().trim().min(1, "Filename is required").max(255),
+  documentType: z.enum(["RESUME", "COVER_LETTER", "TRANSCRIPT", "CERTIFICATE", "OTHER"]),
+  title: z.string().trim().min(1, "Document title is required").max(255),
+  storagePath: z.string().trim().max(1024).optional(), // Client storagePath is ignored; server derives canonical path
+  fileSizeBytes: z.number().int().positive().max(50 * 1024 * 1024, "File size exceeds 50 MB limit"),
   mimeType: z.string().trim().min(1).max(100),
   isDefault: z.boolean().default(false),
 });
@@ -129,4 +140,5 @@ export type CandidateAssignmentInput = z.input<typeof CandidateAssignmentSchema>
 export type CandidateVerificationInput = z.input<typeof CandidateVerificationSchema>;
 export type CandidateStatusTransitionInput = z.input<typeof CandidateStatusTransitionSchema>;
 export type CandidateDocumentUploadInput = z.input<typeof CandidateDocumentUploadSchema>;
+export type CandidateDocumentUploadSelfInput = z.input<typeof CandidateDocumentUploadSelfSchema>;
 export type UpdateCandidateAuthorizationModeInput = z.input<typeof UpdateCandidateAuthorizationModeSchema>;

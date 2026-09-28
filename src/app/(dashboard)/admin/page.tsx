@@ -317,21 +317,23 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Operations Overview
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Here&apos;s the current operational status of your organization.
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Admin Command Center
+            </h1>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-500 font-medium">
+            Executive operations, organizational throughput signals, team workload distribution, and audit telemetry.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-white text-slate-700 border border-slate-200/90 shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-white text-slate-700 border border-slate-200 shadow-2xs">
             {currentDate}
           </span>
-          <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-slate-900 text-white shadow-xs">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-900 text-white shadow-2xs">
             {dashboardData.organizationName}
           </span>
         </div>

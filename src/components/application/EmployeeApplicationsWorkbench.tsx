@@ -402,16 +402,16 @@ export function EmployeeApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleQueueChange("all")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "all"
-              ? "bg-slate-900 text-white border-slate-900"
-              : "bg-white border-slate-200 hover:border-slate-300"
+              ? "bg-slate-900 text-white border-slate-900 shadow-md shadow-slate-900/10"
+              : "bg-white border-slate-200/90 hover:border-slate-300"
           }`}
         >
-          <div className={`text-[10px] font-semibold uppercase tracking-wider ${queue === "all" ? "text-slate-300" : "text-slate-500"}`}>
-            Total Applications
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "all" ? "text-slate-300" : "text-slate-400"}`}>
+            Total Pipeline
           </div>
-          <div className={`text-xl font-bold mt-1 ${queue === "all" ? "text-white" : "text-slate-900"}`}>
+          <div className={`text-2xl font-bold mt-1 ${queue === "all" ? "text-white" : "text-slate-900"}`}>
             {queueCounts.total}
           </div>
         </button>
@@ -419,17 +419,17 @@ export function EmployeeApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleQueueChange("ready")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "ready"
-              ? "bg-sky-600 text-white border-sky-600"
-              : "bg-white border-slate-200 hover:border-sky-300"
+              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-md shadow-blue-500/20"
+              : "bg-white border-slate-200/90 hover:border-blue-300"
           }`}
         >
-          <div className={`text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5 ${queue === "ready" ? "text-sky-100" : "text-sky-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${queue === "ready" ? "bg-white" : "bg-sky-500 animate-pulse"}`} />
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${queue === "ready" ? "text-blue-100" : "text-blue-600"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${queue === "ready" ? "bg-white" : "bg-blue-600 animate-pulse"}`} />
             Ready to Apply
           </div>
-          <div className={`text-xl font-bold mt-1 ${queue === "ready" ? "text-white" : "text-sky-950"}`}>
+          <div className={`text-2xl font-bold mt-1 ${queue === "ready" ? "text-white" : "text-blue-950"}`}>
             {queueCounts.ready}
           </div>
         </button>
@@ -437,16 +437,16 @@ export function EmployeeApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleQueueChange("in_progress")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "in_progress"
-              ? "bg-indigo-600 text-white border-indigo-600"
-              : "bg-white border-slate-200 hover:border-indigo-300"
+              ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20"
+              : "bg-white border-slate-200/90 hover:border-indigo-300"
           }`}
         >
-          <div className={`text-[10px] font-semibold uppercase tracking-wider ${queue === "in_progress" ? "text-indigo-100" : "text-indigo-700"}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "in_progress" ? "text-indigo-100" : "text-indigo-700"}`}>
             In Progress
           </div>
-          <div className={`text-xl font-bold mt-1 ${queue === "in_progress" ? "text-white" : "text-indigo-950"}`}>
+          <div className={`text-2xl font-bold mt-1 ${queue === "in_progress" ? "text-white" : "text-indigo-950"}`}>
             {queueCounts.inProgress}
           </div>
         </button>
@@ -454,16 +454,16 @@ export function EmployeeApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleQueueChange("submitted")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "submitted"
-              ? "bg-emerald-700 text-white border-emerald-700"
-              : "bg-white border-slate-200 hover:border-emerald-300"
+              ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20"
+              : "bg-white border-slate-200/90 hover:border-emerald-300"
           }`}
         >
-          <div className={`text-[10px] font-semibold uppercase tracking-wider ${queue === "submitted" ? "text-emerald-100" : "text-emerald-700"}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "submitted" ? "text-emerald-100" : "text-emerald-700"}`}>
             Submitted
           </div>
-          <div className={`text-xl font-bold mt-1 ${queue === "submitted" ? "text-white" : "text-emerald-950"}`}>
+          <div className={`text-2xl font-bold mt-1 ${queue === "submitted" ? "text-white" : "text-emerald-950"}`}>
             {queueCounts.submitted}
           </div>
         </button>
@@ -474,16 +474,16 @@ export function EmployeeApplicationsWorkbench({
             handleQueueChange("needs_attention");
             setStatusFilter("AWAITING_APPROVAL");
           }}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             statusFilter === "AWAITING_APPROVAL"
-              ? "bg-amber-600 text-white border-amber-600"
-              : "bg-white border-slate-200 hover:border-amber-300"
+              ? "bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20"
+              : "bg-white border-slate-200/90 hover:border-amber-300"
           }`}
         >
-          <div className={`text-[10px] font-semibold uppercase tracking-wider ${statusFilter === "AWAITING_APPROVAL" ? "text-amber-100" : "text-amber-700"}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${statusFilter === "AWAITING_APPROVAL" ? "text-amber-100" : "text-amber-700"}`}>
             Awaiting Candidate
           </div>
-          <div className={`text-xl font-bold mt-1 ${statusFilter === "AWAITING_APPROVAL" ? "text-white" : "text-amber-950"}`}>
+          <div className={`text-2xl font-bold mt-1 ${statusFilter === "AWAITING_APPROVAL" ? "text-white" : "text-amber-950"}`}>
             {applications.filter((a) => a.status === "AWAITING_APPROVAL").length}
           </div>
         </button>
@@ -491,16 +491,16 @@ export function EmployeeApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleQueueChange("needs_attention")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "needs_attention" && statusFilter !== "AWAITING_APPROVAL"
-              ? "bg-rose-700 text-white border-rose-700"
-              : "bg-white border-slate-200 hover:border-rose-300"
+              ? "bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-500/20"
+              : "bg-white border-slate-200/90 hover:border-rose-300"
           }`}
         >
-          <div className={`text-[10px] font-semibold uppercase tracking-wider ${queue === "needs_attention" ? "text-rose-100" : "text-rose-700"}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "needs_attention" ? "text-rose-100" : "text-rose-700"}`}>
             Submission Issues
           </div>
-          <div className={`text-xl font-bold mt-1 ${queue === "needs_attention" ? "text-white" : "text-rose-950"}`}>
+          <div className={`text-2xl font-bold mt-1 ${queue === "needs_attention" ? "text-white" : "text-rose-950"}`}>
             {queueCounts.needsAttention}
           </div>
         </button>
@@ -510,15 +510,13 @@ export function EmployeeApplicationsWorkbench({
       <InstantTabs tabs={tabs} activeTab={queue} onChange={handleQueueChange} />
 
       {/* Create Managed Application Panel */}
-      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-2xs space-y-3">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
         <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
               Create Managed Application Record
             </h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Establishes the internal OOS application record for an external job match.
-            </p>
           </div>
         </div>
 
@@ -532,11 +530,11 @@ export function EmployeeApplicationsWorkbench({
           className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1"
         >
           <div>
-            <label className="block font-medium text-slate-700 mb-1">Select Candidate *</label>
+            <label className="block font-semibold text-slate-700 mb-1">Select Candidate *</label>
             <select
               name="candidateId"
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose Candidate...</option>
               {candidates.map((c) => (
@@ -548,11 +546,11 @@ export function EmployeeApplicationsWorkbench({
           </div>
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">Select Discovered Job *</label>
+            <label className="block font-semibold text-slate-700 mb-1">Select Discovered Job *</label>
             <select
               name="jobId"
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose Sourced Job...</option>
               {jobs.map((j) => (
@@ -567,7 +565,7 @@ export function EmployeeApplicationsWorkbench({
             <PendingButton
               type="submit"
               pendingText="Creating..."
-              className="w-full"
+              className="w-full rounded-xl py-2 font-semibold"
             >
               + Create Managed Application
             </PendingButton>
@@ -576,7 +574,7 @@ export function EmployeeApplicationsWorkbench({
       </div>
 
       {/* Advanced Filter, Search & Sort Bar (0ms in-memory response) */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           <InstantSearch
             value={searchTerm}
@@ -600,7 +598,7 @@ export function EmployeeApplicationsWorkbench({
       </div>
 
       {/* Authoritative Applications Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
         {filteredApplications.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-500">
             <p className="font-semibold text-slate-700">No applications match the specified criteria.</p>

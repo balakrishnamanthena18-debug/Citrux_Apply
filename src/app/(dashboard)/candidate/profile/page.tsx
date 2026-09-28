@@ -1,6 +1,8 @@
 import { getAuthenticatedContext } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
-import { CandidateProfileManager } from "@/components/CandidateProfileManager";
+import { CandidateCareerWorkspace } from "@/components/candidate/CandidateCareerWorkspace";
+import { CandidateHistoryItem } from "@/components/candidate/CareerChangeHistory";
+import { AuditAction } from "@/generated/prisma";
 import { redirect } from "next/navigation";
 
 export default async function CandidateProfilePage() {
@@ -8,7 +10,7 @@ export default async function CandidateProfilePage() {
   if (ctx.role === "ADMIN") redirect("/admin");
   if (ctx.role === "EMPLOYEE") redirect("/employee");
 
-  const candidate = await withRlsContext(ctx.userId, async (tx) => {
+  const data = await withRlsContext(ctx.userId, async (tx) => {
     let cand = await tx.candidate.findUnique({
       where: { userId: ctx.userId },
       include: {
@@ -18,8 +20,21 @@ export default async function CandidateProfilePage() {
         projects: { orderBy: { orderIndex: "asc" } },
         certifications: { orderBy: { createdAt: "asc" } },
         documents: { orderBy: { createdAt: "desc" } },
-        assignedEmployee: true,
-        user: true,
+        assignedEmployee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -38,24 +53,101 @@ export default async function CandidateProfilePage() {
           projects: true,
           certifications: true,
           documents: true,
-          assignedEmployee: true,
-          user: true,
+          assignedEmployee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
         },
       });
     }
 
-    return cand;
+    // Load candidate-safe audit change history
+    const candidateAuditActions = [
+      AuditAction.CANDIDATE_CREATED,
+      AuditAction.CANDIDATE_PROFILE_UPDATED,
+      AuditAction.CANDIDATE_EXPERIENCE_UPDATED,
+      AuditAction.CANDIDATE_EDUCATION_UPDATED,
+      AuditAction.CANDIDATE_SKILLS_UPDATED,
+      AuditAction.CANDIDATE_DOCUMENT_UPLOADED,
+      AuditAction.CANDIDATE_DOCUMENT_DELETED,
+      AuditAction.CANDIDATE_VERIFIED,
+      AuditAction.CANDIDATE_STATUS_CHANGED,
+      AuditAction.CANDIDATE_AUTHORIZATION_MODE_CHANGED,
+    ];
+
+    const auditEvents = await tx.auditEvent.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        action: { in: candidateAuditActions },
+        OR: [
+          { actorId: ctx.userId },
+          { entityId: cand.id },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    return { candidate: cand, auditEvents };
   });
 
-  const userName = [candidate.user?.firstName, candidate.user?.lastName].filter(Boolean).join(" ") || "Candidate";
+  const { candidate, auditEvents } = data;
+  const userName =
+    [candidate.user?.firstName, candidate.user?.lastName].filter(Boolean).join(" ") ||
+    "Candidate";
+
+  const getHistoryDescription = (evt: (typeof auditEvents)[0]): string => {
+    switch (evt.action) {
+      case AuditAction.CANDIDATE_PROFILE_UPDATED:
+        return "Updated professional profile & personal details";
+      case AuditAction.CANDIDATE_EXPERIENCE_UPDATED:
+        return "Updated work experience records";
+      case AuditAction.CANDIDATE_EDUCATION_UPDATED:
+        return "Updated academic credentials & education history";
+      case AuditAction.CANDIDATE_SKILLS_UPDATED:
+        return "Updated technical competencies in skills catalog";
+      case AuditAction.CANDIDATE_DOCUMENT_UPLOADED:
+        return "Uploaded new document to candidate vault";
+      case AuditAction.CANDIDATE_DOCUMENT_DELETED:
+        return "Removed document from candidate vault";
+      case AuditAction.CANDIDATE_VERIFIED:
+        return "Specialist reviewed and verified candidate profile facts";
+      case AuditAction.CANDIDATE_STATUS_CHANGED:
+        return "Candidate lifecycle status transitioned";
+      case AuditAction.CANDIDATE_AUTHORIZATION_MODE_CHANGED:
+        return "Application authorization preference updated";
+      case AuditAction.CANDIDATE_CREATED:
+        return "Initialized canonical career record";
+      default:
+        return "Updated career profile";
+    }
+  };
+
+  const changeHistory: CandidateHistoryItem[] = auditEvents.map((evt) => ({
+    id: evt.id,
+    action: evt.action,
+    description: getHistoryDescription(evt),
+    timestamp: evt.createdAt,
+    entityType: evt.entityType,
+  }));
 
   return (
-    <div className="pb-16 max-w-6xl mx-auto">
-      <CandidateProfileManager
-        candidate={candidate}
-        userEmail={candidate.user?.email || ctx.email}
-        userName={userName}
-      />
-    </div>
+    <CandidateCareerWorkspace
+      candidate={candidate}
+      userEmail={candidate.user?.email || ctx.email}
+      userName={userName}
+      changeHistory={changeHistory}
+    />
   );
 }

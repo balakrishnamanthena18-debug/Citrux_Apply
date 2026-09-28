@@ -8,7 +8,8 @@ import {
   updateTaskChecklistItemAction,
 } from "@/lib/task/actions";
 import { ALLOWED_TASK_TRANSITIONS } from "@/lib/task/constants";
-import { TaskStatus } from "@/generated/prisma";
+import type { TaskStatus } from "@/generated/prisma";
+import { RecordHeader } from "@/components/ui/RecordHeader";
 
 export default async function EmployeeTaskDetailPage({
   params,
@@ -92,107 +93,121 @@ export default async function EmployeeTaskDetailPage({
     redirect(`/employee/tasks/${taskId}`);
   }
 
+  const candidateName = task.candidate?.user
+    ? [task.candidate.user.firstName, task.candidate.user.lastName].filter(Boolean).join(" ") || task.candidate.user.email
+    : task.application?.candidate?.user
+    ? [task.application.candidate.user.firstName, task.application.candidate.user.lastName].filter(Boolean).join(" ") || task.application.candidate.user.email
+    : undefined;
+
+  const assignedStaffName = task.assignedEmployee
+    ? [task.assignedEmployee.firstName, task.assignedEmployee.lastName].filter(Boolean).join(" ") || task.assignedEmployee.email
+    : "Unassigned";
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back link */}
-      <div className="mb-6">
-        <Link
-          href="/employee/tasks"
-          className="text-xs font-semibold text-slate-500 hover:text-slate-900 inline-flex items-center space-x-1"
-        >
-          <span>← Back to Task Workbench</span>
-        </Link>
-      </div>
-
-      {/* Header Banner */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-8">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 uppercase tracking-wider">
-                {task.category}
-              </span>
-              <span className="text-xs font-mono text-slate-500">{task.type}</span>
-              <span
-                className={`text-xs font-bold px-2.5 py-0.5 rounded uppercase tracking-wider ${
-                  task.priority === "URGENT"
-                    ? "bg-rose-100 text-rose-800"
-                    : task.priority === "HIGH"
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {task.priority} PRIORITY
-              </span>
-              <span
-                className={`text-xs font-bold px-2.5 py-0.5 rounded uppercase tracking-wider ${
-                  task.status === "COMPLETED"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : task.status === "BLOCKED" || task.status === "ESCALATED"
-                    ? "bg-rose-100 text-rose-800"
-                    : task.status === "QA" || task.status === "READY_FOR_REVIEW"
-                    ? "bg-blue-100 text-blue-800"
-                    : task.status === "IN_PROGRESS"
-                    ? "bg-indigo-100 text-indigo-800"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {task.status}
-              </span>
-            </div>
-
-            <h1 className="text-2xl font-bold text-slate-900">{task.title}</h1>
-            {task.description && <p className="text-sm text-slate-600 mt-2 whitespace-pre-wrap">{task.description}</p>}
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* 1. Task Record Header */}
+      <RecordHeader
+        breadcrumbs={[
+          { label: "Task Workbench", href: "/employee/tasks" },
+          { label: task.title },
+        ]}
+        title={task.title}
+        subtitle={
+          <>
+            <span className="font-mono text-[11px] text-slate-500 uppercase">{task.type}</span>
+            <span>•</span>
+            <span>Created {new Date(task.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
+          </>
+        }
+        statusBadge={
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs font-bold px-2.5 py-0.5 rounded uppercase tracking-wider ${
+                task.priority === "URGENT"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : task.priority === "HIGH"
+                  ? "bg-amber-50 text-amber-800 border border-amber-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
+              }`}
+            >
+              {task.priority}
+            </span>
+            <span
+              className={`text-xs font-bold px-2.5 py-0.5 rounded uppercase tracking-wider ${
+                task.status === "COMPLETED"
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : task.status === "BLOCKED" || task.status === "ESCALATED"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : task.status === "QA" || task.status === "READY_FOR_REVIEW"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : task.status === "IN_PROGRESS"
+                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
+              }`}
+            >
+              {task.status.replace(/_/g, " ")}
+            </span>
           </div>
+        }
+        metaItems={[
+          {
+            label: "Category",
+            value: task.category,
+          },
+          {
+            label: "Assignee",
+            value: assignedStaffName,
+          },
+          {
+            label: "Candidate",
+            value: candidateName ? (
+              task.candidateId ? (
+                <Link href={`/employee/candidates/${task.candidateId}`} className="hover:underline font-semibold text-slate-900">
+                  {candidateName}
+                </Link>
+              ) : (
+                candidateName
+              )
+            ) : (
+              "General"
+            ),
+          },
+          {
+            label: "Job / Role",
+            value: task.job?.title || task.application?.job?.title || "N/A",
+          },
+          {
+            label: "Due Date",
+            value: task.dueDate ? new Date(task.dueDate).toLocaleDateString([], { month: "short", day: "numeric" }) : "No deadline",
+          },
+          {
+            label: "Checklist",
+            value: `${task.checklistItems.filter((i) => i.isCompleted).length} / ${task.checklistItems.length} Done`,
+          },
+        ]}
+      />
 
-          {/* Assignee Box */}
-          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 w-full md:w-72">
-            <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Operational Assignee</div>
-            <form action={handleAssign} className="space-y-2">
-              <select
-                name="assignedEmployeeId"
-                defaultValue={task.assignedEmployeeId || ""}
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="">Unassigned (Backlog)</option>
-                {staffMembers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName || s.email}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                className="w-full text-xs bg-slate-900 hover:bg-slate-800 text-white font-medium py-1.5 rounded-lg transition-colors"
-              >
-                Update Assignee
-              </button>
-            </form>
-          </div>
+      {/* Reason Banners for Blocked / Waiting / Escalated */}
+      {task.status === "BLOCKED" && task.blockedReason && (
+        <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+          <span className="font-bold">⛔ Blocker:</span> {task.blockedReason}
         </div>
-
-        {/* Reason Banners for Blocked / Waiting / Escalated */}
-        {task.status === "BLOCKED" && task.blockedReason && (
-          <div className="mt-4 p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">
-            <span className="font-bold">⛔ Blocker:</span> {task.blockedReason}
-          </div>
-        )}
-        {task.status === "WAITING" && task.waitingReason && (
-          <div className="mt-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-            <span className="font-bold">⏳ Waiting:</span> {task.waitingReason}
-          </div>
-        )}
-        {task.status === "ESCALATED" && task.escalationReason && (
-          <div className="mt-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
-            <span className="font-bold">🚨 Escalation Reason:</span> {task.escalationReason}
-          </div>
-        )}
-      </div>
+      )}
+      {task.status === "WAITING" && task.waitingReason && (
+        <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+          <span className="font-bold">⏳ Waiting:</span> {task.waitingReason}
+        </div>
+      )}
+      {task.status === "ESCALATED" && task.escalationReason && (
+        <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-900 text-xs">
+          <span className="font-bold">🚨 Escalation Reason:</span> {task.escalationReason}
+        </div>
+      )}
 
       {/* 3-Column Layout: Checklist & Workflow, Context Cards, State History */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Column 1 & 2: Preparation Checklist & Status Transitions */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
           {/* Checklist */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">

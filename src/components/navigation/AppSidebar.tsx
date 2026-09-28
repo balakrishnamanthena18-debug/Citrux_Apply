@@ -39,10 +39,10 @@ export function AppSidebar({
 
   const adminNavSections: NavSection[] = [
     {
-      title: "MAIN",
+      title: "WORK",
       items: [
         {
-          label: "Dashboard",
+          label: "Operations Command",
           href: "/admin/dashboard",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -50,11 +50,6 @@ export function AppSidebar({
             </svg>
           ),
         },
-      ],
-    },
-    {
-      title: "OPERATIONS",
-      items: [
         {
           label: "Application Desk",
           href: "/employee/application-log",
@@ -64,15 +59,11 @@ export function AppSidebar({
             </svg>
           ),
         },
-        {
-          label: "Members",
-          href: "/admin/members",
-          icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ),
-        },
+      ],
+    },
+    {
+      title: "OPERATIONS",
+      items: [
         {
           label: "Applications",
           href: "/admin/applications",
@@ -83,7 +74,7 @@ export function AppSidebar({
           ),
         },
         {
-          label: "Tasks",
+          label: "Tasks & Work",
           href: "/employee/tasks",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -92,21 +83,12 @@ export function AppSidebar({
           ),
         },
         {
-          label: "Escalations",
+          label: "Escalation Console",
           href: "/admin/tasks/escalations",
           highlight: true,
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-amber-600" : "text-amber-500 group-hover:text-amber-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          ),
-        },
-        {
-          label: "Jobs",
-          href: "/employee/jobs",
-          icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           ),
         },
@@ -120,7 +102,16 @@ export function AppSidebar({
           ),
         },
         {
-          label: "Messages",
+          label: "Job Opportunities",
+          href: "/employee/jobs",
+          icon: (active) => (
+            <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          ),
+        },
+        {
+          label: "Team Messages",
           href: "/employee/messages",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -134,7 +125,16 @@ export function AppSidebar({
       title: "GOVERNANCE",
       items: [
         {
-          label: "Privacy Queue",
+          label: "Staff Roster",
+          href: "/admin/members",
+          icon: (active) => (
+            <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ),
+        },
+        {
+          label: "Privacy Requests",
           href: "/admin/privacy",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,7 +157,7 @@ export function AppSidebar({
       title: "ADMINISTRATION",
       items: [
         {
-          label: "Settings",
+          label: "Organization Settings",
           href: "/admin/settings",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -172,10 +172,10 @@ export function AppSidebar({
 
   const employeeNavSections: NavSection[] = [
     {
-      title: "OPERATIONS",
+      title: "WORK",
       items: [
         {
-          label: "Workspace",
+          label: "My Command Center",
           href: "/employee",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -192,6 +192,11 @@ export function AppSidebar({
             </svg>
           ),
         },
+      ],
+    },
+    {
+      title: "OPERATIONS",
+      items: [
         {
           label: "Applications",
           href: "/employee/applications",
@@ -202,20 +207,11 @@ export function AppSidebar({
           ),
         },
         {
-          label: "Tasks",
+          label: "Tasks & Queue",
           href: "/employee/tasks",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-          ),
-        },
-        {
-          label: "Jobs",
-          href: "/employee/jobs",
-          icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           ),
         },
@@ -225,6 +221,15 @@ export function AppSidebar({
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          ),
+        },
+        {
+          label: "Job Catalog",
+          href: "/employee/jobs",
+          icon: (active) => (
+            <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           ),
         },
@@ -243,10 +248,10 @@ export function AppSidebar({
 
   const candidateNavSections: NavSection[] = [
     {
-      title: "PORTAL",
+      title: "CANDIDATE PORTAL",
       items: [
         {
-          label: "Portal",
+          label: "Dashboard",
           href: "/candidate",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -282,7 +287,7 @@ export function AppSidebar({
           ),
         },
         {
-          label: "Privacy",
+          label: "Privacy & Data",
           href: "/candidate/privacy",
           icon: (active) => (
             <svg className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -318,15 +323,15 @@ export function AppSidebar({
         {/* Brand Header */}
         <div className="h-14 lg:h-16 flex items-center justify-between px-5 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-7 h-7 rounded bg-slate-900 text-white flex items-center justify-center font-bold text-[11px] tracking-wider shadow-xs">
+            <div className="w-7 h-7 rounded-md bg-slate-900 text-white flex items-center justify-center font-bold text-[11px] tracking-wider shadow-2xs">
               OOS
             </div>
             <div className="min-w-0">
               <div className="text-xs font-bold text-slate-900 leading-tight tracking-tight">
-                OOS
+                Operations OS
               </div>
-              <div className="text-[11px] text-slate-500 font-medium truncate">
-                Operations Operating System
+              <div className="text-[10px] text-slate-400 font-medium truncate">
+                {organizationName}
               </div>
             </div>
           </div>
@@ -368,9 +373,9 @@ export function AppSidebar({
                     onClick={() => {
                       if (isMobile && onClose) onClose();
                     }}
-                    className={`group flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md transition-all ${
+                    className={`group flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-all ${
                       isActive
-                        ? "bg-blue-50/90 text-slate-900 font-semibold shadow-xs"
+                        ? "bg-slate-100/90 text-slate-900 font-semibold shadow-2xs border-l-2 border-blue-600 pl-2.5"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     }`}
                   >
@@ -379,7 +384,7 @@ export function AppSidebar({
                       <span className="truncate">{item.label}</span>
                     </div>
                     {item.highlight && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
                     )}
                   </Link>
                 );
@@ -391,7 +396,7 @@ export function AppSidebar({
 
       {/* User / Account Footer */}
       <div className="p-3 border-t border-slate-100 bg-slate-50/40 flex-shrink-0">
-        <div className="p-2 rounded-lg bg-white border border-slate-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
               {initials}
@@ -400,13 +405,13 @@ export function AppSidebar({
               <div className="text-xs font-semibold text-slate-900 truncate">
                 {displayName}
               </div>
-              <div className="text-[10px] text-slate-400 truncate max-w-[110px]">
+              <div className="text-[10px] text-slate-400 truncate max-w-[100px]">
                 {email}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-1 flex-shrink-0">
+          <div className="flex items-center space-x-1.5 flex-shrink-0">
             <span
               className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
                 role === "ADMIN"
@@ -422,7 +427,7 @@ export function AppSidebar({
               <button
                 type="submit"
                 title="Sign out"
-                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -435,3 +440,4 @@ export function AppSidebar({
     </aside>
   );
 }
+

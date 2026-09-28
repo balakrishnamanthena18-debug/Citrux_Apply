@@ -15,6 +15,7 @@ import {
   CandidateVerificationSchema,
   CandidateStatusTransitionSchema,
   CandidateDocumentUploadSchema,
+  CandidateDocumentUploadSelfSchema,
   UpdateCandidateAuthorizationModeSchema,
   type CandidateProfileInput,
   type CandidateExperienceInput,
@@ -25,12 +26,16 @@ import {
   type CandidateVerificationInput,
   type CandidateStatusTransitionInput,
   type CandidateDocumentUploadInput,
+  type CandidateDocumentUploadSelfInput,
   type UpdateCandidateAuthorizationModeInput,
 } from "@/lib/validation/candidate.schemas";
 import {
   generateCandidateDocumentPath,
+  isCanonicalCandidateDocumentPath,
+  verifyCandidateDocumentStorageExists,
   createSignedUploadUrl,
   createSignedDownloadUrl,
+  deleteCandidateDocumentStorage,
 } from "@/lib/storage";
 import { CandidateStatus, Role, ApplicationAuthorizationMode, AuditAction } from "@/generated/prisma";
 import { AuthorizationError, InvalidStateTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
@@ -798,6 +803,167 @@ export async function updateCandidateStatusAction(
 }
 
 /**
+ * Requests a short-lived signed upload URL for candidate self-service document uploads.
+ * Derives candidate identity authoritatively from authenticated session and returns a server-bound documentId.
+ */
+export async function requestCandidateDocumentUploadUrlSelfAction(params: {
+  filename: string;
+}): Promise<ActionResult<{ signedUrl: string; storagePath: string; documentId: string; filename: string }>> {
+  const ctx = await getAuthenticatedContext();
+
+  try {
+    const candidate = await withRlsContext(ctx.userId, async (tx) => {
+      const cand = await tx.candidate.findUnique({
+        where: { userId: ctx.userId },
+      });
+      if (!cand) throw new NotFoundError("Candidate profile not found");
+      return cand;
+    });
+
+    const docId = crypto.randomUUID();
+    const storagePath = generateCandidateDocumentPath(
+      ctx.organizationId,
+      candidate.id,
+      docId,
+      1,
+      params.filename
+    );
+
+    const uploadPayload = await createSignedUploadUrl(storagePath);
+    if (!uploadPayload) {
+      return { success: false, error: "Unable to prepare secure upload. Please try again." };
+    }
+
+    return {
+      success: true,
+      data: {
+        signedUrl: uploadPayload.signedUrl,
+        storagePath: uploadPayload.path,
+        documentId: docId,
+        filename: params.filename,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: "Unable to prepare secure upload. Please try again." };
+  }
+}
+
+/**
+ * Registers metadata in PostgreSQL for a candidate self-service uploaded document.
+ * Authoritatively derives candidate and canonical storage path from authenticated session.
+ * Verifies storage object presence before DB row creation.
+ */
+export async function registerCandidateDocumentSelfAction(
+  input: CandidateDocumentUploadSelfInput
+): Promise<ActionResult<{ document: any }>> {
+  const parsed = CandidateDocumentUploadSelfSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  const ctx = await getAuthenticatedContext();
+
+  try {
+    const candidate = await withRlsContext(ctx.userId, async (tx) => {
+      const cand = await tx.candidate.findUnique({
+        where: { userId: ctx.userId },
+      });
+      if (!cand) throw new NotFoundError("Candidate profile not found");
+      return cand;
+    });
+
+    // 1. Authoritatively derive the canonical storage path on the server
+    const canonicalStoragePath = generateCandidateDocumentPath(
+      ctx.organizationId,
+      candidate.id,
+      parsed.data.documentId,
+      1,
+      parsed.data.filename
+    );
+
+    // 2. Verify that the storage object actually exists at the canonical path
+    const objectExists = await verifyCandidateDocumentStorageExists(canonicalStoragePath);
+    if (!objectExists) {
+      return {
+        success: false,
+        error: "Upload could not be verified. Please try uploading the document again.",
+      };
+    }
+
+    // 3. Persist CandidateDocument with idempotency and atomic default resume handling
+    const doc = await withRlsContext(ctx.userId, async (tx) => {
+      // Idempotency: return existing record if already created for this documentId
+      const existing = await tx.candidateDocument.findUnique({
+        where: { id: parsed.data.documentId },
+      });
+      if (existing) {
+        if (existing.candidateId !== candidate.id) {
+          throw new AuthorizationError("Document ID conflict across candidate boundaries");
+        }
+        return existing;
+      }
+
+      if (parsed.data.isDefault && parsed.data.documentType === "RESUME") {
+        await tx.candidateDocument.updateMany({
+          where: { candidateId: candidate.id, documentType: "RESUME" },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.candidateDocument.create({
+        data: {
+          id: parsed.data.documentId,
+          candidateId: candidate.id,
+          documentType: parsed.data.documentType,
+          title: parsed.data.title,
+          storagePath: canonicalStoragePath, // Strictly use server-derived canonical path
+          fileSizeBytes: parsed.data.fileSizeBytes,
+          mimeType: parsed.data.mimeType,
+          isDefault: parsed.data.isDefault,
+          uploadedBy: ctx.userId,
+        },
+      });
+    });
+
+    await logUserAuditEvent({
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
+      action: "CANDIDATE_DOCUMENT_UPLOADED",
+      entityType: "CandidateDocument",
+      entityId: doc.id,
+      details: {
+        documentType: doc.documentType,
+        title: doc.title,
+        fileSizeBytes: doc.fileSizeBytes,
+        storagePath: canonicalStoragePath,
+      },
+    });
+
+    revalidateCandidateViews();
+    return {
+      success: true,
+      data: {
+        document: {
+          id: doc.id,
+          candidateId: doc.candidateId,
+          documentType: doc.documentType,
+          title: doc.title,
+          storagePath: doc.storagePath,
+          fileSizeBytes: doc.fileSizeBytes,
+          mimeType: doc.mimeType,
+          versionNumber: doc.versionNumber,
+          isDefault: doc.isDefault,
+          createdAt: doc.createdAt.toISOString(),
+          updatedAt: doc.updatedAt.toISOString(),
+        },
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to register document" };
+  }
+}
+
+/**
  * Requests a short-lived signed upload URL for Supabase Storage to upload a candidate document.
  */
 export async function requestDocumentUploadUrlAction(params: {
@@ -875,8 +1041,13 @@ export async function registerCandidateDocumentAction(
         });
       }
 
+      // Extract documentId if storagePath matches canonical UUID pattern
+      const match = parsed.data.storagePath.match(/\/documents\/([0-9a-fA-F-]{36})-v/);
+      const embeddedDocId = match ? match[1] : undefined;
+
       return tx.candidateDocument.create({
         data: {
+          ...(embeddedDocId ? { id: embeddedDocId } : {}),
           candidateId: candidate.id,
           documentType: parsed.data.documentType,
           title: parsed.data.title,
@@ -889,23 +1060,35 @@ export async function registerCandidateDocumentAction(
       });
     });
 
-    await logUserAuditEvent({
-      userId: ctx.userId,
-      organizationId: ctx.organizationId,
-      action: "CANDIDATE_DOCUMENT_UPLOADED",
-      entityType: "CandidateDocument",
-      entityId: doc.id,
-      details: { documentType: doc.documentType, title: doc.title },
-    });
+    try {
+      await logUserAuditEvent({
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        action: AuditAction.CANDIDATE_DOCUMENT_UPLOADED,
+        entityType: "CandidateDocument",
+        entityId: doc.id,
+        details: { documentType: doc.documentType, title: doc.title },
+      });
+    } catch {
+      // Non-fatal for registration outcome
+    }
 
+    revalidateCandidateViews();
     return { success: true, data: { documentId: doc.id } };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to register document" };
+    if (err instanceof AuthorizationError) {
+      return { success: false, error: "You don't have permission to register this document." };
+    }
+    if (err instanceof NotFoundError) {
+      return { success: false, error: "Candidate not found." };
+    }
+    return { success: false, error: "Failed to register candidate document metadata." };
   }
 }
 
 /**
  * Generates a short-lived signed download URL for an authorized candidate document.
+ * Validates candidate ownership and canonical storage path invariant.
  */
 export async function getDocumentDownloadUrlAction(
   documentId: string
@@ -924,6 +1107,34 @@ export async function getDocumentDownloadUrlAction(
       if (ctx.role === "CANDIDATE" && document.candidate.userId !== ctx.userId) {
         throw new AuthorizationError("Unauthorized document access");
       }
+
+      // Authoritative canonical storage path invariant check
+      const isCanonical = isCanonicalCandidateDocumentPath(
+        document.storagePath,
+        ctx.organizationId,
+        document.candidateId,
+        document.id
+      );
+
+      if (!isCanonical) {
+        try {
+          await logUserAuditEvent({
+            userId: ctx.userId,
+            organizationId: ctx.organizationId,
+            action: AuditAction.SECURITY_ALERT_INVALID_STORAGE_PATH,
+            entityType: "CandidateDocument",
+            entityId: document.id,
+            details: {
+              storagePath: document.storagePath,
+              expectedCandidateId: document.candidateId,
+            },
+          });
+        } catch {
+          // Audit logging failure must never convert denial into success
+        }
+        throw new AuthorizationError("Invalid document storage path invariant");
+      }
+
       return document;
     });
 
@@ -934,12 +1145,123 @@ export async function getDocumentDownloadUrlAction(
 
     return { success: true, data: { downloadUrl } };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to retrieve document URL" };
+    if (err instanceof AuthorizationError) {
+      return { success: false, error: err.message };
+    }
+    if (err instanceof NotFoundError) {
+      return { success: false, error: "Document not found" };
+    }
+    return { success: false, error: "Failed to retrieve document URL" };
   }
 }
 
 /**
- * Deletes a candidate document record.
+ * Generates a short-lived signed URL for in-browser document preview.
+ * Returns document metadata needed by the viewer (title, mimeType, fileSizeBytes).
+ * Validates candidate ownership, canonical storage path, and storage object existence.
+ * Logs CANDIDATE_DOCUMENT_VIEWED audit event on success.
+ */
+export async function getCandidateDocumentViewUrlAction(
+  documentId: string
+): Promise<ActionResult<{ viewUrl: string; title: string; mimeType: string; fileSizeBytes: number }>> {
+  const ctx = await getAuthenticatedContext();
+
+  try {
+    const doc = await withRlsContext(ctx.userId, async (tx) => {
+      const document = await tx.candidateDocument.findUnique({
+        where: { id: documentId },
+        include: { candidate: true },
+      });
+      if (!document || document.candidate.organizationId !== ctx.organizationId) {
+        throw new NotFoundError("Document not found");
+      }
+      if (ctx.role === "CANDIDATE" && document.candidate.userId !== ctx.userId) {
+        throw new AuthorizationError("You don't have permission to view this document.");
+      }
+
+      // Authoritative canonical storage path invariant check
+      const isCanonical = isCanonicalCandidateDocumentPath(
+        document.storagePath,
+        ctx.organizationId,
+        document.candidateId,
+        document.id
+      );
+
+      if (!isCanonical) {
+        try {
+          await logUserAuditEvent({
+            userId: ctx.userId,
+            organizationId: ctx.organizationId,
+            action: AuditAction.SECURITY_ALERT_INVALID_STORAGE_PATH,
+            entityType: "CandidateDocument",
+            entityId: document.id,
+            details: {
+              storagePath: document.storagePath,
+              expectedCandidateId: document.candidateId,
+            },
+          });
+        } catch {
+          // Audit failure must never convert denial into success
+        }
+        throw new AuthorizationError("Invalid document storage path invariant");
+      }
+
+      return document;
+    });
+
+    // Verify storage object still exists before generating signed URL
+    const objectExists = await verifyCandidateDocumentStorageExists(doc.storagePath);
+    if (!objectExists) {
+      return { success: false, error: "Document is currently unavailable." };
+    }
+
+    // Generate short-lived signed URL for preview (120 seconds for viewing)
+    const viewUrl = await createSignedDownloadUrl(doc.storagePath, 120);
+    if (!viewUrl) {
+      return { success: false, error: "Unable to prepare document preview. Please try again." };
+    }
+
+    // Log document viewed audit event
+    try {
+      await logUserAuditEvent({
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        action: AuditAction.CANDIDATE_DOCUMENT_VIEWED,
+        entityType: "CandidateDocument",
+        entityId: doc.id,
+        details: {
+          candidateId: doc.candidateId,
+          documentType: doc.documentType,
+          title: doc.title,
+        },
+      });
+    } catch {
+      // Non-fatal for preview URL presentation
+    }
+
+    return {
+      success: true,
+      data: {
+        viewUrl,
+        title: doc.title,
+        mimeType: doc.mimeType,
+        fileSizeBytes: doc.fileSizeBytes,
+      },
+    };
+  } catch (err: any) {
+    if (err instanceof AuthorizationError) {
+      return { success: false, error: err.message };
+    }
+    if (err instanceof NotFoundError) {
+      return { success: false, error: "Document not found" };
+    }
+    return { success: false, error: "Unable to prepare document preview. Please try again." };
+  }
+}
+
+/**
+ * Deletes a candidate document record and its Supabase storage object.
+ * Validates candidate ownership and canonical storage path invariant.
  */
 export async function deleteCandidateDocumentAction(
   documentId: string
@@ -947,6 +1269,8 @@ export async function deleteCandidateDocumentAction(
   const ctx = await getAuthenticatedContext();
 
   try {
+    let storagePathToDelete: string | null = null;
+
     await withRlsContext(ctx.userId, async (tx) => {
       const document = await tx.candidateDocument.findUnique({
         where: { id: documentId },
@@ -959,22 +1283,67 @@ export async function deleteCandidateDocumentAction(
         throw new AuthorizationError("Unauthorized document deletion");
       }
 
+      // Authoritative canonical storage path invariant check
+      const isCanonical = isCanonicalCandidateDocumentPath(
+        document.storagePath,
+        ctx.organizationId,
+        document.candidateId,
+        document.id
+      );
+
+      if (!isCanonical) {
+        try {
+          await logUserAuditEvent({
+            userId: ctx.userId,
+            organizationId: ctx.organizationId,
+            action: AuditAction.SECURITY_ALERT_INVALID_STORAGE_PATH,
+            entityType: "CandidateDocument",
+            entityId: document.id,
+            details: {
+              storagePath: document.storagePath,
+              expectedCandidateId: document.candidateId,
+            },
+          });
+        } catch {
+          // Audit failure must never convert denial into success
+        }
+        throw new AuthorizationError("Invalid document storage path invariant");
+      }
+
+      storagePathToDelete = document.storagePath;
+
       await tx.candidateDocument.delete({
         where: { id: documentId },
       });
     });
 
-    await logUserAuditEvent({
-      userId: ctx.userId,
-      organizationId: ctx.organizationId,
-      action: "CANDIDATE_DOCUMENT_DELETED",
-      entityType: "CandidateDocument",
-      entityId: documentId,
-    });
+    // Delete binary from Supabase storage
+    if (storagePathToDelete) {
+      await deleteCandidateDocumentStorage(storagePathToDelete);
+    }
 
+    try {
+      await logUserAuditEvent({
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        action: AuditAction.CANDIDATE_DOCUMENT_DELETED,
+        entityType: "CandidateDocument",
+        entityId: documentId,
+      });
+    } catch {
+      // Non-fatal for deletion outcome
+    }
+
+    revalidateCandidateViews();
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to delete document" };
+    if (err instanceof AuthorizationError) {
+      return { success: false, error: err.message };
+    }
+    if (err instanceof NotFoundError) {
+      return { success: false, error: "Document not found" };
+    }
+    return { success: false, error: "Failed to delete document" };
   }
 }
 
