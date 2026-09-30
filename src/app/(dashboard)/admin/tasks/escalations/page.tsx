@@ -10,28 +10,29 @@ export default async function AdminTaskEscalationsPage() {
   requireAdmin(ctx);
 
   const { escalatedTasks, staffMembers } = await withRlsContext(ctx.userId, async (tx) => {
-    const tasks = await tx.task.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        status: TaskStatus.ESCALATED,
-      },
-      include: {
-        assignedEmployee: true,
-        candidate: { include: { user: true } },
-        job: true,
-        application: { include: { job: true } },
-      },
-      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
-    });
-
-    const staff = await tx.membership.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        role: { in: ["EMPLOYEE", "ADMIN"] },
-        status: "ACTIVE",
-      },
-      include: { user: true },
-    });
+    const [tasks, staff] = await Promise.all([
+      tx.task.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: TaskStatus.ESCALATED,
+        },
+        include: {
+          assignedEmployee: true,
+          candidate: { include: { user: true } },
+          job: true,
+          application: { include: { job: true } },
+        },
+        orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+      }),
+      tx.membership.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          role: { in: ["EMPLOYEE", "ADMIN"] },
+          status: "ACTIVE",
+        },
+        include: { user: true },
+      }),
+    ]);
 
     return {
       escalatedTasks: tasks.map(t => ({

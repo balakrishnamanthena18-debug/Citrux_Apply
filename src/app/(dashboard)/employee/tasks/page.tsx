@@ -32,75 +32,72 @@ export default async function EmployeeTasksPage({ searchParams }: Props) {
   const currentPriority = params.priority || "";
 
   const data = await withRlsContext(ctx.userId, async (tx) => {
-    const canCreate = await canUserCreateTask(tx, ctx);
-
-    const allTasks = await tx.task.findMany({
-      where: { organizationId: ctx.organizationId },
-      include: {
-        assignedEmployee: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
-        candidate: {
-          select: {
-            id: true,
-            user: { select: { firstName: true, lastName: true, email: true } },
+    const [canCreate, allTasks, staff, cands, openJobs, activeApps] = await Promise.all([
+      canUserCreateTask(tx, ctx),
+      tx.task.findMany({
+        where: { organizationId: ctx.organizationId },
+        include: {
+          assignedEmployee: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+          candidate: {
+            select: {
+              id: true,
+              user: { select: { firstName: true, lastName: true, email: true } },
+            },
+          },
+          job: { select: { id: true, title: true, companyName: true } },
+          application: {
+            select: {
+              id: true,
+              job: { select: { title: true, companyName: true } },
+            },
+          },
+          checklistItems: {
+            select: { id: true, description: true, isCompleted: true },
           },
         },
-        job: { select: { id: true, title: true, companyName: true } },
-        application: {
-          select: {
-            id: true,
-            job: { select: { title: true, companyName: true } },
+        orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+        take: 250,
+      }),
+      tx.membership.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          role: { in: ["EMPLOYEE", "ADMIN"] },
+          status: "ACTIVE",
+        },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+        take: 100,
+      }),
+      tx.candidate.findMany({
+        where: { organizationId: ctx.organizationId, status: { not: "ARCHIVED" } },
+        select: {
+          id: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+        },
+        take: 100,
+      }),
+      tx.job.findMany({
+        where: { organizationId: ctx.organizationId, status: "OPEN" },
+        select: { id: true, title: true, companyName: true },
+        take: 100,
+      }),
+      tx.application.findMany({
+        where: { organizationId: ctx.organizationId },
+        select: {
+          id: true,
+          job: { select: { title: true, companyName: true } },
+          candidate: {
+            select: {
+              user: { select: { firstName: true, lastName: true, email: true } },
+            },
           },
         },
-        checklistItems: {
-          select: { id: true, description: true, isCompleted: true },
-        },
-      },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
-      take: 250,
-    });
-
-    const staff = await tx.membership.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        role: { in: ["EMPLOYEE", "ADMIN"] },
-        status: "ACTIVE",
-      },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-      take: 100,
-    });
-
-    const cands = await tx.candidate.findMany({
-      where: { organizationId: ctx.organizationId, status: { not: "ARCHIVED" } },
-      select: {
-        id: true,
-        user: { select: { firstName: true, lastName: true, email: true } },
-      },
-      take: 100,
-    });
-
-    const openJobs = await tx.job.findMany({
-      where: { organizationId: ctx.organizationId, status: "OPEN" },
-      select: { id: true, title: true, companyName: true },
-      take: 100,
-    });
-
-    const activeApps = await tx.application.findMany({
-      where: { organizationId: ctx.organizationId },
-      select: {
-        id: true,
-        job: { select: { title: true, companyName: true } },
-        candidate: {
-          select: {
-            user: { select: { firstName: true, lastName: true, email: true } },
-          },
-        },
-      },
-      take: 100,
-    });
+        take: 100,
+      }),
+    ]);
 
     return {
       tasks: allTasks.map((t) => ({
