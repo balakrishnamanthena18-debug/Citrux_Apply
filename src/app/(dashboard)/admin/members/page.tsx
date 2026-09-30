@@ -7,26 +7,27 @@ export default async function AdminMembersPage() {
   requireAdmin(ctx);
 
   const { memberships, designations, managers } = await withRlsContext(ctx.userId, async (tx) => {
-    const mems = await tx.membership.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        role: { in: ["EMPLOYEE", "ADMIN"] },
-      },
-      include: {
-        user: true,
-        designation: true,
-        reportingManager: true,
-      },
-      orderBy: [
-        { status: "asc" },
-        { createdAt: "desc" },
-      ],
-    });
-
-    const desigs = await tx.designation.findMany({
-      where: { organizationId: ctx.organizationId },
-      orderBy: { name: "asc" },
-    });
+    const [mems, desigs] = await Promise.all([
+      tx.membership.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          role: { in: ["EMPLOYEE", "ADMIN"] },
+        },
+        include: {
+          user: true,
+          designation: true,
+          reportingManager: true,
+        },
+        orderBy: [
+          { status: "asc" },
+          { createdAt: "desc" },
+        ],
+      }),
+      tx.designation.findMany({
+        where: { organizationId: ctx.organizationId },
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
     const activeStaff = mems.filter((m) => m.status === "ACTIVE");
     const mgrs = activeStaff

@@ -7,26 +7,50 @@ export default async function AdminApplicationsPage() {
   requireAdmin(ctx);
 
   const { applications, totalCount, statusCounts } = await withRlsContext(ctx.userId, async (tx) => {
-    const apps = await tx.application.findMany({
-      where: { organizationId: ctx.organizationId },
-      include: {
-        candidate: { include: { user: true } },
-        job: true,
-        assignedEmployee: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 250,
-    });
-
-    const total = await tx.application.count({
-      where: { organizationId: ctx.organizationId },
-    });
-
-    const counts = await tx.application.groupBy({
-      by: ["status"],
-      where: { organizationId: ctx.organizationId },
-      _count: true,
-    });
+    const [apps, total, counts] = await Promise.all([
+      tx.application.findMany({
+        where: { organizationId: ctx.organizationId },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          candidate: {
+            select: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+          job: {
+            select: {
+              title: true,
+              companyName: true,
+            },
+          },
+          assignedEmployee: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 250,
+      }),
+      tx.application.count({
+        where: { organizationId: ctx.organizationId },
+      }),
+      tx.application.groupBy({
+        by: ["status"],
+        where: { organizationId: ctx.organizationId },
+        _count: true,
+      }),
+    ]);
 
     return { 
       applications: apps.map(app => ({

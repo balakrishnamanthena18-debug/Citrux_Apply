@@ -31,66 +31,69 @@ export default async function EmployeeApplicationsPage({ searchParams }: Props) 
   const sortParam = resolvedParams.sort || "newest";
 
   const { applications, candidates, jobs, sources } = await withRlsContext(ctx.userId, async (tx) => {
-    // 1. Authoritative Bounded Workspace Applications
-    const apps = await tx.application.findMany({
-      where: { organizationId: ctx.organizationId },
-      include: {
-        candidate: {
-          select: {
-            id: true,
-            applicationAuthorizationMode: true,
-            user: { select: { firstName: true, lastName: true, email: true } },
+    // Parallelize authoritative bounded applications and reference lookups
+    const [apps, cands, openJobs, uniqueSources] = await Promise.all([
+      // 1. Authoritative Bounded Workspace Applications
+      tx.application.findMany({
+        where: { organizationId: ctx.organizationId },
+        include: {
+          candidate: {
+            select: {
+              id: true,
+              applicationAuthorizationMode: true,
+              user: { select: { firstName: true, lastName: true, email: true } },
+            },
+          },
+          job: true,
+          assignedEmployee: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+          submissions: {
+            orderBy: { attemptNumber: "desc" },
+            take: 1,
+            include: {
+              submittedBy: { select: { firstName: true, lastName: true, email: true } },
+            },
+          },
+          stateHistory: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            include: {
+              changedBy: { select: { firstName: true, lastName: true, email: true } },
+            },
           },
         },
-        job: true,
-        assignedEmployee: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
-        submissions: {
-          orderBy: { attemptNumber: "desc" },
-          take: 1,
-          include: {
-            submittedBy: { select: { firstName: true, lastName: true, email: true } },
-          },
-        },
-        stateHistory: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          include: {
-            changedBy: { select: { firstName: true, lastName: true, email: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 250,
-    });
+        orderBy: { createdAt: "desc" },
+        take: 250,
+      }),
 
-    // 2. Reference candidate options for creation
-    const cands = await tx.candidate.findMany({
-      where: { organizationId: ctx.organizationId, status: { not: "ARCHIVED" } },
-      select: {
-        id: true,
-        status: true,
-        user: { select: { firstName: true, lastName: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+      // 2. Reference candidate options for creation
+      tx.candidate.findMany({
+        where: { organizationId: ctx.organizationId, status: { not: "ARCHIVED" } },
+        select: {
+          id: true,
+          status: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
 
-    // 3. Reference open jobs for creation
-    const openJobs = await tx.job.findMany({
-      where: { organizationId: ctx.organizationId, status: "OPEN" },
-      select: { id: true, title: true, companyName: true, source: true },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+      // 3. Reference open jobs for creation
+      tx.job.findMany({
+        where: { organizationId: ctx.organizationId, status: "OPEN" },
+        select: { id: true, title: true, companyName: true, source: true },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
 
-    // 4. Distinct sources
-    const uniqueSources = await tx.job.findMany({
-      where: { organizationId: ctx.organizationId, source: { not: null } },
-      select: { source: true },
-      distinct: ["source"],
-    });
+      // 4. Distinct sources
+      tx.job.findMany({
+        where: { organizationId: ctx.organizationId, source: { not: null } },
+        select: { source: true },
+        distinct: ["source"],
+      }),
+    ]);
 
     const candidateOptions: CandidateOption[] = cands.map((c) => ({
       id: c.id,
