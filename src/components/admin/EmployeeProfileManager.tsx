@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -81,25 +81,26 @@ export function EmployeeProfileManager({
   auditLogs,
 }: EmployeeProfileManagerProps) {
   const router = useRouter();
-  const isSelf = member.userId === currentUserId;
+  const [profile, setProfile] = useState<EmployeeProfileData>(member);
+  const isSelf = profile.userId === currentUserId;
 
   // Edit Designation Modal
   const [isDesignationModalOpen, setIsDesignationModalOpen] = useState(false);
-  const [selectedDesignationId, setSelectedDesignationId] = useState(member.designation?.id || "");
+  const [selectedDesignationId, setSelectedDesignationId] = useState(profile.designation?.id || "");
   const [designationLoading, setDesignationLoading] = useState(false);
 
   // Edit Organization Modal
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
-  const [dept, setDept] = useState(member.department || "");
-  const [teamVal, setTeamVal] = useState(member.team || "");
-  const [managerId, setManagerId] = useState(member.reportingManagerId || "");
-  const [isTeamLeadVal, setIsTeamLeadVal] = useState(member.isTeamLead || false);
-  const [teamLeadOfVal, setTeamLeadOfVal] = useState(member.teamLeadOf || "");
-  const [workLoc, setWorkLoc] = useState(member.workLocation || "");
-  const [workMod, setWorkMod] = useState(member.workMode || "REMOTE");
-  const [empType, setEmpType] = useState(member.employmentType || "FULL_TIME");
-  const [phoneVal, setPhoneVal] = useState(member.phone || "");
-  const [personalEmailVal, setPersonalEmailVal] = useState(member.personalEmail || "");
+  const [dept, setDept] = useState(profile.department || "");
+  const [teamVal, setTeamVal] = useState(profile.team || "");
+  const [managerId, setManagerId] = useState(profile.reportingManagerId || "");
+  const [isTeamLeadVal, setIsTeamLeadVal] = useState(profile.isTeamLead || false);
+  const [teamLeadOfVal, setTeamLeadOfVal] = useState(profile.teamLeadOf || "");
+  const [workLoc, setWorkLoc] = useState(profile.workLocation || "");
+  const [workMod, setWorkMod] = useState(profile.workMode || "REMOTE");
+  const [empType, setEmpType] = useState(profile.employmentType || "FULL_TIME");
+  const [phoneVal, setPhoneVal] = useState(profile.phone || "");
+  const [personalEmailVal, setPersonalEmailVal] = useState(profile.personalEmail || "");
   const [orgLoading, setOrgLoading] = useState(false);
 
   // Deactivation Modal
@@ -109,10 +110,10 @@ export function EmployeeProfileManager({
   const [banner, setBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const activeDesignations = designations.filter((d) => d.status === "ACTIVE" || d.id === member.designation?.id);
-  const eligibleManagers = managers.filter((m) => m.id !== member.userId);
+  const activeDesignations = designations.filter((d) => d.status === "ACTIVE" || d.id === profile.designation?.id);
+  const eligibleManagers = managers.filter((m) => m.id !== profile.userId);
 
-  const fullName = `${member.user.firstName ?? ""} ${member.user.lastName ?? ""}`.trim() || member.user.email || "Employee";
+  const fullName = `${profile.user.firstName ?? ""} ${profile.user.lastName ?? ""}`.trim() || profile.user.email || "Employee";
 
   async function handleUpdateDesignation(e: React.FormEvent) {
     e.preventDefault();
@@ -120,7 +121,7 @@ export function EmployeeProfileManager({
     setBanner(null);
 
     const res = await updateEmployeeDesignationAction({
-      membershipId: member.id,
+      membershipId: profile.id,
       designationId: selectedDesignationId || null,
     });
 
@@ -130,9 +131,13 @@ export function EmployeeProfileManager({
       return;
     }
 
+    const matchedDesig = designations.find((d) => d.id === selectedDesignationId);
+    setProfile((prev) => ({
+      ...prev,
+      designation: matchedDesig ? { id: matchedDesig.id, name: matchedDesig.name, status: "ACTIVE" } : null,
+    }));
     setIsDesignationModalOpen(false);
     setBanner({ type: "success", text: "Employee designation successfully updated." });
-    router.refresh();
   }
 
   async function handleUpdateOrganization(e: React.FormEvent) {
@@ -141,7 +146,7 @@ export function EmployeeProfileManager({
     setBanner(null);
 
     const res = await updateEmployeeOrganizationAction({
-      membershipId: member.id,
+      membershipId: profile.id,
       department: dept || null,
       team: teamVal || null,
       reportingManagerId: managerId || null,
@@ -155,29 +160,39 @@ export function EmployeeProfileManager({
       return;
     }
 
+    setProfile((prev) => ({
+      ...prev,
+      department: dept || null,
+      team: teamVal || null,
+      reportingManagerId: managerId || null,
+      isTeamLead: isTeamLeadVal,
+      teamLeadOf: isTeamLeadVal ? (teamLeadOfVal || teamVal || null) : null,
+    }));
     setIsOrgModalOpen(false);
     setBanner({ type: "success", text: "Organizational profile successfully updated." });
-    router.refresh();
   }
 
   async function handleRoleSwitch() {
-    const nextRole = member.role === "ADMIN" ? "EMPLOYEE" : "ADMIN";
+    const nextRole = profile.role === "ADMIN" ? "EMPLOYEE" : "ADMIN";
     setActionLoading(true);
     setBanner(null);
 
+    // Optimistic local update
+    setProfile((prev) => ({ ...prev, role: nextRole }));
+
     const res = await updateEmployeeRoleAction({
-      employeeUserId: member.userId,
+      employeeUserId: profile.userId,
       role: nextRole,
     });
 
     setActionLoading(false);
     if (!res.success) {
+      setProfile(member);
       setBanner({ type: "error", text: res.error || "Failed to update role." });
       return;
     }
 
     setBanner({ type: "success", text: `Assigned role changed to ${nextRole}.` });
-    router.refresh();
   }
 
   async function handleResendInvite() {
@@ -185,7 +200,7 @@ export function EmployeeProfileManager({
     setBanner(null);
 
     const res = await resendStaffActivationAction({
-      membershipId: member.id,
+      membershipId: profile.id,
     });
 
     setActionLoading(false);
@@ -194,27 +209,33 @@ export function EmployeeProfileManager({
       return;
     }
 
-    setBanner({ type: "success", text: `New activation link emailed to ${member.user.email}.` });
-    router.refresh();
+    setBanner({ type: "success", text: `New activation link emailed to ${profile.user.email}.` });
   }
 
   async function handleReactivate() {
     setActionLoading(true);
     setBanner(null);
 
+    // Optimistic local update
+    setProfile((prev) => ({
+      ...prev,
+      status: "ACTIVE",
+      user: { ...prev.user, status: "ACTIVE" },
+    }));
+
     const res = await setEmployeeStatusAction({
-      employeeUserId: member.userId,
+      employeeUserId: profile.userId,
       status: "ACTIVE",
     });
 
     setActionLoading(false);
     if (!res.success) {
+      setProfile(member);
       setBanner({ type: "error", text: res.error || "Failed to reactivate employee." });
       return;
     }
 
     setBanner({ type: "success", text: "Employee account has been reactivated." });
-    router.refresh();
   }
 
   return (

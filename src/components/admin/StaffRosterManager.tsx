@@ -61,6 +61,7 @@ export function StaffRosterManager({
   managers,
 }: StaffRosterManagerProps) {
   const router = useRouter();
+  const [memberList, setMemberList] = useState<StaffMemberItem[]>(members);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
@@ -93,10 +94,10 @@ export function StaffRosterManager({
 
   // Extract unique departments
   const uniqueDepartments = Array.from(
-    new Set(members.map((m) => m.department).filter((d): d is string => Boolean(d)))
+    new Set(memberList.map((m) => m.department).filter((d): d is string => Boolean(d)))
   ).sort();
 
-  const filtered = members.filter((m) => {
+  const filtered = memberList.filter((m) => {
     const fullName = `${m.user.firstName ?? ""} ${m.user.lastName ?? ""}`.trim() || m.user.name || "";
     const matchesSearch =
       fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -129,16 +130,21 @@ export function StaffRosterManager({
     setDepartmentFilter("ALL");
   }
 
-  const totalMembers = members.length;
-  const activeCount = members.filter((m) => m.status === "ACTIVE").length;
-  const invitedCount = members.filter((m) => m.status === "INVITED").length;
-  const deactivatedCount = members.filter((m) => m.status === "DEACTIVATED").length;
+  const totalMembers = memberList.length;
+  const activeCount = memberList.filter((m) => m.status === "ACTIVE").length;
+  const invitedCount = memberList.filter((m) => m.status === "INVITED").length;
+  const deactivatedCount = memberList.filter((m) => m.status === "DEACTIVATED").length;
 
   async function handleRoleToggle(m: StaffMemberItem) {
     const nextRole = m.role === "ADMIN" ? "EMPLOYEE" : "ADMIN";
     setActionInProgress(m.id);
     setActionMessage(null);
     setActiveMenuId(null);
+
+    // Optimistic local update
+    setMemberList((prev) =>
+      prev.map((item) => (item.id === m.id ? { ...item, role: nextRole } : item))
+    );
 
     const res = await updateEmployeeRoleAction({
       employeeUserId: m.userId,
@@ -147,6 +153,8 @@ export function StaffRosterManager({
 
     setActionInProgress(null);
     if (!res.success) {
+      // Revert on failure
+      setMemberList(members);
       setActionMessage({ type: "error", text: res.error || "Failed to update member role." });
       return;
     }
@@ -155,7 +163,6 @@ export function StaffRosterManager({
       type: "success",
       text: `Updated role for ${m.user.firstName ?? "Member"} to ${nextRole}.`,
     });
-    router.refresh();
   }
 
   async function handleResendInvitation(m: StaffMemberItem) {
@@ -177,13 +184,21 @@ export function StaffRosterManager({
       type: "success",
       text: `New activation invitation dispatched to ${m.user.email}.`,
     });
-    router.refresh();
   }
 
   async function handleReactivate(m: StaffMemberItem) {
     setActionInProgress(m.id);
     setActionMessage(null);
     setActiveMenuId(null);
+
+    // Optimistic local reactivate
+    setMemberList((prev) =>
+      prev.map((item) =>
+        item.id === m.id
+          ? { ...item, status: "ACTIVE", user: { ...item.user, status: "ACTIVE" } }
+          : item
+      )
+    );
 
     const res = await setEmployeeStatusAction({
       employeeUserId: m.userId,
@@ -192,6 +207,7 @@ export function StaffRosterManager({
 
     setActionInProgress(null);
     if (!res.success) {
+      setMemberList(members);
       setActionMessage({ type: "error", text: res.error || "Failed to reactivate member." });
       return;
     }
@@ -200,7 +216,6 @@ export function StaffRosterManager({
       type: "success",
       text: `Account for ${m.user.firstName ?? "Member"} successfully reactivated.`,
     });
-    router.refresh();
   }
 
   return (
@@ -633,11 +648,18 @@ export function StaffRosterManager({
           employeeName={`${deactivatingMember.user.firstName ?? ""} ${deactivatingMember.user.lastName ?? ""}`.trim() || deactivatingMember.user.email}
           potentialReassignees={managers}
           onSuccess={() => {
+            const targetId = deactivatingMember.userId;
+            setMemberList((prev) =>
+              prev.map((item) =>
+                item.userId === targetId
+                  ? { ...item, status: "DEACTIVATED", user: { ...item.user, status: "SUSPENDED" } }
+                  : item
+              )
+            );
             setActionMessage({
               type: "success",
               text: "Employee successfully deactivated and sessions revoked.",
             });
-            router.refresh();
           }}
           onClose={() => setDeactivatingMember(null)}
         />

@@ -6,7 +6,7 @@ interface PendingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   pendingText?: string;
   isPending?: boolean;
   onAsyncClick?: () => Promise<void> | void;
-  variant?: "primary" | "secondary" | "danger" | "outline" | "ghost" | "amber";
+  variant?: "primary" | "secondary" | "danger" | "outline" | "ghost" | "amber" | "emerald" | "indigo";
   size?: "sm" | "md" | "lg";
 }
 
@@ -45,6 +45,8 @@ export function PendingButton({
     outline: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 disabled:bg-slate-50 disabled:text-slate-400",
     ghost: "bg-transparent text-slate-700 hover:bg-slate-100 disabled:text-slate-400",
     amber: "bg-amber-600 text-white hover:bg-amber-700 disabled:bg-amber-300",
+    emerald: "bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-emerald-300",
+    indigo: "bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300",
   };
 
   const sizeStyles: Record<string, string> = {

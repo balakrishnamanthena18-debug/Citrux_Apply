@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   requestDocumentUploadUrlAction,
@@ -39,6 +39,7 @@ export function EmployeeCandidateDocuments({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  const [docList, setDocList] = useState<CandidateDocumentItem[]>(documents);
   const [isUploading, setIsUploading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -69,12 +70,6 @@ export function EmployeeCandidateDocuments({
     }, 5000);
   };
 
-  const refreshData = () => {
-    startTransition(() => {
-      router.refresh();
-    });
-  };
-
   const handleDownload = async (docId: string, title: string) => {
     const res = await getDocumentDownloadUrlAction(docId);
     if (res.success && res.data?.downloadUrl) {
@@ -88,11 +83,14 @@ export function EmployeeCandidateDocuments({
     if (!confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
       return;
     }
+    // Optimistic local removal
+    setDocList((prev) => prev.filter((d) => d.id !== docId));
     const res = await deleteCandidateDocumentAction(docId);
     if (res.success) {
       showFeedback("success", `Document "${title}" removed successfully.`);
-      refreshData();
     } else {
+      // Revert if server failed
+      setDocList(documents);
       showFeedback("error", res.error || "Failed to delete document");
     }
   };
@@ -154,9 +152,27 @@ export function EmployeeCandidateDocuments({
         isDefault,
       });
 
-      if (!registerRes.success) {
-        throw new Error(registerRes.error || "Failed to register candidate document metadata");
-      }
+      const newDoc: CandidateDocumentItem = {
+        id: registerRes.data?.documentId || `doc-${Date.now()}`,
+        candidateId,
+        documentType,
+        title: documentTitle.trim() || selectedFile.name,
+        storagePath,
+        fileSizeBytes: selectedFile.size,
+        mimeType: selectedFile.type || "application/octet-stream",
+        versionNumber: 1,
+        isDefault,
+        uploadedBy: "me",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      setDocList((prev) => {
+        let updated = isDefault
+          ? prev.map((d) => (d.documentType === documentType ? { ...d, isDefault: false } : d))
+          : [...prev];
+        return [newDoc, ...updated];
+      });
 
       setUploadStatus("success");
       showFeedback("success", `Document "${documentTitle || selectedFile.name}" uploaded successfully.`);
@@ -165,17 +181,16 @@ export function EmployeeCandidateDocuments({
         setSelectedFile(null);
         setDocumentTitle("");
         setUploadStatus("idle");
-        refreshData();
-      }, 800);
+      }, 500);
     } catch (err: any) {
       setUploadStatus("error");
       setErrorMessage(err.message || "An unexpected error occurred during upload.");
     }
   };
 
-  // Filter resumes vs other documents
-  const resumes = documents.filter((d) => d.documentType === "RESUME");
-  const otherDocs = documents.filter((d) => d.documentType !== "RESUME");
+  // Filter resumes vs other documents from local state
+  const resumes = docList.filter((d) => d.documentType === "RESUME");
+  const otherDocs = docList.filter((d) => d.documentType !== "RESUME");
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6 space-y-6">
@@ -185,7 +200,7 @@ export function EmployeeCandidateDocuments({
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-slate-900">Candidate Documents</h2>
             <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
-              {documents.length} {documents.length === 1 ? "file" : "files"}
+              {docList.length} {docList.length === 1 ? "file" : "files"}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -201,7 +216,7 @@ export function EmployeeCandidateDocuments({
             setErrorMessage(null);
             setSelectedFile(null);
             setDocumentTitle("");
-            setIsDefault(documents.length === 0);
+            setIsDefault(docList.length === 0);
           }}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition shadow-sm"
         >
