@@ -2,8 +2,20 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { InstantSearch } from "@/components/workbench/InstantSearch";
-import { TablePagination } from "@/components/workbench/TablePagination";
+import {
+  WorkbenchShell,
+  WorkbenchHeader,
+  WorkbenchToolbar,
+  WorkbenchEmptyState,
+  InstantTabs,
+  TabItem,
+  InstantSearch,
+  InstantSort,
+  SortDirection,
+  SortOption,
+  TablePagination,
+} from "@/components/workbench";
+import { syncUrlParams } from "@/lib/client/urlSync";
 
 export interface AdminAppItem {
   id: string;
@@ -33,21 +45,60 @@ interface Props {
   statusCounts: Array<{ status: string; _count: number }>;
 }
 
+const SORT_OPTIONS: SortOption[] = [
+  { value: "createdAt", label: "Date Created" },
+  { value: "candidate", label: "Candidate Name" },
+  { value: "company", label: "Company" },
+  { value: "status", label: "Status" },
+];
+
 export function AdminApplicationsWorkbench({
   applications,
   totalCount,
   statusCounts,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [activeTab, setActiveTab] = useState("ALL");
+  const [sortField, setSortField] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const pageSize = 25;
+
+  const tabs: TabItem[] = useMemo(() => {
+    const list: TabItem[] = [{ key: "ALL", label: "All Applications", count: totalCount }];
+    for (const sc of statusCounts.slice(0, 6)) {
+      list.push({
+        key: sc.status,
+        label: sc.status.replace(/_/g, " "),
+        count: sc._count,
+        highlight: sc.status === "AWAITING_APPROVAL" || sc.status === "SUBMISSION_ISSUE",
+      });
+    }
+    return list;
+  }, [totalCount, statusCounts]);
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    setPage(1);
+    syncUrlParams({ status: newTab === "ALL" ? null : newTab });
+  };
+
+  const handleSearchChange = (term: string) => {
+    setSearchTerm(term);
+    setPage(1);
+    syncUrlParams({ search: term ? term : null });
+  };
+
+  const handleSortChange = (field: string, direction: SortDirection) => {
+    setSortField(field);
+    setSortDirection(direction);
+  };
 
   const filtered = useMemo(() => {
     let result = applications;
 
-    if (statusFilter !== "ALL") {
-      result = result.filter((a) => a.status === statusFilter);
+    if (activeTab !== "ALL") {
+      result = result.filter((a) => a.status === activeTab);
     }
 
     const q = searchTerm.trim().toLowerCase();
@@ -63,8 +114,32 @@ export function AdminApplicationsWorkbench({
       });
     }
 
-    return result;
-  }, [applications, statusFilter, searchTerm]);
+    return [...result].sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+
+      if (sortField === "createdAt") {
+        aVal = new Date(a.createdAt).getTime();
+        bVal = new Date(b.createdAt).getTime();
+      } else if (sortField === "candidate") {
+        aVal = `${a.candidate?.user?.firstName || ""} ${a.candidate?.user?.lastName || ""}`.trim() || a.candidate?.user?.email;
+        bVal = `${b.candidate?.user?.firstName || ""} ${b.candidate?.user?.lastName || ""}`.trim() || b.candidate?.user?.email;
+      } else if (sortField === "company") {
+        aVal = a.job?.companyName || "";
+        bVal = b.job?.companyName || "";
+      } else if (sortField === "status") {
+        aVal = a.status;
+        bVal = b.status;
+      }
+
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      return sortDirection === "asc"
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+  }, [applications, activeTab, searchTerm, sortField, sortDirection]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginated = useMemo(() => {
@@ -73,134 +148,125 @@ export function AdminApplicationsWorkbench({
   }, [filtered, page, pageSize]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Application Operations Oversight</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Administrative monitoring, pipeline tracking, and audit review across all managed applications.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4 max-w-7xl mx-auto pb-16">
+      <WorkbenchShell ariaLabel="Admin Application Oversight Workbench">
+        <WorkbenchHeader
+          title="Application Operations Oversight"
+          description="Administrative monitoring, pipeline tracking, and operational audit review across all managed applications."
+          badge={`${totalCount} Total`}
+          badgeVariant="indigo"
+        />
 
-      {/* Metrics Row */}
-      <div className="bg-white rounded-lg border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter("ALL");
-              setPage(1);
-            }}
-            className={`p-4 text-left transition-colors cursor-pointer ${statusFilter === "ALL" ? "bg-slate-50" : "hover:bg-slate-50/60"}`}
-          >
-            <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Total Applications</div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1">{totalCount}</div>
-          </button>
-          {statusCounts.slice(0, 5).map((sc) => (
-            <button
-              key={sc.status}
-              type="button"
-              onClick={() => {
-                setStatusFilter(sc.status);
-                setPage(1);
-              }}
-              className={`p-4 text-left transition-colors cursor-pointer ${statusFilter === sc.status ? "bg-slate-50" : "hover:bg-slate-50/60"}`}
-            >
-              <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wide truncate">
-                {sc.status.replace(/_/g, " ")}
-              </div>
-              <div className="text-2xl font-semibold text-slate-900 mt-1">{sc._count}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Oversight Table */}
-      <div className="bg-white rounded-lg border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-200/80 bg-slate-50/75 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Managed Applications ({filtered.length})
-            </h2>
-            {statusFilter !== "ALL" && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
-                Filtered: {statusFilter.replace(/_/g, " ")}
-              </span>
-            )}
-          </div>
-
-          <div className="w-64">
+        <WorkbenchToolbar>
+          <InstantTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={handleTabChange}
+          />
+          <div className="flex items-center gap-3 w-full lg:w-auto">
             <InstantSearch
               value={searchTerm}
-              onChange={(term) => {
-                setSearchTerm(term);
-                setPage(1);
-              }}
-              placeholder="Search candidate, job, company..."
+              onChange={handleSearchChange}
+              placeholder="Search candidate, job, specialist... (/)"
+            />
+            <InstantSort
+              options={SORT_OPTIONS}
+              currentField={sortField}
+              currentDirection={sortDirection}
+              onSortChange={handleSortChange}
             />
           </div>
-        </div>
+        </WorkbenchToolbar>
 
-        <table className="min-w-full divide-y divide-slate-200/80 text-left text-xs">
-          <thead className="bg-slate-50/75 font-semibold uppercase tracking-wider text-[11px] text-slate-500">
-            <tr>
-              <th className="px-5 py-3">Candidate</th>
-              <th className="px-5 py-3">Job & Company</th>
-              <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Assignee</th>
-              <th className="px-5 py-3">Created</th>
-              <th className="px-5 py-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {paginated.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-slate-400">
-                  No applications match the criteria.
-                </td>
-              </tr>
-            ) : (
-              paginated.map((app) => (
-                <tr key={app.id} className="hover:bg-slate-50/60 transition-colors h-14">
-                  <td className="px-5 py-3 whitespace-nowrap">
-                    <div className="font-semibold text-slate-900">
-                      {app.candidate.user.firstName || app.candidate.user.lastName
-                        ? `${app.candidate.user.firstName ?? ""} ${app.candidate.user.lastName ?? ""}`.trim()
-                        : app.candidate.user.email}
-                    </div>
-                    <div className="font-mono text-[11px] text-slate-400">{app.candidate.user.email}</div>
-                  </td>
-                  <td className="px-5 py-3 whitespace-nowrap">
-                    <div className="font-medium text-slate-800">{app.job.title}</div>
-                    <div className="text-[11px] text-slate-400">{app.job.companyName}</div>
-                  </td>
-                  <td className="px-5 py-3 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
-                      {app.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 whitespace-nowrap text-slate-600">
-                    {app.assignedEmployee
-                      ? `${app.assignedEmployee.firstName || ""} ${app.assignedEmployee.lastName || app.assignedEmployee.email}`.trim()
-                      : <span className="text-slate-400 italic">Unassigned</span>}
-                  </td>
-                  <td className="px-5 py-3 whitespace-nowrap text-slate-500">
-                    {new Date(app.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-5 py-3 whitespace-nowrap text-right">
-                    <Link
-                      href={`/employee/applications/${app.id}`}
-                      className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs transition-colors"
-                    >
-                      Inspect →
-                    </Link>
-                  </td>
+        {filtered.length === 0 ? (
+          <WorkbenchEmptyState
+            title="No applications match active criteria"
+            description="Try adjusting your status tab or clearing the search filter."
+            actionText={searchTerm || activeTab !== "ALL" ? "Reset Filters" : undefined}
+            onAction={() => {
+              setSearchTerm("");
+              setActiveTab("ALL");
+              syncUrlParams({ search: null, status: null });
+            }}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+              <thead className="bg-slate-50 font-semibold uppercase tracking-wider text-[11px] text-slate-500">
+                <tr>
+                  <th scope="col" className="px-5 py-3">Candidate</th>
+                  <th scope="col" className="px-5 py-3">Job & Company</th>
+                  <th scope="col" className="px-5 py-3">Status</th>
+                  <th scope="col" className="px-5 py-3">Assigned Specialist</th>
+                  <th scope="col" className="px-5 py-3">Created Date</th>
+                  <th scope="col" className="px-5 py-3 text-right">Actions</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {paginated.map((app) => (
+                  <tr key={app.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <div className="font-semibold text-slate-900">
+                        {[app.candidate?.user?.firstName, app.candidate?.user?.lastName].filter(Boolean).join(" ") ||
+                          app.candidate?.user?.email ||
+                          "Unnamed Candidate"}
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        {app.candidate?.user?.email}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <div className="font-semibold text-slate-900">{app.job?.title || "Untitled Position"}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">{app.job?.companyName || "Unknown Company"}</div>
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                          app.status === "READY"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : app.status === "AWAITING_APPROVAL"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : app.status === "SUBMISSION_ISSUE"
+                            ? "bg-rose-50 text-rose-700 border border-rose-200"
+                            : app.status === "SUBMITTED"
+                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {app.status.replace(/_/g, " ")}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap text-slate-600">
+                      {app.assignedEmployee ? (
+                        <div className="font-medium text-slate-900">
+                          {[app.assignedEmployee.firstName, app.assignedEmployee.lastName].filter(Boolean).join(" ") ||
+                            app.assignedEmployee.email}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                      {new Date(app.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                      <Link
+                        href={`/employee/applications/${app.id}`}
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-xs transition-colors"
+                      >
+                        Inspect Dossier →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <TablePagination
           currentPage={page}
@@ -209,7 +275,7 @@ export function AdminApplicationsWorkbench({
           pageSize={pageSize}
           onPageChange={setPage}
         />
-      </div>
+      </WorkbenchShell>
     </div>
   );
 }
