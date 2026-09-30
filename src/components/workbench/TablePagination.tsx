@@ -26,25 +26,25 @@ export function TablePagination({
 
   return (
     <div
-      className={`px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 ${className}`}
+      className={`px-5 py-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8]/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#64748B] ${className}`}
     >
       <div>
-        Showing <span className="font-semibold text-slate-900">{startItem}</span> to{" "}
-        <span className="font-semibold text-slate-900">{endItem}</span> of{" "}
-        <span className="font-semibold text-slate-900">{totalItems}</span> records
+        Showing <span className="font-bold text-[#0F1720]">{startItem}</span> to{" "}
+        <span className="font-bold text-[#0F1720]">{endItem}</span> of{" "}
+        <span className="font-bold text-[#0F1720]">{totalItems}</span> records
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="px-2.5 py-1 rounded border border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+          className="px-3 py-1.5 rounded-[9px] border border-[#E5EAE7] bg-white font-medium text-[#0F1720] hover:bg-[#F7F9F8] disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-2xs transition-colors"
         >
           ← Prev
         </button>
 
-        <span className="px-2 font-mono font-medium">
+        <span className="px-2.5 font-mono font-bold text-[#0F1720]">
           {currentPage} / {totalPages}
         </span>
 
@@ -52,7 +52,7 @@ export function TablePagination({
           type="button"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="px-2.5 py-1 rounded border border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+          className="px-3 py-1.5 rounded-[9px] border border-[#E5EAE7] bg-white font-medium text-[#0F1720] hover:bg-[#F7F9F8] disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-2xs transition-colors"
         >
           Next →
         </button>

@@ -288,26 +288,26 @@ export default async function EmployeeWorkspacePage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* 1. Operational Workspace Header */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="bg-white rounded-[20px] border border-[#E5EAE7] p-5 shadow-[0_4px_18px_rgba(15,23,32,0.04)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Employee Command Center</h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#12A150] animate-pulse" />
+            <h1 className="text-lg sm:text-xl font-bold text-[#0F1720] tracking-tight">Employee Command Center</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#12A150]/[0.08] text-[#0B3B2C] border border-[#12A150]/20">
               OPERATIONAL WORK DESK
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <p className="mt-1 text-xs text-[#64748B] font-medium">
             Daily triage queue for assignments, priority action items, and submission handoffs.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs">
+          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#F7F9F8] border border-[#E5EAE7] text-[#64748B] shadow-2xs">
             {formattedCurrentDate}
           </span>
           <Link
             href="/employee/application-log"
-            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition"
+            className="inline-flex items-center px-3.5 py-1.5 rounded-[11px] text-xs font-semibold bg-[#12A150] hover:bg-[#0E8541] text-white shadow-2xs transition"
           >
             + Fast Intake
           </Link>
@@ -318,14 +318,14 @@ export default async function EmployeeWorkspacePage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Link
           href="/employee/tasks?scope=mine"
-          className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 transition group"
+          className="bg-white rounded-[16px] border border-[#E5EAE7] p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] hover:border-[#12A150]/40 transition group"
         >
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">My Active Tasks</div>
+          <div className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">My Active Tasks</div>
           <div className="mt-1.5 flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
+            <div className="text-2xl font-bold text-[#0F1720] group-hover:text-[#12A150] transition">
               {data.myTasksCount}
             </div>
-            <span className="text-[11px] font-semibold text-blue-600">
+            <span className="text-[11px] font-semibold text-[#12A150]">
               View Tasks →
             </span>
           </div>
@@ -333,14 +333,14 @@ export default async function EmployeeWorkspacePage() {
 
         <Link
           href="/employee/candidates?scope=mine"
-          className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 transition group"
+          className="bg-white rounded-[16px] border border-[#E5EAE7] p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] hover:border-[#12A150]/40 transition group"
         >
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assigned Candidates</div>
+          <div className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Assigned Candidates</div>
           <div className="mt-1.5 flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
+            <div className="text-2xl font-bold text-[#0F1720] group-hover:text-[#12A150] transition">
               {data.myCandidatesCount}
             </div>
-            <span className="text-[11px] font-semibold text-blue-600">
+            <span className="text-[11px] font-semibold text-[#12A150]">
               Directory →
             </span>
           </div>
@@ -348,14 +348,14 @@ export default async function EmployeeWorkspacePage() {
 
         <Link
           href="/employee/applications?scope=mine"
-          className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:border-blue-300 transition group"
+          className="bg-white rounded-[16px] border border-[#E5EAE7] p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] hover:border-[#12A150]/40 transition group"
         >
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Applications</div>
+          <div className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Active Applications</div>
           <div className="mt-1.5 flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition">
+            <div className="text-2xl font-bold text-[#0F1720] group-hover:text-[#12A150] transition">
               {data.activeApplicationsCount}
             </div>
-            <span className="text-[11px] font-semibold text-blue-600">
+            <span className="text-[11px] font-semibold text-[#12A150]">
               Queue →
             </span>
           </div>
@@ -363,17 +363,17 @@ export default async function EmployeeWorkspacePage() {
 
         <Link
           href="/employee/tasks?scope=mine&filter=due_today"
-          className={`rounded-xl border p-4 shadow-xs transition group ${
+          className={`rounded-[16px] border p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] transition group ${
             data.dueTodayTasksCount > 0
-              ? "bg-amber-50/70 border-amber-200"
-              : "bg-white border-slate-200/90 hover:border-slate-300"
+              ? "bg-amber-50/60 border-amber-200"
+              : "bg-white border-[#E5EAE7] hover:border-[#12A150]/40"
           }`}
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-amber-900">
             Due Today / Overdue
           </div>
           <div className="mt-1.5 flex items-baseline justify-between">
-            <div className={`text-2xl font-bold ${data.dueTodayTasksCount > 0 ? "text-amber-950" : "text-slate-900"}`}>
+            <div className={`text-2xl font-bold ${data.dueTodayTasksCount > 0 ? "text-amber-950" : "text-[#0F1720]"}`}>
               {data.dueTodayTasksCount}
             </div>
             <span className="text-[11px] font-semibold text-amber-800">
@@ -384,20 +384,20 @@ export default async function EmployeeWorkspacePage() {
       </div>
 
       {/* 3. Primary Operational Workspace: MY WORK QUEUE */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden transition-all">
-        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+      <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden transition-all">
+        <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">My Work Queue</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-slate-900 text-white font-mono font-bold">
+            <span className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">My Work Queue</span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#0B3B2C] text-white font-mono font-bold">
               {workItems.length}
             </span>
-            <span className="text-[11px] text-slate-500 hidden sm:inline">
+            <span className="text-[11px] text-[#64748B] hidden sm:inline">
               — Prioritized by SLA deadlines and operational dependencies
             </span>
           </div>
           <Link
             href="/employee/tasks?scope=mine"
-            className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition inline-flex items-center gap-1"
+            className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] transition inline-flex items-center gap-1"
           >
             <span>Open Task Board</span>
             <span>→</span>
@@ -405,10 +405,10 @@ export default async function EmployeeWorkspacePage() {
         </div>
 
         {workItems.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
-            <div className="text-2xl mb-1 text-slate-400">✓</div>
-            <h3 className="text-sm font-bold text-slate-800">All caught up</h3>
-            <p className="text-xs text-slate-500 mt-0.5 max-w-sm mx-auto">
+          <div className="p-12 text-center text-[#64748B]">
+            <div className="text-2xl mb-1 text-[#12A150]">✓</div>
+            <h3 className="text-sm font-bold text-[#0F1720]">All caught up</h3>
+            <p className="text-xs text-[#64748B] mt-0.5 max-w-sm mx-auto">
               No pending tasks or urgent application actions are assigned to you right now.
             </p>
           </div>
@@ -420,35 +420,35 @@ export default async function EmployeeWorkspacePage() {
               return (
                 <div
                   key={item.id}
-                  className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                  className={`p-4 rounded-[14px] border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
                     isTopItem
-                      ? "border-blue-200 bg-blue-50/40 hover:bg-blue-50/60"
-                      : "border-slate-200/80 bg-slate-50/30 hover:bg-white hover:border-slate-300"
+                      ? "border-[#12A150]/30 bg-[#12A150]/[0.04] hover:bg-[#12A150]/[0.07]"
+                      : "border-[#E5EAE7] bg-white hover:bg-[#F7F9F8] hover:border-[#12A150]/30"
                   }`}
                 >
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                           item.priority === "URGENT" || item.isOverdue
-                            ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            ? "bg-rose-50 text-rose-800 border border-rose-200"
                             : item.priority === "HIGH" || item.isDueToday
-                            ? "bg-amber-100 text-amber-900 border border-amber-200"
-                            : "bg-slate-100 text-slate-700 border border-slate-200"
+                            ? "bg-amber-50 text-amber-900 border border-amber-200"
+                            : "bg-[#F7F9F8] text-[#64748B] border border-[#E5EAE7]"
                         }`}
                       >
                         {item.isOverdue ? "OVERDUE" : item.isDueToday ? "DUE TODAY" : item.priority}
                       </span>
 
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                           item.status === "READY"
-                            ? "bg-sky-100 text-sky-800 border border-sky-200"
+                            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                             : item.status === "IN_PROGRESS"
-                            ? "bg-blue-100 text-blue-800 border border-blue-200"
+                            ? "bg-blue-50 text-blue-800 border border-blue-200"
                             : item.status === "BLOCKED" || item.status === "ESCALATED"
-                            ? "bg-rose-100 text-rose-800 border border-rose-200"
-                            : "bg-slate-100 text-slate-700 border border-slate-200"
+                            ? "bg-rose-50 text-rose-800 border border-rose-200"
+                            : "bg-[#F7F9F8] text-[#64748B] border border-[#E5EAE7]"
                         }`}
                       >
                         {item.status.replace(/_/g, " ")}
@@ -457,7 +457,7 @@ export default async function EmployeeWorkspacePage() {
                       {item.dueDateContext && (
                         <span
                           className={`text-[11px] font-medium ${
-                            item.isOverdue ? "text-rose-700 font-semibold" : item.isDueToday ? "text-amber-800 font-semibold" : "text-slate-500"
+                            item.isOverdue ? "text-rose-700 font-semibold" : item.isDueToday ? "text-amber-800 font-semibold" : "text-[#64748B]"
                           }`}
                         >
                           ⏱ {item.dueDateContext}
@@ -465,22 +465,22 @@ export default async function EmployeeWorkspacePage() {
                       )}
                     </div>
 
-                    <h3 className="text-xs font-bold text-slate-900">
-                      <Link href={item.actionUrl} className="hover:text-blue-600 transition">
+                    <h3 className="text-xs font-bold text-[#0F1720]">
+                      <Link href={item.actionUrl} className="hover:text-[#12A150] transition">
                         {item.title}
                       </Link>
                     </h3>
 
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                    <div className="flex items-center gap-2 text-[11px] text-[#64748B] flex-wrap">
                       {item.candidateName && (
                         <span>
                           Candidate:{" "}
                           {item.candidateId ? (
-                            <Link href={`/employee/candidates/${item.candidateId}`} className="font-semibold text-slate-700 hover:underline">
+                            <Link href={`/employee/candidates/${item.candidateId}`} className="font-semibold text-[#0F1720] hover:underline">
                               {item.candidateName}
                             </Link>
                           ) : (
-                            <strong className="text-slate-700 font-semibold">{item.candidateName}</strong>
+                            <strong className="text-[#0F1720] font-semibold">{item.candidateName}</strong>
                           )}
                         </span>
                       )}
@@ -488,7 +488,7 @@ export default async function EmployeeWorkspacePage() {
                         <>
                           <span>•</span>
                           <span>
-                            Role: <strong className="text-slate-700 font-semibold">{item.jobTitle}</strong>
+                            Role: <strong className="text-[#0F1720] font-semibold">{item.jobTitle}</strong>
                             {item.companyName && ` @ ${item.companyName}`}
                           </span>
                         </>
@@ -499,10 +499,10 @@ export default async function EmployeeWorkspacePage() {
                   <div className="shrink-0 flex items-center gap-2">
                     <Link
                       href={item.actionUrl}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1 ${
+                      className={`px-3.5 py-1.5 rounded-[11px] text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1 ${
                         isTopItem
-                          ? "bg-blue-600 hover:bg-blue-700 text-white"
-                          : "bg-slate-900 hover:bg-slate-800 text-white"
+                          ? "bg-[#12A150] hover:bg-[#0E8541] text-white"
+                          : "bg-[#0B3B2C] hover:bg-[#082D22] text-white"
                       }`}
                     >
                       {item.actionLabel}
@@ -518,28 +518,28 @@ export default async function EmployeeWorkspacePage() {
       {/* 4. Two-Column Operational Surface: Ready for Submission & Dependencies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Section: READY FOR EXTERNAL SUBMISSION */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col">
-          <div className="px-5 py-3.5 border-b border-slate-100 bg-sky-50/40 flex justify-between items-center">
+        <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex justify-between items-center">
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-600" />
-                <h2 className="text-xs font-bold text-sky-950 uppercase tracking-wider">Ready for External Submission</h2>
+                <span className="w-2 h-2 rounded-full bg-[#12A150]" />
+                <h2 className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">Ready for External Submission</h2>
               </div>
-              <p className="text-[11px] text-sky-900/80 mt-0.5">
+              <p className="text-[11px] text-[#64748B] mt-0.5">
                 Approved packages ready for manual external submission on employer portals.
               </p>
             </div>
             <Link
               href="/employee/applications?status=READY"
-              className="text-xs font-semibold text-sky-700 hover:text-sky-900 hover:underline shrink-0"
+              className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline shrink-0"
             >
               View All ({data.readyApplications.length}) →
             </Link>
           </div>
 
-          <div className="divide-y divide-slate-100 flex-1">
+          <div className="divide-y divide-[#EDF1EF] flex-1">
             {data.readyApplications.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
+              <div className="p-6 text-center text-xs text-[#64748B]">
                 No applications currently waiting for external submission.
               </div>
             ) : (
@@ -549,28 +549,28 @@ export default async function EmployeeWorkspacePage() {
                   app.candidate.user.email;
 
                 return (
-                  <div key={app.id} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                  <div key={app.id} className="p-4 hover:bg-[#12A150]/[0.035] transition flex items-center justify-between gap-3 text-xs">
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <Link href={`/employee/candidates/${app.candidateId}`} className="font-semibold text-slate-900 hover:underline truncate">
+                        <Link href={`/employee/candidates/${app.candidateId}`} className="font-semibold text-[#0F1720] hover:underline truncate">
                           {candName}
                         </Link>
-                        <span className="text-slate-400">→</span>
-                        <span className="text-slate-700 font-medium truncate">{app.job.title}</span>
+                        <span className="text-[#94A3B8]">→</span>
+                        <span className="text-[#0F1720] font-medium truncate">{app.job.title}</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-[11px] text-[#64748B] truncate">
                         {app.job.companyName} {app.job.location && `• ${app.job.location}`}
                       </p>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-2">
-                        <span>QA: <strong className="text-emerald-700 font-semibold">Passed</strong></span>
+                      <div className="text-[10px] text-[#64748B] flex items-center gap-2">
+                        <span>QA: <strong className="text-[#12A150] font-semibold">Passed</strong></span>
                         <span>•</span>
-                        <span>Mode: <strong className="text-slate-700">{app.candidate.applicationAuthorizationMode}</strong></span>
+                        <span>Mode: <strong className="text-[#0F1720]">{app.candidate.applicationAuthorizationMode}</strong></span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Link
                         href={`/employee/applications/${app.id}`}
-                        className="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs transition"
+                        className="px-3.5 py-1.5 rounded-[11px] bg-[#12A150] hover:bg-[#0E8541] text-white text-xs font-semibold shadow-2xs transition"
                       >
                         Submit →
                       </Link>
@@ -583,19 +583,19 @@ export default async function EmployeeWorkspacePage() {
         </div>
 
         {/* Section: WAITING ON (Dependency Tracking) */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col">
-          <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/75 flex justify-between items-center">
+        <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex justify-between items-center">
             <div>
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Dependencies & Attention Items</h2>
-              <p className="text-[11px] text-slate-500 mt-0.5">
+              <h2 className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">Dependencies & Attention Items</h2>
+              <p className="text-[11px] text-[#64748B] mt-0.5">
                 Work waiting on candidate authorization, QA decisions, or blocker resolutions.
               </p>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100 flex-1">
+          <div className="divide-y divide-[#EDF1EF] flex-1">
             {data.awaitingApprovalApps.length === 0 && data.waitingOrBlockedTasks.length === 0 && data.qaReviewApps.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
+              <div className="p-6 text-center text-xs text-[#64748B]">
                 No active dependencies blocking your workflow.
               </div>
             ) : (
@@ -607,21 +607,21 @@ export default async function EmployeeWorkspacePage() {
                     app.candidate.user.email;
 
                   return (
-                    <div key={`wait-cand-${app.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                    <div key={`wait-cand-${app.id}`} className="p-4 hover:bg-[#12A150]/[0.035] transition flex items-center justify-between gap-3 text-xs">
                       <div className="space-y-0.5 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-bold text-[10px] uppercase">
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 font-bold text-[10px] uppercase">
                             Candidate Sign-off
                           </span>
-                          <span className="font-semibold text-slate-900 truncate">{candName}</span>
+                          <span className="font-semibold text-[#0F1720] truncate">{candName}</span>
                         </div>
-                        <p className="text-slate-600 text-[11px] truncate">
+                        <p className="text-[#64748B] text-[11px] truncate">
                           Application for <strong>{app.job.title}</strong> at {app.job.companyName}
                         </p>
                       </div>
                       <Link
                         href={`/employee/applications/${app.id}`}
-                        className="text-xs font-semibold text-slate-700 hover:text-slate-900 hover:underline shrink-0"
+                        className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline shrink-0"
                       >
                         View Status →
                       </Link>
@@ -636,15 +636,15 @@ export default async function EmployeeWorkspacePage() {
                     app.candidate.user.email;
 
                   return (
-                    <div key={`wait-qa-${app.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                    <div key={`wait-qa-${app.id}`} className="p-4 hover:bg-[#12A150]/[0.035] transition flex items-center justify-between gap-3 text-xs">
                       <div className="space-y-0.5 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-200 font-bold text-[10px] uppercase">
+                          <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-900 border border-purple-200 font-bold text-[10px] uppercase">
                             QA Decision
                           </span>
-                          <span className="font-semibold text-slate-900 truncate">{app.job.title}</span>
+                          <span className="font-semibold text-[#0F1720] truncate">{app.job.title}</span>
                         </div>
-                        <p className="text-slate-600 text-[11px] truncate">
+                        <p className="text-[#64748B] text-[11px] truncate">
                           Candidate: {candName} @ {app.job.companyName}
                         </p>
                       </div>
@@ -660,21 +660,21 @@ export default async function EmployeeWorkspacePage() {
 
                 {/* 3. Blocked / Waiting Tasks */}
                 {data.waitingOrBlockedTasks.map((t) => (
-                  <div key={`wait-task-${t.id}`} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                  <div key={`wait-task-${t.id}`} className="p-4 hover:bg-[#12A150]/[0.035] transition flex items-center justify-between gap-3 text-xs">
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 font-bold text-[10px] uppercase">
+                        <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200 font-bold text-[10px] uppercase">
                           {t.status}
                         </span>
-                        <span className="font-semibold text-slate-900 truncate">{t.title}</span>
+                        <span className="font-semibold text-[#0F1720] truncate">{t.title}</span>
                       </div>
-                      <p className="text-slate-500 text-[11px] truncate">
+                      <p className="text-[#64748B] text-[11px] truncate">
                         {t.blockedReason || t.waitingReason || t.escalationReason || "Awaiting resolution"}
                       </p>
                     </div>
                     <Link
                       href={`/employee/tasks/${t.id}`}
-                      className="text-xs font-semibold text-slate-700 hover:text-slate-900 hover:underline shrink-0"
+                      className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline shrink-0"
                     >
                       Resolve →
                     </Link>
@@ -686,7 +686,7 @@ export default async function EmployeeWorkspacePage() {
         </div>
       </div>
 
-      {/* 5. Authoritative Operational Summary Strip (Replacing fake score gauges) */}
+      {/* 5. Authoritative Operational Summary Strip */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <TelemetryGauge
           displayValue={`${data.dueTodayTasksCount} Due Today`}
@@ -726,20 +726,20 @@ export default async function EmployeeWorkspacePage() {
       </div>
 
       {/* 6. Operational History: Recent Submissions Recorded by You */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/75 flex justify-between items-center">
+      <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex justify-between items-center">
           <div>
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">My Recorded External Submissions</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">Authoritative audit log of external job portal submissions recorded by you.</p>
+            <h2 className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">My Recorded External Submissions</h2>
+            <p className="text-[11px] text-[#64748B] mt-0.5">Authoritative audit log of external job portal submissions recorded by you.</p>
           </div>
-          <Link href="/employee/applications?status=SUBMITTED" className="text-xs font-semibold text-slate-700 hover:underline">
+          <Link href="/employee/applications?status=SUBMITTED" className="text-xs font-semibold text-[#12A150] hover:underline">
             All Submitted Applications →
           </Link>
         </div>
 
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-[#EDF1EF]">
           {data.myRecentSubmissions.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-500">
+            <div className="p-6 text-center text-xs text-[#64748B]">
               No external submissions recorded by you yet.
             </div>
           ) : (
@@ -749,15 +749,15 @@ export default async function EmployeeWorkspacePage() {
                 sub.application.candidate.user.email;
 
               return (
-                <div key={sub.id} className="p-4 hover:bg-slate-50/75 transition flex items-center justify-between gap-3 text-xs">
+                <div key={sub.id} className="p-4 hover:bg-[#12A150]/[0.035] transition flex items-center justify-between gap-3 text-xs">
                   <div className="space-y-0.5 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900">{sub.application.job.companyName}</span>
-                      <span className="text-slate-400">·</span>
-                      <span className="text-slate-700 font-medium">{sub.application.job.title}</span>
+                      <span className="font-semibold text-[#0F1720]">{sub.application.job.companyName}</span>
+                      <span className="text-[#94A3B8]">·</span>
+                      <span className="text-[#0F1720] font-medium">{sub.application.job.title}</span>
                     </div>
-                    <div className="text-slate-500 flex items-center gap-2 text-[11px] flex-wrap">
-                      <span>Candidate: <strong className="text-slate-700">{candName}</strong></span>
+                    <div className="text-[#64748B] flex items-center gap-2 text-[11px] flex-wrap">
+                      <span>Candidate: <strong className="text-[#0F1720]">{candName}</strong></span>
                       <span>•</span>
                       <span>Attempt #{sub.attemptNumber}</span>
                       <span>•</span>
@@ -767,13 +767,13 @@ export default async function EmployeeWorkspacePage() {
 
                   <div className="flex items-center gap-2 shrink-0">
                     {sub.externalReference && (
-                      <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-slate-700">
+                      <span className="font-mono text-[11px] bg-[#F7F9F8] px-2.5 py-0.5 rounded-full border border-[#E5EAE7] text-[#64748B]">
                         Ref: {sub.externalReference}
                       </span>
                     )}
                     <Link
                       href={`/employee/applications/${sub.application.id}`}
-                      className="text-xs font-semibold text-blue-600 hover:underline"
+                      className="text-xs font-semibold text-[#12A150] hover:underline"
                     >
                       View Record →
                     </Link>

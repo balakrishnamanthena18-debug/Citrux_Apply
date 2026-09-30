@@ -36,7 +36,7 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] antialiased text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-[#F7F9F8] antialiased text-[#0F1720] selection:bg-emerald-500/20 selection:text-[#0B3B2C]">
       {/* Desktop Fixed Persistent Sidebar (>= 1024px / lg:) */}
       <div className="hidden lg:block">
         <AppSidebar
@@ -57,13 +57,13 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
         >
           {/* Controlled Backdrop (25-30% opacity, minimal/no blur) */}
           <div
-            className="fixed inset-0 bg-slate-900/30 transition-opacity"
+            className="fixed inset-0 bg-[#0B3B2C]/25 transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
             aria-hidden="true"
           />
 
           {/* Drawer Panel */}
-          <div className="relative flex flex-col w-[min(320px,86vw)] max-w-[320px] bg-white z-50 shadow-xl border-r border-slate-200/80 h-full">
+          <div className="relative flex flex-col w-[min(320px,86vw)] max-w-[320px] bg-white z-50 shadow-xl border-r border-[#E5EAE7] h-full">
             <AppSidebar
               role={role}
               email={email}

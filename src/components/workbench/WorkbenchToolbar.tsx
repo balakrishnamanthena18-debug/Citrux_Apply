@@ -13,7 +13,7 @@ export function WorkbenchToolbar({
 }: WorkbenchToolbarProps) {
   return (
     <div
-      className={`px-5 py-3 border-b border-slate-200 bg-slate-50/50 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 ${className}`}
+      className={`px-5 py-3 border-b border-[#EDF1EF] bg-[#F7F9F8]/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 ${className}`}
     >
       {children}
     </div>

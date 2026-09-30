@@ -79,22 +79,22 @@ export function CandidateCommandCenter({
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16">
       {/* 1. Header with Restrained Height & Clear Hierarchy */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs">
+      <div className="bg-[#0B3B2C] text-white rounded-[20px] p-6 sm:p-7 shadow-[0_4px_18px_rgba(15,23,32,0.06)] border border-[#0B3B2C]">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#C6F432]">
                 Candidate Command Center
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-              <span className="text-xs text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#12A150]" />
+              <span className="text-xs text-white/70">
                 Career Operations Desk
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-white">
               {candidateGreetingTime}, {candidateName}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500">
+            <p className="text-xs sm:text-sm text-white/80 max-w-2xl">
               Here is what is happening across your active job search, tailored materials, and submission pipeline.
             </p>
           </div>
@@ -102,13 +102,13 @@ export function CandidateCommandCenter({
           <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
             <Link
               href="/candidate/applications"
-              className="flex-1 sm:flex-initial text-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition shadow-2xs"
+              className="flex-1 sm:flex-initial text-center px-4 py-2 rounded-[11px] text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition shadow-2xs"
             >
               All Applications
             </Link>
             <Link
               href="/candidate/messages"
-              className="flex-1 sm:flex-initial text-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition shadow-2xs"
+              className="flex-1 sm:flex-initial text-center px-4 py-2 rounded-[11px] text-xs font-semibold bg-[#12A150] hover:bg-[#0E8541] text-white transition shadow-2xs"
             >
               Message Team
             </Link>
@@ -116,55 +116,55 @@ export function CandidateCommandCenter({
         </div>
 
         {/* Horizontal Information & Telemetry Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-slate-100 text-xs">
-          <div className="p-3 rounded-lg bg-slate-50/80 border border-slate-100">
-            <span className="text-[11px] font-medium text-slate-500 block">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10 text-xs">
+          <div className="p-3.5 rounded-[14px] bg-white/[0.08] border border-white/10">
+            <span className="text-[11px] font-semibold text-white/70 block">
               In Active Pipeline
             </span>
-            <span className="text-lg font-bold text-slate-900 block mt-0.5">
+            <span className="text-xl font-bold text-white block mt-0.5">
               {stats.activeApplications}
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">
+            <span className="text-[10px] text-white/60 block mt-0.5">
               Discovery, tailoring & review
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-200/80">
-            <span className="text-[11px] font-semibold text-amber-800 block">
+          <div className="p-3.5 rounded-[14px] bg-amber-500/20 border border-amber-400/30">
+            <span className="text-[11px] font-bold text-amber-200 block">
               Awaiting Your Review
             </span>
-            <span className="text-lg font-bold text-amber-950 block mt-0.5">
+            <span className="text-xl font-bold text-white block mt-0.5">
               {stats.awaitingApprovalApplications}
             </span>
-            <span className="text-[10px] text-amber-700 block mt-0.5">
+            <span className="text-[10px] text-amber-200/80 block mt-0.5">
               {stats.awaitingApprovalApplications > 0
                 ? "Approval needed before submission"
                 : "No pending sign-offs"}
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-200/80">
-            <span className="text-[11px] font-semibold text-emerald-800 block">
+          <div className="p-3.5 rounded-[14px] bg-[#12A150]/20 border border-[#12A150]/40">
+            <span className="text-[11px] font-bold text-[#C6F432] block">
               Submitted Applications
             </span>
-            <span className="text-lg font-bold text-emerald-950 block mt-0.5">
+            <span className="text-xl font-bold text-white block mt-0.5">
               {stats.submittedApplications}
             </span>
-            <span className="text-[10px] text-emerald-700 block mt-0.5">
+            <span className="text-[10px] text-emerald-200/80 block mt-0.5">
               Verified employer receipts
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-slate-50/80 border border-slate-100">
-            <span className="text-[11px] font-medium text-slate-500 block">
+          <div className="p-3.5 rounded-[14px] bg-white/[0.08] border border-white/10">
+            <span className="text-[11px] font-semibold text-white/70 block">
               Profile Readiness
             </span>
-            <span className="text-lg font-bold text-slate-900 block mt-0.5">
+            <span className="text-xl font-bold text-white block mt-0.5">
               {candidateProfile.verificationStatus === "VERIFIED"
                 ? "Verified"
                 : "Active"}
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">
+            <span className="text-[10px] text-white/60 block mt-0.5">
               {candidateProfile.documentsCount} documents in vault
             </span>
           </div>

@@ -134,7 +134,11 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
         console.error("[AUTH_FLOW] logSystemAuditEvent error:", e);
       }
 
-      return { success: false, error: "Invalid email or password" };
+      const errorMessage = error?.message?.toLowerCase().includes("email not confirmed")
+        ? "Email not confirmed. Please verify your email address before signing in."
+        : "Invalid email or password";
+
+      return { success: false, error: errorMessage };
     }
 
     // 2. Resolve membership within transaction-local RLS context to verify active status
@@ -198,9 +202,16 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
     }
   } catch (globalErr: any) {
     console.error("[AUTH_FLOW] Unexpected signInAction global exception:", globalErr);
+    const isConnError =
+      globalErr?.message?.toLowerCase().includes("fetch") ||
+      globalErr?.message?.toLowerCase().includes("connect") ||
+      globalErr?.message?.toLowerCase().includes("network");
+
     return {
       success: false,
-      error: "An unexpected error occurred during sign in. Please try again.",
+      error: isConnError
+        ? "Unable to connect to the authentication service. Please check your network and try again."
+        : "An unexpected error occurred during sign in. Please try again.",
     };
   }
 }

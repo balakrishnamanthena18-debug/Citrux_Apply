@@ -103,23 +103,23 @@ export function CandidateProfileHealth({ candidate }: Props) {
   const incompleteCount = items.filter((i) => !i.isComplete).length;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between">
+    <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
       <div>
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
+        <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
               Career Profile Health
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-[#64748B] mt-0.5">
               Canonical fact verification & profile completeness
             </p>
           </div>
 
           <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
               incompleteCount === 0
-                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                ? "bg-[#12A150]/[0.08] text-[#0B3B2C] border border-[#12A150]/20"
                 : "bg-amber-50 text-amber-800 border border-amber-200"
             }`}
           >
@@ -130,7 +130,7 @@ export function CandidateProfileHealth({ candidate }: Props) {
         </div>
 
         {/* Checklist */}
-        <div className="divide-y divide-slate-100 px-5 py-2">
+        <div className="divide-y divide-[#EDF1EF] px-5 py-2">
           {items.map((item) => (
             <div
               key={item.id}
@@ -140,15 +140,15 @@ export function CandidateProfileHealth({ candidate }: Props) {
                 <span
                   className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                     item.isComplete
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-slate-100 text-slate-400 border border-slate-300"
+                      ? "bg-[#12A150]/[0.12] text-[#12A150]"
+                      : "bg-[#F7F9F8] text-[#94A3B8] border border-[#E5EAE7]"
                   }`}
                 >
                   {item.isComplete ? "✓" : "○"}
                 </span>
                 <span
                   className={`font-medium truncate ${
-                    item.isComplete ? "text-slate-800" : "text-slate-600"
+                    item.isComplete ? "text-[#0F1720]" : "text-[#64748B]"
                   }`}
                 >
                   {item.label}
@@ -157,7 +157,7 @@ export function CandidateProfileHealth({ candidate }: Props) {
 
               <span
                 className={`truncate text-right max-w-[180px] sm:max-w-[220px] ${
-                  item.isComplete ? "text-slate-500" : "text-amber-700 font-medium"
+                  item.isComplete ? "text-[#64748B]" : "text-amber-700 font-medium"
                 }`}
               >
                 {item.details}
@@ -168,13 +168,13 @@ export function CandidateProfileHealth({ candidate }: Props) {
       </div>
 
       {/* Footer CTA */}
-      <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-        <span className="text-xs text-slate-500">
+      <div className="px-5 py-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8] flex items-center justify-between">
+        <span className="text-xs text-[#64748B]">
           Canonical source of truth
         </span>
         <Link
           href="/candidate/profile"
-          className="text-xs font-semibold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+          className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] inline-flex items-center gap-1"
         >
           <span>Review Career Profile</span>
           <span>→</span>

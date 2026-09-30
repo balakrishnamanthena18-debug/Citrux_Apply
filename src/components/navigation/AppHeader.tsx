@@ -76,14 +76,14 @@ export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeader
     .toUpperCase() || "U";
 
   return (
-    <header className="h-14 lg:h-16 bg-white border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between flex-shrink-0 z-20 sticky top-0">
+    <header className="h-14 lg:h-16 bg-white border-b border-[#E5EAE7] px-4 sm:px-6 flex items-center justify-between flex-shrink-0 z-20 sticky top-0">
       {/* Left: Hamburger (Mobile & Tablet) + Breadcrumbs */}
       <div className="flex items-center space-x-2 min-w-0">
         {onOpenMobileMenu && (
           <button
             type="button"
             onClick={onOpenMobileMenu}
-            className="lg:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex-shrink-0"
+            className="lg:hidden p-1.5 -ml-1 text-[#64748B] hover:text-[#0F1720] hover:bg-[#F7F9F8] rounded-lg transition-colors flex-shrink-0"
             aria-label="Open navigation menu"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,13 +93,13 @@ export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeader
         )}
 
         <div className="flex items-center space-x-2 text-xs truncate">
-          <span className="font-medium text-slate-400">OOS</span>
-          <span className="text-slate-300">/</span>
-          <span className="font-medium text-slate-600">{breadcrumb}</span>
+          <span className="font-semibold text-[#94A3B8]">OOS</span>
+          <span className="text-[#E5EAE7]">/</span>
+          <span className="font-medium text-[#64748B]">{breadcrumb}</span>
           {section && (
             <>
-              <span className="text-slate-300">/</span>
-              <span className="font-semibold text-slate-900 truncate">{section}</span>
+              <span className="text-[#E5EAE7]">/</span>
+              <span className="font-bold text-[#0F1720] truncate">{section}</span>
             </>
           )}
         </div>
@@ -110,16 +110,16 @@ export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeader
         {/* Realtime Notifications */}
         <NotificationsBell />
 
-        <div className="h-4 w-[1px] bg-slate-200" />
+        <div className="h-4 w-[1px] bg-[#E5EAE7]" />
 
         {/* Role Badge */}
         <span
-          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase ${
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
             role === "ADMIN"
               ? "bg-purple-50 text-purple-700 border border-purple-200/60"
               : role === "EMPLOYEE"
               ? "bg-blue-50 text-blue-700 border border-blue-200/60"
-              : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+              : "bg-emerald-50 text-[#12A150] border border-emerald-200/60"
           }`}
         >
           {role}
@@ -127,10 +127,10 @@ export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeader
 
         {/* User Account Snippet */}
         <div className="flex items-center space-x-2 pl-1">
-          <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px] flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-[#12A150]/10 text-[#0B3B2C] border border-[#12A150]/20 font-bold text-[10px] flex items-center justify-center">
             {initials}
           </div>
-          <span className="text-xs font-medium text-slate-700 hidden sm:inline-block max-w-[140px] truncate">
+          <span className="text-xs font-semibold text-[#0F1720] hidden sm:inline-block max-w-[140px] truncate">
             {displayName}
           </span>
         </div>

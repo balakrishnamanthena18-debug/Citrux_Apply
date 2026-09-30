@@ -46,7 +46,7 @@ export function InstantFilterBar({
               id={`filter-${filter.key}`}
               value={currentValue}
               onChange={(e) => onChange(filter.key, e.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs bg-white text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-500 focus:border-slate-500 transition-colors cursor-pointer"
+              className="rounded-[10px] border border-[#DDE5E0] px-3 py-1.5 text-xs bg-white text-[#0F1720] font-medium focus:outline-none focus:ring-1 focus:ring-[#12A150] focus:border-[#12A150] transition-colors cursor-pointer"
             >
               <option value="">{filter.allLabel || `All ${filter.label}`}</option>
               {filter.options.map((opt) => (
@@ -65,7 +65,7 @@ export function InstantFilterBar({
         <button
           type="button"
           onClick={onClearAll}
-          className="px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+          className="px-2.5 py-1.5 text-xs font-semibold text-[#64748B] hover:text-[#12A150] transition-colors cursor-pointer"
         >
           Reset Filters
         </button>

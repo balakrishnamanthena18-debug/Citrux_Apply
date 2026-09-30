@@ -39,20 +39,20 @@ export function PendingButton({
   };
 
   const variantStyles: Record<string, string> = {
-    primary: "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300",
-    secondary: "bg-slate-100 text-slate-800 hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400",
-    danger: "bg-rose-600 text-white hover:bg-rose-700 disabled:bg-rose-300",
-    outline: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 disabled:bg-slate-50 disabled:text-slate-400",
-    ghost: "bg-transparent text-slate-700 hover:bg-slate-100 disabled:text-slate-400",
-    amber: "bg-amber-600 text-white hover:bg-amber-700 disabled:bg-amber-300",
-    emerald: "bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-emerald-300",
-    indigo: "bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300",
+    primary: "bg-[#12A150] text-white hover:bg-[#0E8541] disabled:bg-slate-200 disabled:text-slate-400 shadow-sm",
+    secondary: "bg-white text-[#0F1720] border border-[#E5EAE7] hover:bg-[#F7F9F8] hover:border-[#DDE5E0] disabled:bg-[#F7F9F8] disabled:text-slate-300 shadow-2xs",
+    danger: "bg-[#DC2626] text-white hover:bg-[#B91C1C] disabled:bg-rose-200 disabled:text-rose-400 shadow-sm",
+    outline: "bg-white text-[#0F1720] border border-[#E5EAE7] hover:bg-[#F7F9F8] hover:border-[#DDE5E0] disabled:bg-white disabled:text-slate-300",
+    ghost: "bg-transparent text-[#64748B] hover:text-[#0F1720] hover:bg-[#12A150]/[0.05] disabled:text-slate-300",
+    amber: "bg-[#D97706] text-white hover:bg-[#B45309] disabled:bg-amber-200 shadow-sm",
+    emerald: "bg-[#12A150] text-white hover:bg-[#0E8541] disabled:bg-emerald-200 shadow-sm",
+    indigo: "bg-[#0B3B2C] text-[#C6F432] hover:bg-[#082d21] disabled:bg-slate-300 shadow-sm",
   };
 
   const sizeStyles: Record<string, string> = {
-    sm: "px-2.5 py-1 text-xs",
-    md: "px-3.5 py-1.5 text-xs font-semibold",
-    lg: "px-4 py-2 text-sm font-semibold",
+    sm: "px-2.5 py-1 text-xs font-medium rounded-lg",
+    md: "px-3.5 py-1.5 text-xs font-semibold rounded-[11px]",
+    lg: "px-4 py-2 text-sm font-semibold rounded-[11px]",
   };
 
   return (
@@ -61,7 +61,7 @@ export function PendingButton({
       disabled={disabled || isPending}
       aria-busy={isPending}
       onClick={handleClick}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-md transition-all duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
+      className={`inline-flex items-center justify-center gap-1.5 transition-all duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150] focus-visible:ring-offset-1 ${
         variantStyles[variant] || variantStyles.primary
       } ${sizeStyles[size] || sizeStyles.md} ${className}`}
       {...props}

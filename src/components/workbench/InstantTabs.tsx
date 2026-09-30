@@ -69,19 +69,19 @@ export function InstantTabs({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(tab.key)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 select-none ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150] select-none ${
               isActive
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                ? "bg-[#0B3B2C] text-white shadow-sm"
+                : "bg-transparent text-[#64748B] hover:bg-[#12A150]/[0.05] hover:text-[#0F1720]"
             }`}
           >
             <span>{tab.label}</span>
             {tab.count !== undefined && (
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium transition-colors ${
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
                   isActive
-                    ? "bg-slate-800 text-slate-200"
-                    : "bg-slate-100 text-slate-600"
+                    ? "bg-[#12A150]/40 text-[#C6F432]"
+                    : "bg-[#EDF1EF] text-[#64748B]"
                 }`}
               >
                 {tab.count}

@@ -36,7 +36,7 @@ export function InstantSort({
 
   return (
     <div className={`inline-flex items-center gap-1.5 text-xs ${className}`}>
-      <label htmlFor="sort-field-select" className="text-slate-500 font-medium whitespace-nowrap">
+      <label htmlFor="sort-field-select" className="text-[#64748B] font-medium whitespace-nowrap">
         Sort by:
       </label>
       <select
@@ -45,7 +45,7 @@ export function InstantSort({
         onChange={handleFieldChange}
         disabled={disabled}
         aria-label="Sort by field"
-        className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs bg-white text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-500 focus:border-slate-500 transition-colors cursor-pointer disabled:opacity-50"
+        className="rounded-[10px] border border-[#DDE5E0] px-2.5 py-1.5 text-xs bg-white text-[#0F1720] font-medium focus:outline-none focus:ring-1 focus:ring-[#12A150] focus:border-[#12A150] transition-colors cursor-pointer disabled:opacity-50"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -59,7 +59,7 @@ export function InstantSort({
         disabled={disabled}
         aria-label={`Toggle sort direction (currently ${currentDirection === "asc" ? "ascending" : "descending"})`}
         title={`Sort ${currentDirection === "asc" ? "Ascending" : "Descending"}`}
-        className="p-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center min-w-[28px]"
+        className="p-1.5 rounded-[10px] border border-[#DDE5E0] bg-white hover:bg-[#F7F9F8] text-[#0F1720] font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center min-w-[28px]"
       >
         {currentDirection === "asc" ? "▲" : "▼"}
       </button>

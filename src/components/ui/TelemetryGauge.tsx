@@ -23,68 +23,68 @@ export function TelemetryGauge({
 }: TelemetryGaugeProps) {
   const colorMap = {
     blue: {
-      accent: "bg-blue-600",
-      text: "text-blue-600",
-      badge: "bg-blue-50 text-blue-700 border-blue-200",
-      pill: "bg-blue-50 text-blue-800",
+      accent: "bg-[#2563EB]",
+      text: "text-[#2563EB]",
+      badge: "bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20",
+      pill: "bg-[#2563EB]/10 text-[#2563EB]",
     },
     emerald: {
-      accent: "bg-emerald-600",
-      text: "text-emerald-600",
-      badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      pill: "bg-emerald-50 text-emerald-800",
+      accent: "bg-[#12A150]",
+      text: "text-[#12A150]",
+      badge: "bg-[#12A150]/10 text-[#0B3B2C] border-[#12A150]/25",
+      pill: "bg-[#12A150]/10 text-[#0B3B2C]",
     },
     amber: {
-      accent: "bg-amber-500",
-      text: "text-amber-600",
-      badge: "bg-amber-50 text-amber-800 border-amber-200",
-      pill: "bg-amber-50 text-amber-900",
+      accent: "bg-[#D97706]",
+      text: "text-[#D97706]",
+      badge: "bg-[#D97706]/10 text-[#B45309] border-[#D97706]/20",
+      pill: "bg-[#D97706]/10 text-[#B45309]",
     },
     indigo: {
-      accent: "bg-indigo-600",
-      text: "text-indigo-600",
-      badge: "bg-indigo-50 text-indigo-700 border-indigo-200",
-      pill: "bg-indigo-50 text-indigo-800",
+      accent: "bg-[#0B3B2C]",
+      text: "text-[#0B3B2C]",
+      badge: "bg-[#0B3B2C]/10 text-[#0B3B2C] border-[#0B3B2C]/20",
+      pill: "bg-[#0B3B2C]/10 text-[#0B3B2C]",
     },
     rose: {
-      accent: "bg-rose-600",
-      text: "text-rose-600",
-      badge: "bg-rose-50 text-rose-700 border-rose-200",
-      pill: "bg-rose-50 text-rose-800",
+      accent: "bg-[#DC2626]",
+      text: "text-[#DC2626]",
+      badge: "bg-[#DC2626]/10 text-[#DC2626] border-[#DC2626]/20",
+      pill: "bg-[#DC2626]/10 text-[#DC2626]",
     },
   };
 
-  const scheme = colorMap[color] || colorMap.blue;
+  const scheme = colorMap[color] || colorMap.emerald;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+    <div className="bg-white rounded-[16px] border border-[#E5EAE7] p-5 shadow-[0_4px_18px_rgba(15,23,32,0.04)] flex flex-col justify-between transition-all">
       <div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">
             {category}
           </span>
           {displayValue && (
-            <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${scheme.badge}`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${scheme.badge}`}>
               {displayValue}
             </span>
           )}
           {!displayValue && typeof score === "number" && (
-            <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${scheme.badge}`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${scheme.badge}`}>
               {score}% Complete
             </span>
           )}
         </div>
 
-        <h4 className="text-sm font-bold text-slate-900 tracking-tight">{title}</h4>
-        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{subtitle}</p>
+        <h4 className="text-sm font-bold text-[#0F1720] tracking-tight">{title}</h4>
+        <p className="text-xs text-[#64748B] mt-0.5 leading-relaxed">{subtitle}</p>
       </div>
 
       {metrics.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 mt-4">
+        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#EDF1EF] mt-4">
           {metrics.map((m, idx) => (
             <div key={idx} className="min-w-0">
-              <div className="text-[10px] text-slate-400 font-medium truncate">{m.label}</div>
-              <div className="text-xs font-bold text-slate-800 truncate mt-0.5">{m.value}</div>
+              <div className="text-[10px] text-[#94A3B8] font-medium truncate">{m.label}</div>
+              <div className="text-xs font-bold text-[#0F1720] truncate mt-0.5">{m.value}</div>
             </div>
           ))}
         </div>

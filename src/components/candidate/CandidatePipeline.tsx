@@ -100,24 +100,24 @@ export function CandidatePipeline({
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+    <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden">
       {/* Pipeline Header */}
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex flex-wrap items-center justify-between gap-2">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
             Application Pipeline
           </span>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-[#64748B] mt-0.5">
             Real-time tracking across operations stages from qualification to submission
           </p>
         </div>
-        <div className="text-xs text-slate-500 font-medium">
+        <div className="text-xs text-[#94A3B8] font-medium">
           Click any stage to filter
         </div>
       </div>
 
       {/* Horizontal Interactive Pipeline Rail */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-y sm:divide-y-0 lg:divide-x divide-slate-100">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-y sm:divide-y-0 lg:divide-x divide-[#EDF1EF]">
         {stages.map((stage) => {
           const isSelected = activeStage === stage.key;
           const isAwaitingAction = stage.key === "AWAITING_APPROVAL" && stage.count > 0;
@@ -129,8 +129,8 @@ export function CandidatePipeline({
               onClick={() => onSelectStage(stage.key)}
               className={`p-3.5 text-left transition-all relative flex flex-col justify-between cursor-pointer ${
                 isSelected
-                  ? "bg-blue-50/50 text-slate-900 ring-2 ring-inset ring-blue-600 z-10"
-                  : "hover:bg-slate-50/80 text-slate-700"
+                  ? "bg-[#12A150]/[0.08] text-[#0B3B2C] ring-2 ring-inset ring-[#12A150] z-10"
+                  : "hover:bg-[#12A150]/[0.035] text-[#0F1720]"
               }`}
             >
               <div className="flex items-center justify-between gap-1 mb-1">
@@ -146,19 +146,19 @@ export function CandidatePipeline({
                 <span
                   className={`text-xl font-bold tracking-tight ${
                     isSelected
-                      ? "text-blue-700"
+                      ? "text-[#0B3B2C]"
                       : isAwaitingAction
                       ? "text-amber-800"
-                      : "text-slate-900"
+                      : "text-[#0F1720]"
                   }`}
                 >
                   {stage.count}
                 </span>
 
                 <span
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
                     isSelected
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      ? "bg-[#12A150]/20 text-[#0B3B2C] border-[#12A150]/40 font-semibold"
                       : stage.badgeColor
                   }`}
                 >

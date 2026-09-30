@@ -4,15 +4,20 @@
 
 @layer base {
   :root {
-    --canvas: #F8FAFC;
+    --canvas: #F7F9F8;
     --surface: #FFFFFF;
-    --foreground: #0F172A;
-    --muted: #475569;
-    --border: #E2E8F0;
-    --border-subtle: #F1F5F9;
-    --accent: #2563EB;
-    --accent-hover: #1D4ED8;
-    --accent-light: #EFF6FF;
+    --foreground: #0F1720;
+    --text-primary: #0F1720;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+    --border: #E5EAE7;
+    --border-soft: #EDF1EF;
+    --primary: #12A150;
+    --primary-hover: #0E8541;
+    --primary-dark: #0B3B2C;
+    --accent-lime: #C6F432;
+    --primary-tint: rgba(18, 161, 80, 0.08);
+    --primary-subtle: rgba(18, 161, 80, 0.035);
   }
 
   * {
@@ -22,7 +27,7 @@
   body {
     color: var(--foreground);
     background-color: var(--canvas);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-plus-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -48,14 +53,14 @@
   background: #94A3B8;
 }
 
-/* Subtle selection colors */
+/* Subtle selection colors in soft green */
 ::selection {
-  background-color: #DBEAFE;
-  color: #1E3A8A;
+  background-color: rgba(18, 161, 80, 0.18);
+  color: #0B3B2C;
 }
 
 /* Focus visibility for accessible keyboard navigation */
 :focus-visible {
-  outline: 2px solid #2563EB;
+  outline: 2px solid #12A150;
   outline-offset: 2px;
 }

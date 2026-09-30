@@ -90,7 +90,7 @@ export function InstantSearch({
         placeholder={placeholder}
         disabled={disabled}
         aria-label={placeholder}
-        className="w-full rounded-md border border-slate-300 pl-8 pr-12 py-1.5 text-xs bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors disabled:opacity-50"
+        className="w-full rounded-[11px] border border-[#DDE5E0] pl-8 pr-12 py-1.5 text-xs bg-white text-[#0F1720] placeholder:text-[#94A3B8] focus:outline-none focus:ring-1 focus:ring-[#12A150] focus:border-[#12A150] transition-colors disabled:opacity-50"
       />
       <div className="absolute right-2 flex items-center gap-1">
         {value && !disabled ? (
@@ -98,14 +98,14 @@ export function InstantSearch({
             type="button"
             onClick={handleClear}
             aria-label="Clear search"
-            className="text-slate-400 hover:text-slate-700 text-xs p-0.5 rounded cursor-pointer transition-colors"
+            className="text-slate-400 hover:text-[#0F1720] text-xs p-0.5 rounded cursor-pointer transition-colors"
           >
             ✕
           </button>
         ) : enableShortcut && !disabled ? (
           <kbd
             aria-hidden="true"
-            className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 border border-slate-200 rounded select-none"
+            className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-[#94A3B8] bg-[#F7F9F8] border border-[#E5EAE7] rounded select-none"
           >
             /
           </kbd>

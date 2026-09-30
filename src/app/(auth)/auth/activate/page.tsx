@@ -84,11 +84,11 @@ function StaffActivationForm() {
 
   if (isValidating) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-sm border border-slate-200 text-center space-y-4">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-slate-900" />
-          <h2 className="text-lg font-semibold text-slate-900">Validating Activation Invitation...</h2>
-          <p className="text-sm text-slate-500">Please wait while we verify your organizational invitation.</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7] text-center space-y-4">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-[#E5EAE7] border-t-[#12A150]" />
+          <h2 className="text-lg font-bold text-[#0F1720]">Validating Activation Invitation...</h2>
+          <p className="text-xs text-[#64748B]">Please wait while we verify your organizational invitation.</p>
         </div>
       </div>
     );
@@ -96,21 +96,21 @@ function StaffActivationForm() {
 
   if (validationError || !tokenData) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-sm border border-slate-200 text-center space-y-6">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7] text-center space-y-6">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-200">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Activation Link Invalid</h2>
-            <p className="mt-2 text-sm text-slate-600">{validationError}</p>
+            <h2 className="text-xl font-bold tracking-tight text-[#0F1720]">Activation Link Invalid</h2>
+            <p className="mt-2 text-xs text-[#64748B]">{validationError}</p>
           </div>
           <div className="pt-2">
             <Link
               href="/login"
-              className="inline-flex w-full justify-center rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+              className="inline-flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] transition"
             >
               Return to Sign In
             </Link>
@@ -121,48 +121,48 @@ function StaffActivationForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-sm border border-slate-200">
+    <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-6 rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7]">
         <div>
           <div className="flex justify-center">
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">
+            <span className="inline-flex items-center rounded-full bg-[#12A150]/[0.08] px-3.5 py-1 text-xs font-semibold text-[#0B3B2C] border border-[#12A150]/20">
               {tokenData.organizationName}
             </span>
           </div>
-          <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#0F1720]">
             Activate Your Staff Account
           </h2>
-          <p className="mt-1 text-center text-sm text-slate-600">
+          <p className="mt-1 text-center text-xs text-[#64748B]">
             Complete your employee onboarding to access the Operations Operating System.
           </p>
         </div>
 
         {/* Employee Identity Summary */}
-        <div className="rounded-lg bg-slate-50 p-4 border border-slate-200 space-y-2 text-sm">
+        <div className="rounded-[14px] bg-[#F7F9F8] p-4 border border-[#E5EAE7] space-y-2 text-xs">
           <div className="flex justify-between">
-            <span className="text-slate-500">Employee:</span>
-            <span className="font-semibold text-slate-900">{tokenData.employeeName}</span>
+            <span className="text-[#64748B]">Employee:</span>
+            <span className="font-semibold text-[#0F1720]">{tokenData.employeeName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Work Email:</span>
-            <span className="font-mono text-slate-800 text-xs">{tokenData.email}</span>
+            <span className="text-[#64748B]">Work Email:</span>
+            <span className="font-mono text-[#0F1720] text-xs">{tokenData.email}</span>
           </div>
           {tokenData.employeeId && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Employee ID:</span>
-              <span className="font-mono font-semibold text-slate-900">{tokenData.employeeId}</span>
+              <span className="text-[#64748B]">Employee ID:</span>
+              <span className="font-mono font-semibold text-[#0F1720]">{tokenData.employeeId}</span>
             </div>
           )}
           {tokenData.designationName && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Designation:</span>
-              <span className="font-medium text-slate-900">{tokenData.designationName}</span>
+              <span className="text-[#64748B]">Designation:</span>
+              <span className="font-medium text-[#0F1720]">{tokenData.designationName}</span>
             </div>
           )}
           {(tokenData.department || tokenData.team) && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Unit:</span>
-              <span className="text-slate-800">
+              <span className="text-[#64748B]">Unit:</span>
+              <span className="text-[#0F1720]">
                 {[tokenData.department, tokenData.team].filter(Boolean).join(" / ")}
               </span>
             </div>
@@ -170,20 +170,20 @@ function StaffActivationForm() {
         </div>
 
         {submitError && (
-          <div className="rounded-md bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+          <div className="rounded-[12px] bg-rose-50 p-4 text-xs font-semibold text-rose-700 border border-rose-200" role="alert">
             {submitError}
           </div>
         )}
 
         {activatedSuccess ? (
-          <div className="rounded-md bg-emerald-50 p-4 text-center text-sm text-emerald-800 border border-emerald-200 space-y-2">
-            <p className="font-semibold">Account Activated Successfully!</p>
-            <p className="text-xs text-emerald-700">Redirecting to login page...</p>
+          <div className="rounded-[12px] bg-[#12A150]/[0.08] p-4 text-center text-xs text-[#0B3B2C] border border-[#12A150]/20 space-y-2 font-semibold">
+            <p className="font-bold">Account Activated Successfully!</p>
+            <p className="text-[11px] text-[#12A150]">Redirecting to login page...</p>
           </div>
         ) : (
           <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="password" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
                 Create Password
               </label>
               <input
@@ -194,14 +194,14 @@ function StaffActivationForm() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:text-sm"
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="confirmPassword" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
                 Confirm Password
               </label>
               <input
@@ -212,15 +212,15 @@ function StaffActivationForm() {
                 minLength={8}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:text-sm"
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
                 placeholder="Re-enter password"
                 autoComplete="new-password"
               />
             </div>
 
-            <div className="rounded-md bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200">
-              <p className="font-medium">Security Notice:</p>
-              <p className="mt-0.5 text-amber-700">
+            <div className="rounded-[12px] bg-amber-50/70 p-3.5 text-xs text-amber-900 border border-amber-200">
+              <p className="font-bold">Security Notice:</p>
+              <p className="mt-0.5 text-amber-800">
                 By activating your account, you confirm authorization to access internal organizational systems.
               </p>
             </div>
@@ -228,7 +228,7 @@ function StaffActivationForm() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full justify-center rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50"
+              className="flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 disabled:opacity-50 transition"
             >
               {submitting ? "Activating Account..." : "Set Password & Complete Activation"}
             </button>
@@ -243,10 +243,10 @@ export default function StaffActivationPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
-          <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-sm border border-slate-200 text-center space-y-4">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-slate-900" />
-            <h2 className="text-lg font-semibold text-slate-900">Loading Activation...</h2>
+        <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+          <div className="w-full max-w-md rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7] text-center space-y-4">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-[#E5EAE7] border-t-[#12A150]" />
+            <h2 className="text-lg font-bold text-[#0F1720]">Loading Activation...</h2>
           </div>
         </div>
       }
