@@ -34,136 +34,149 @@ export default async function EmployeeWorkspacePage() {
   todayEnd.setHours(23, 59, 59, 999);
 
   const data = await withRlsContext(ctx.userId, async (tx) => {
-    // 1. My Tasks Count
-    const myTasksCount = await tx.task.count({
-      where: {
-        organizationId: ctx.organizationId,
-        assignedEmployeeId: ctx.userId,
-        status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED] },
-      },
-    });
+    const [
+      myTasksCount,
+      myCandidatesCount,
+      activeApplicationsCount,
+      dueTodayTasksCount,
+      assignedTasks,
+      readyApplications,
+      awaitingApprovalApps,
+      waitingOrBlockedTasks,
+      myRecentSubmissions,
+      qaReviewApps,
+    ] = await Promise.all([
+      // 1. My Tasks Count
+      tx.task.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: ctx.userId,
+          status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED] },
+        },
+      }),
 
-    // 2. My Assigned Candidates Count
-    const myCandidatesCount = await tx.candidate.count({
-      where: {
-        organizationId: ctx.organizationId,
-        assignedEmployeeId: ctx.userId,
-        status: { not: "ARCHIVED" },
-      },
-    });
+      // 2. My Assigned Candidates Count
+      tx.candidate.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: ctx.userId,
+          status: { not: "ARCHIVED" },
+        },
+      }),
 
-    // 3. Active Applications Count (Assigned to employee or org)
-    const activeApplicationsCount = await tx.application.count({
-      where: {
-        organizationId: ctx.organizationId,
-        assignedEmployeeId: ctx.userId,
-        status: { notIn: [ApplicationStatus.SUBMITTED, ApplicationStatus.WITHDRAWN, ApplicationStatus.REJECTED, ApplicationStatus.FAILED] },
-      },
-    });
+      // 3. Active Applications Count (Assigned to employee or org)
+      tx.application.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: ctx.userId,
+          status: { notIn: [ApplicationStatus.SUBMITTED, ApplicationStatus.WITHDRAWN, ApplicationStatus.REJECTED, ApplicationStatus.FAILED] },
+        },
+      }),
 
-    // 4. Tasks Due Today / Overdue for Employee
-    const dueTodayTasksCount = await tx.task.count({
-      where: {
-        organizationId: ctx.organizationId,
-        assignedEmployeeId: ctx.userId,
-        status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED] },
-        dueDate: { lte: todayEnd },
-      },
-    });
+      // 4. Tasks Due Today / Overdue for Employee
+      tx.task.count({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: ctx.userId,
+          status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED] },
+          dueDate: { lte: todayEnd },
+        },
+      }),
 
-    // 5. Assigned Tasks for Work Center
-    const assignedTasks = await tx.task.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        assignedEmployeeId: ctx.userId,
-        status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED] },
-      },
-      include: {
-        candidate: { include: { user: true } },
-        job: true,
-        application: { include: { job: true, candidate: { include: { user: true } } } },
-        checklistItems: true,
-      },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
-      take: 20,
-    });
+      // 5. Assigned Tasks for Work Center
+      tx.task.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: ctx.userId,
+          status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELED] },
+        },
+        include: {
+          candidate: { include: { user: true } },
+          job: true,
+          application: { include: { job: true, candidate: { include: { user: true } } } },
+          checklistItems: true,
+        },
+        orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+        take: 20,
+      }),
 
-    // 6. Applications Ready for Submission
-    const readyApplications = await tx.application.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        status: ApplicationStatus.READY,
-      },
-      include: {
-        candidate: { include: { user: true } },
-        job: true,
-        assignedEmployee: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 6,
-    });
+      // 6. Applications Ready for Submission
+      tx.application.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.READY,
+        },
+        include: {
+          candidate: { include: { user: true } },
+          job: true,
+          assignedEmployee: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+      }),
 
-    // 7. Applications Awaiting Candidate Approval
-    const awaitingApprovalApps = await tx.application.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        status: ApplicationStatus.AWAITING_APPROVAL,
-      },
-      include: {
-        candidate: { include: { user: true } },
-        job: true,
-        assignedEmployee: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-    });
+      // 7. Applications Awaiting Candidate Approval
+      tx.application.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.AWAITING_APPROVAL,
+        },
+        include: {
+          candidate: { include: { user: true } },
+          job: true,
+          assignedEmployee: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+      }),
 
-    // 8. Tasks in Waiting or Blocked status
-    const waitingOrBlockedTasks = await tx.task.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        assignedEmployeeId: ctx.userId,
-        status: { in: [TaskStatus.WAITING, TaskStatus.BLOCKED, TaskStatus.ESCALATED] },
-      },
-      include: {
-        candidate: { include: { user: true } },
-        job: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-    });
+      // 8. Tasks in Waiting or Blocked status
+      tx.task.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          assignedEmployeeId: ctx.userId,
+          status: { in: [TaskStatus.WAITING, TaskStatus.BLOCKED, TaskStatus.ESCALATED] },
+        },
+        include: {
+          candidate: { include: { user: true } },
+          job: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+      }),
 
-    // 9. Recent Submissions by this authenticated employee
-    const myRecentSubmissions = await tx.applicationSubmission.findMany({
-      where: {
-        submittedById: ctx.userId,
-        application: { organizationId: ctx.organizationId },
-      },
-      include: {
-        application: {
-          include: {
-            candidate: { include: { user: true } },
-            job: true,
+      // 9. Recent Submissions by this authenticated employee
+      tx.applicationSubmission.findMany({
+        where: {
+          submittedById: ctx.userId,
+          application: { organizationId: ctx.organizationId },
+        },
+        include: {
+          application: {
+            include: {
+              candidate: { include: { user: true } },
+              job: true,
+            },
           },
         },
-      },
-      orderBy: { submittedAt: "desc" },
-      take: 5,
-    });
+        orderBy: { submittedAt: "desc" },
+        take: 5,
+      }),
 
-    // 10. Applications in Review (QA queue)
-    const qaReviewApps = await tx.application.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        status: ApplicationStatus.REVIEW,
-      },
-      include: {
-        candidate: { include: { user: true } },
-        job: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-    });
+      // 10. Applications in Review (QA queue)
+      tx.application.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: ApplicationStatus.REVIEW,
+        },
+        include: {
+          candidate: { include: { user: true } },
+          job: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+      }),
+    ]);
 
     return {
       myTasksCount,
