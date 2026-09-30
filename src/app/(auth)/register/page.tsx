@@ -15,17 +15,26 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
 
-    const formData = new FormData(event.currentTarget);
-    const result = await signUpCandidateAction(formData);
+    try {
+      const formData = new FormData(event.currentTarget);
+      const result = await signUpCandidateAction(formData);
 
-    if (!result.success) {
-      setError(result.error || "Registration failed");
+      if (!result.success) {
+        setError(result.error || "Registration failed");
+        setLoading(false);
+        return;
+      }
+
+      if (result.data?.redirectUrl) {
+        window.location.assign(result.data.redirectUrl);
+      } else {
+        setError("Account created, but redirect destination was missing.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error("[REGISTER_CLIENT_ERROR]", err);
+      setError(err?.message || "An unexpected error occurred during registration. Please try again.");
       setLoading(false);
-      return;
-    }
-
-    if (result.data?.redirectUrl) {
-      router.push(result.data.redirectUrl);
     }
   }
 

@@ -61,22 +61,25 @@ function StaffActivationForm() {
     setSubmitting(true);
     setSubmitError(null);
 
-    const res = await activateStaffAccountAction({
-      token,
-      password,
-      confirmPassword,
-    });
+    try {
+      const res = await activateStaffAccountAction({
+        token,
+        password,
+        confirmPassword,
+      });
 
-    if (!res.success) {
-      setSubmitError(res.error || "Activation failed. Please try again.");
-      setSubmitting(false);
-      return;
-    }
+      if (!res.success) {
+        setSubmitError(res.error || "Activation failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
 
-    setActivatedSuccess(true);
-    setTimeout(() => {
+      setActivatedSuccess(true);
       router.push("/login?activated=true");
-    }, 2000);
+    } catch (err: any) {
+      setSubmitError(err?.message || "An unexpected error occurred. Please try again.");
+      setSubmitting(false);
+    }
   }
 
   if (isValidating) {

@@ -15,16 +15,21 @@ export default function ResetPasswordPage() {
     setError(null);
     setLoading(true);
 
-    const formData = new FormData(event.currentTarget);
-    const result = await resetPasswordAction(formData);
+    try {
+      const formData = new FormData(event.currentTarget);
+      const result = await resetPasswordAction(formData);
 
-    setLoading(false);
-    if (!result.success) {
-      setError(result.error || "Failed to reset password");
-      return;
+      if (!result.success) {
+        setError(result.error || "Failed to reset password");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/login?message=password_updated");
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred. Please try again.");
+      setLoading(false);
     }
-
-    router.push("/login?message=password_updated");
   }
 
   return (

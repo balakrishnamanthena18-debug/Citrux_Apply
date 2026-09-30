@@ -51,105 +51,157 @@ async function getClientIp(): Promise<string> {
  * Enforces rate limiting against brute-force attacks and logs audit events.
  */
 export async function signInAction(formData: FormData): Promise<ActionResult<{ redirectUrl: string }>> {
-  const rawData = {
-    email: formData.get("email"),
-    password: formData.get("password"),
-  };
-
-  const parsed = LoginSchema.safeParse(rawData);
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
-  }
-
-  const normalizedEmail = parsed.data.email.toLowerCase().trim();
-  const clientIp = await getClientIp();
-  const rateLimitParams = { email: normalizedEmail, ip: clientIp };
-
-  // 1. Enforce Distributed Database-Backed Rate Limiting against Brute-Force Attacks
-  const rateLimitCheck = await checkRateLimit("LOGIN", rateLimitParams);
-  if (!rateLimitCheck.allowed) {
-    await logSystemAuditEvent({
-      action: AuditAction.SECURITY_ALERT,
-      actorType: "ANONYMOUS",
-      entityType: "User",
-      details: {
-        reason: "Login rate limit exceeded",
-        email: normalizedEmail,
-        ip: clientIp,
-        retryAfterSeconds: rateLimitCheck.retryAfterSeconds,
-      },
-    });
-
-    const retryMin = Math.ceil((rateLimitCheck.retryAfterSeconds || 60) / 60);
-    return {
-      success: false,
-      error: `Too many failed login attempts. Please try again in ${retryMin} minute(s).`,
-    };
-  }
-
-  const supabase = await createServerClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: normalizedEmail,
-    password: parsed.data.password,
-  });
-
-  if (error || !data.user) {
-    // Record failed attempt atomically in PostgreSQL
-    await recordFailedAttempt("LOGIN", rateLimitParams);
-
-    await logSystemAuditEvent({
-      action: AuditAction.ACCESS_DENIED,
-      actorType: "ANONYMOUS",
-      entityType: "User",
-      details: {
-        email: normalizedEmail,
-        ip: clientIp,
-        reason: error?.message ?? "Invalid credentials",
-      },
-    });
-
-    return { success: false, error: "Invalid email or password" };
-  }
-
-  // 2. Resolve membership within transaction-local RLS context to verify active status
   try {
-    const membership = await withRlsContext(data.user.id, async (tx) => {
-      return tx.membership.findFirst({
-        where: {
-          userId: data.user.id,
-          status: "ACTIVE",
-          user: { status: "ACTIVE" },
-          organization: { status: "ACTIVE" },
-        },
-      });
-    });
+    const rawData = {
+      email: formData.get("email"),
+      password: formData.get("password"),
+    };
 
-    if (!membership) {
-      await recordFailedAttempt("LOGIN", rateLimitParams);
-      await supabase.auth.signOut();
-      return { success: false, error: "Account is inactive or pending organization approval" };
+    const parsed = LoginSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
     }
 
-    // 3. Reset rate limit counter on successful authentication
-    await recordSuccessfulAttempt("LOGIN", rateLimitParams);
+    const normalizedEmail = parsed.data.email.toLowerCase().trim();
+    const clientIp = await getClientIp();
+    const rateLimitParams = { email: normalizedEmail, ip: clientIp };
 
-    await logUserAuditEvent({
-      userId: data.user.id,
-      organizationId: membership.organizationId,
-      action: AuditAction.USER_LOGIN,
-      entityType: "User",
-      entityId: data.user.id,
-      details: { ip: clientIp },
+    console.log(`[AUTH_FLOW] LOGIN_START email_domain=${normalizedEmail.split("@")[1] ?? "unknown"}`);
+
+    // 1. Enforce Distributed Database-Backed Rate Limiting against Brute-Force Attacks
+    let rateLimitCheck;
+    try {
+      rateLimitCheck = await checkRateLimit("LOGIN", rateLimitParams);
+    } catch (rlErr) {
+      console.error("[AUTH_FLOW] Rate limiter check error (graceful fallback):", rlErr);
+      rateLimitCheck = { allowed: true, remaining: 5 };
+    }
+
+    if (!rateLimitCheck.allowed) {
+      try {
+        await logSystemAuditEvent({
+          action: AuditAction.SECURITY_ALERT,
+          actorType: "ANONYMOUS",
+          entityType: "User",
+          details: {
+            reason: "Login rate limit exceeded",
+            email: normalizedEmail,
+            ip: clientIp,
+            retryAfterSeconds: rateLimitCheck.retryAfterSeconds,
+          },
+        });
+      } catch (auditErr) {
+        console.error("[AUTH_FLOW] Audit logging failed:", auditErr);
+      }
+
+      const retryMin = Math.ceil((rateLimitCheck.retryAfterSeconds || 60) / 60);
+      return {
+        success: false,
+        error: `Too many failed login attempts. Please try again in ${retryMin} minute(s).`,
+      };
+    }
+
+    console.log("[AUTH_FLOW] RATE_LIMIT_CHECK_COMPLETE");
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password: parsed.data.password,
     });
 
-    let redirectUrl = "/candidate";
-    if (membership.role === "ADMIN") redirectUrl = "/admin";
-    else if (membership.role === "EMPLOYEE") redirectUrl = "/employee";
+    console.log(`[AUTH_FLOW] SUPABASE_AUTH_COMPLETE success=${!error && !!data?.user}`);
 
-    return { success: true, data: { redirectUrl } };
-  } catch (err: any) {
-    await supabase.auth.signOut();
-    return { success: false, error: err.message || "Failed to establish user context" };
+    if (error || !data.user) {
+      // Record failed attempt atomically in PostgreSQL
+      try {
+        await recordFailedAttempt("LOGIN", rateLimitParams);
+      } catch (e) {
+        console.error("[AUTH_FLOW] recordFailedAttempt error:", e);
+      }
+
+      try {
+        await logSystemAuditEvent({
+          action: AuditAction.ACCESS_DENIED,
+          actorType: "ANONYMOUS",
+          entityType: "User",
+          details: {
+            email: normalizedEmail,
+            ip: clientIp,
+            reason: error?.message ?? "Invalid credentials",
+          },
+        });
+      } catch (e) {
+        console.error("[AUTH_FLOW] logSystemAuditEvent error:", e);
+      }
+
+      return { success: false, error: "Invalid email or password" };
+    }
+
+    // 2. Resolve membership within transaction-local RLS context to verify active status
+    try {
+      const membership = await withRlsContext(data.user.id, async (tx) => {
+        return tx.membership.findFirst({
+          where: {
+            userId: data.user.id,
+            status: "ACTIVE",
+            user: { status: "ACTIVE" },
+            organization: { status: "ACTIVE" },
+          },
+        });
+      });
+
+      console.log(`[AUTH_FLOW] MEMBERSHIP_RESOLVED found=${!!membership} role=${membership?.role ?? "none"}`);
+
+      if (!membership) {
+        try {
+          await recordFailedAttempt("LOGIN", rateLimitParams);
+          await supabase.auth.signOut();
+        } catch (e) {
+          console.error("[AUTH_FLOW] signOut on inactive membership error:", e);
+        }
+        return { success: false, error: "Account is inactive or pending organization approval" };
+      }
+
+      // 3. Reset rate limit counter on successful authentication
+      try {
+        await recordSuccessfulAttempt("LOGIN", rateLimitParams);
+      } catch (e) {
+        console.error("[AUTH_FLOW] recordSuccessfulAttempt error:", e);
+      }
+
+      try {
+        await logUserAuditEvent({
+          userId: data.user.id,
+          organizationId: membership.organizationId,
+          action: AuditAction.USER_LOGIN,
+          entityType: "User",
+          entityId: data.user.id,
+          details: { ip: clientIp },
+        });
+      } catch (e) {
+        console.error("[AUTH_FLOW] logUserAuditEvent error:", e);
+      }
+
+      let redirectUrl = "/candidate";
+      if (membership.role === "ADMIN") redirectUrl = "/admin";
+      else if (membership.role === "EMPLOYEE") redirectUrl = "/employee";
+
+      console.log(`[AUTH_FLOW] LOGIN_SUCCESS redirectUrl=${redirectUrl}`);
+
+      return { success: true, data: { redirectUrl } };
+    } catch (err: any) {
+      console.error("[AUTH_FLOW] Membership resolution error:", err);
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+      return { success: false, error: "Failed to establish user context. Please try again." };
+    }
+  } catch (globalErr: any) {
+    console.error("[AUTH_FLOW] Unexpected signInAction global exception:", globalErr);
+    return {
+      success: false,
+      error: "An unexpected error occurred during sign in. Please try again.",
+    };
   }
 }
 
@@ -159,113 +211,134 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
  * Distributed rate limiting by client IP to prevent account creation abuse.
  */
 export async function signUpCandidateAction(formData: FormData): Promise<ActionResult<{ redirectUrl: string }>> {
-  const clientIp = await getClientIp();
-  const rateLimitParams = { ip: clientIp };
-  const rateLimitCheck = await checkRateLimit("REGISTER", rateLimitParams);
-  if (!rateLimitCheck.allowed) {
-    await logSystemAuditEvent({
-      action: AuditAction.SECURITY_ALERT,
-      actorType: "ANONYMOUS",
-      entityType: "User",
-      details: { reason: "Registration rate limit exceeded", ip: clientIp },
-    });
-    return { success: false, error: "Registration rate limit exceeded. Please try again later." };
-  }
-
-  const rawData = {
-    email: formData.get("email"),
-    password: formData.get("password"),
-    firstName: formData.get("firstName"),
-    lastName: formData.get("lastName"),
-  };
-
-  const parsed = CandidateRegisterSchema.safeParse(rawData);
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
-  }
-
-  // 1. Resolve operating organization strictly via explicit OPERATING_ORGANIZATION_ID configuration
-  const operatingOrgId = process.env.OPERATING_ORGANIZATION_ID;
-  if (!operatingOrgId) {
-    await logSystemAuditEvent({
-      action: AuditAction.SECURITY_ALERT,
-      actorType: "SYSTEM",
-      entityType: "Organization",
-      details: { error: "Missing OPERATING_ORGANIZATION_ID server configuration" },
-    });
-    return { success: false, error: "Operating organization configuration is missing. Registration is disabled." };
-  }
-
-  const operatingOrg = await prisma.organization.findUnique({
-    where: { id: operatingOrgId },
-  });
-
-  if (!operatingOrg || operatingOrg.status !== "ACTIVE") {
-    await logSystemAuditEvent({
-      action: AuditAction.SECURITY_ALERT,
-      actorType: "SYSTEM",
-      entityType: "Organization",
-      entityId: operatingOrgId,
-      details: { error: "Configured OPERATING_ORGANIZATION_ID is not found or not active" },
-    });
-    return { success: false, error: "Operating organization is unavailable or inactive. Registration is disabled." };
-  }
-
-  // 2. Create user in Supabase Auth
-  const supabase = await createServerClient();
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      data: {
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-      },
-    },
-  });
-
-  if (authError || !authData.user) {
-    await recordFailedAttempt("REGISTER", rateLimitParams);
-    return { success: false, error: authError?.message ?? "Registration failed" };
-  }
-
-  const userId = authData.user.id;
-
-  // 3. Create User record and Candidate Membership within user's RLS context
   try {
-    await withRlsContext(userId, async (tx) => {
-      await tx.user.create({
+    const clientIp = await getClientIp();
+    const rateLimitParams = { ip: clientIp };
+    
+    let rateLimitCheck;
+    try {
+      rateLimitCheck = await checkRateLimit("REGISTER", rateLimitParams);
+    } catch {
+      rateLimitCheck = { allowed: true, remaining: 10 };
+    }
+
+    if (!rateLimitCheck.allowed) {
+      try {
+        await logSystemAuditEvent({
+          action: AuditAction.SECURITY_ALERT,
+          actorType: "ANONYMOUS",
+          entityType: "User",
+          details: { reason: "Registration rate limit exceeded", ip: clientIp },
+        });
+      } catch {}
+      return { success: false, error: "Registration rate limit exceeded. Please try again later." };
+    }
+
+    const rawData = {
+      email: formData.get("email"),
+      password: formData.get("password"),
+      firstName: formData.get("firstName"),
+      lastName: formData.get("lastName"),
+    };
+
+    const parsed = CandidateRegisterSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+    }
+
+    // 1. Resolve operating organization strictly via explicit OPERATING_ORGANIZATION_ID configuration
+    const operatingOrgId = process.env.OPERATING_ORGANIZATION_ID;
+    if (!operatingOrgId) {
+      try {
+        await logSystemAuditEvent({
+          action: AuditAction.SECURITY_ALERT,
+          actorType: "SYSTEM",
+          entityType: "Organization",
+          details: { error: "Missing OPERATING_ORGANIZATION_ID server configuration" },
+        });
+      } catch {}
+      return { success: false, error: "Operating organization configuration is missing. Registration is disabled." };
+    }
+
+    const operatingOrg = await prisma.organization.findUnique({
+      where: { id: operatingOrgId },
+    });
+
+    if (!operatingOrg || operatingOrg.status !== "ACTIVE") {
+      try {
+        await logSystemAuditEvent({
+          action: AuditAction.SECURITY_ALERT,
+          actorType: "SYSTEM",
+          entityType: "Organization",
+          entityId: operatingOrgId,
+          details: { error: "Configured OPERATING_ORGANIZATION_ID is not found or not active" },
+        });
+      } catch {}
+      return { success: false, error: "Operating organization is unavailable or inactive. Registration is disabled." };
+    }
+
+    // 2. Create user in Supabase Auth
+    const supabase = await createServerClient();
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      options: {
         data: {
-          id: userId,
-          email: parsed.data.email,
           firstName: parsed.data.firstName,
           lastName: parsed.data.lastName,
-          status: "ACTIVE",
         },
+      },
+    });
+
+    if (authError || !authData.user) {
+      try {
+        await recordFailedAttempt("REGISTER", rateLimitParams);
+      } catch {}
+      return { success: false, error: authError?.message ?? "Registration failed" };
+    }
+
+    const userId = authData.user.id;
+
+    // 3. Create User record and Candidate Membership within user's RLS context
+    try {
+      await withRlsContext(userId, async (tx) => {
+        await tx.user.create({
+          data: {
+            id: userId,
+            email: parsed.data.email,
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            status: "ACTIVE",
+          },
+        });
+
+        await tx.membership.create({
+          data: {
+            organizationId: operatingOrg.id,
+            userId: userId,
+            role: "CANDIDATE",
+            status: "ACTIVE",
+          },
+        });
       });
 
-      await tx.membership.create({
-        data: {
+      try {
+        await logUserAuditEvent({
+          userId,
           organizationId: operatingOrg.id,
-          userId: userId,
-          role: "CANDIDATE",
-          status: "ACTIVE",
-        },
-      });
-    });
+          action: AuditAction.USER_REGISTERED,
+          entityType: "User",
+          entityId: userId,
+          details: { role: "CANDIDATE", ip: clientIp },
+        });
+      } catch {}
 
-    await logUserAuditEvent({
-      userId,
-      organizationId: operatingOrg.id,
-      action: AuditAction.USER_REGISTERED,
-      entityType: "User",
-      entityId: userId,
-      details: { role: "CANDIDATE", ip: clientIp },
-    });
-
-    return { success: true, data: { redirectUrl: "/candidate" } };
+      return { success: true, data: { redirectUrl: "/candidate" } };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to initialize candidate account" };
+    }
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to initialize candidate account" };
+    return { success: false, error: err?.message || "An unexpected error occurred during registration." };
   }
 }
 

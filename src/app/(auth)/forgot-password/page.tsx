@@ -14,16 +14,21 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
 
-    const formData = new FormData(event.currentTarget);
-    const result = await requestPasswordResetAction(formData);
+    try {
+      const formData = new FormData(event.currentTarget);
+      const result = await requestPasswordResetAction(formData);
 
-    setLoading(false);
-    if (!result.success) {
-      setError(result.error || "Failed to send reset email");
-      return;
+      if (!result.success) {
+        setError(result.error || "Failed to send reset email");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setSubmitted(true);
   }
 
   return (

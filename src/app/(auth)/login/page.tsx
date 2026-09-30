@@ -15,17 +15,29 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const formData = new FormData(event.currentTarget);
-    const result = await signInAction(formData);
+    try {
+      const formData = new FormData(event.currentTarget);
+      const result = await signInAction(formData);
 
-    if (!result.success) {
-      setError(result.error || "Failed to sign in");
+      if (!result.success) {
+        setError(result.error || "Failed to sign in");
+        setLoading(false);
+        return;
+      }
+
+      if (result.data?.redirectUrl) {
+        // Guaranteed document-level navigation with fresh session cookies
+        window.location.assign(result.data.redirectUrl);
+      } else {
+        setError("Login succeeded but no redirect destination was provided.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error("[LOGIN_CLIENT_ERROR]", err);
+      setError(
+        err?.message || "An unexpected network or server error occurred. Please check your connection and try again."
+      );
       setLoading(false);
-      return;
-    }
-
-    if (result.data?.redirectUrl) {
-      router.push(result.data.redirectUrl);
     }
   }
 
