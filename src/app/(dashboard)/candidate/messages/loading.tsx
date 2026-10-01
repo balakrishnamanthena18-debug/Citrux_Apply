@@ -1,5 +1,6 @@
-import { MessagesPageSkeleton } from "@/components/navigation/RouteSkeletons";
+import { ConversationPaneSkeleton } from "@/components/messaging/ConversationPaneSkeleton";
 
+/** Localized conversation-switch fallback — list stays mounted in layout. */
 export default function CandidateMessagesLoading() {
-  return <MessagesPageSkeleton />;
+  return <ConversationPaneSkeleton />;
 }

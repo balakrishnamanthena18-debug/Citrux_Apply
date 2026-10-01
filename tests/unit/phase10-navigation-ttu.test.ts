@@ -187,7 +187,7 @@ describe("Phase 10 — Navigation Time-to-Usable invariants", () => {
         "utf8"
       );
       expect(page).toMatch(/take:\s*2000/);
-      expect(page).toContain("Phase 10");
+      expect(page).toMatch(/assignedEmployeeId:\s*\{\s*not:\s*null\s*\}/);
     });
 
     it("does not use layout-wide revalidatePath in application mutation helper", () => {
