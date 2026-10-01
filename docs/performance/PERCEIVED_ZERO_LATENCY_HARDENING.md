@@ -249,7 +249,7 @@ Code deltas in this pass (`RoutePrefetcher`, optimistic notification reads, esca
 2. Detail pages still require a server read for authoritative data (class D).
 3. Large remote search datasets still need debounced server search if/when lists exceed bounded client sets (current workbenches are bounded SSR lists).
 4. Virtualization not introduced (<200-row guideline; no measured need).
-5. New idle prefetch + optimistic notification code requires a production deploy to measure those deltas on the live host.
+5. Supabase Free session-mode pooler caps concurrent clients (`pool_size: 15`). Dense `Link`/`router.prefetch` of many authenticated RSC routes (e.g. every message thread) can exhaust the pool (`EMAXCONNSESSION`) and surface as minified React error **#441**. Mitigated by `prefetch={false}` on dense lists, sidebar-only aggressive prefetch, and sequential idle route warmup.
 
 ---
 
