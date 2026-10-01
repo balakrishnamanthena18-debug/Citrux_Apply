@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 import {
   WorkbenchShell,
   WorkbenchHeader,
@@ -254,12 +254,12 @@ export function AdminApplicationsWorkbench({
                       })}
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap text-right">
-                      <Link
+                      <TransitionLink
                         href={`/employee/applications/${app.id}`}
                         className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-xs transition-colors"
                       >
                         Inspect Dossier →
-                      </Link>
+                      </TransitionLink>
                     </td>
                   </tr>
                 ))}

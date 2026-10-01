@@ -69,7 +69,7 @@ export function InstantTabs({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(tab.key)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150] select-none ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold whitespace-nowrap transition-colors duration-75 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150] select-none active:scale-[0.98] touch-manipulation ${
               isActive
                 ? "bg-[#0B3B2C] text-white shadow-sm"
                 : "bg-transparent text-[#64748B] hover:bg-[#12A150]/[0.05] hover:text-[#0F1720]"

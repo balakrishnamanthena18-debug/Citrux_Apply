@@ -23,10 +23,21 @@ export function TransitionLink({
   activeClassName = "",
   isActive = false,
   onNavigate,
+  prefetch = true,
   ...props
 }: TransitionLinkProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const target = href.toString();
+
+  const warm = () => {
+    try {
+      router.prefetch(target);
+    } catch {
+      // best-effort
+    }
+  };
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // Allow modified clicks (new tab, etc.) to use native behavior
@@ -44,14 +55,18 @@ export function TransitionLink({
     e.preventDefault();
     onNavigate?.();
     startTransition(() => {
-      router.push(href.toString());
+      router.push(target);
     });
   };
 
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       onClick={handleClick}
+      onMouseEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
       aria-current={isActive ? "page" : undefined}
       aria-busy={isPending || undefined}
       data-pending={isPending ? "true" : undefined}

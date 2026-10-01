@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TaskStatus, TaskPriority, TaskCategory, TaskType } from "@/generated/prisma";
 import { InstantTabs, TabItem } from "@/components/workbench/InstantTabs";
@@ -9,6 +8,7 @@ import { InstantSearch } from "@/components/workbench/InstantSearch";
 import { InstantFilterBar, FilterDropdownConfig } from "@/components/workbench/InstantFilterBar";
 import { TablePagination } from "@/components/workbench/TablePagination";
 import { PendingButton } from "@/components/ui/PendingButton";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 import { createTaskAction } from "@/lib/task/actions";
 import { syncUrlParams } from "@/lib/client/urlSync";
 
@@ -652,9 +652,9 @@ export function EmployeeTasksWorkbench({
                     </div>
 
                     <h3 className="text-sm font-semibold text-slate-900">
-                      <Link href={`/employee/tasks/${t.id}`} className="hover:text-blue-600 transition">
+                      <TransitionLink href={`/employee/tasks/${t.id}`} className="hover:text-blue-600 transition">
                         {t.title}
-                      </Link>
+                      </TransitionLink>
                     </h3>
 
                     <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
@@ -677,12 +677,12 @@ export function EmployeeTasksWorkbench({
                   </div>
 
                   <div className="shrink-0 flex items-center gap-2">
-                    <Link
+                    <TransitionLink
                       href={`/employee/tasks/${t.id}`}
                       className="px-3.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-2xs transition"
                     >
                       Execute Task →
-                    </Link>
+                    </TransitionLink>
                   </div>
                 </div>
               );

@@ -176,19 +176,43 @@ export function NotificationsBell() {
   }, [loadNotifications]);
 
   const handleMarkRead = async (id: string) => {
-    await markNotificationReadAction({ notificationId: id });
+    const previous = notifications;
+    const previousUnread = unreadCount;
+    const target = previous.find((n) => n.id === id);
+    const wasUnread = target && !target.readAt;
+
+    // Immediate presentation feedback; server remains authoritative.
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
+      prev.map((n) => (n.id === id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n))
     );
-    setUnreadCount((c) => Math.max(0, c - 1));
+    if (wasUnread) {
+      setUnreadCount((c) => Math.max(0, c - 1));
+    }
+
+    try {
+      await markNotificationReadAction({ notificationId: id });
+    } catch {
+      setNotifications(previous);
+      setUnreadCount(previousUnread);
+    }
   };
 
   const handleMarkAllRead = async () => {
-    await markAllNotificationsReadAction();
+    const previous = notifications;
+    const previousUnread = unreadCount;
+    const now = new Date().toISOString();
+
     setNotifications((prev) =>
-      prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
+      prev.map((n) => ({ ...n, readAt: n.readAt || now }))
     );
     setUnreadCount(0);
+
+    try {
+      await markAllNotificationsReadAction();
+    } catch {
+      setNotifications(previous);
+      setUnreadCount(previousUnread);
+    }
   };
 
   return (

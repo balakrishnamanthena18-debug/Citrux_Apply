@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
+import { RoutePrefetcher } from "./RoutePrefetcher";
 import type { Role } from "@/generated/prisma";
 
 interface AppShellProps {
@@ -37,6 +38,7 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-[#F7F9F8] antialiased text-[#0F1720] selection:bg-emerald-500/20 selection:text-[#0B3B2C]">
+      <RoutePrefetcher role={role} />
       {/* Desktop Fixed Persistent Sidebar (>= 1024px / lg:) */}
       <div className="hidden lg:block">
         <AppSidebar

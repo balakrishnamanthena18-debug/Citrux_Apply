@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 import type { ApplicationStatus } from "@/generated/prisma";
 import {
   ApplicationFilterTab,
@@ -247,9 +247,9 @@ export function CandidateApplicationsWorkbench({
                     </div>
 
                     <h3 className="text-base font-semibold text-slate-900">
-                      <Link href={`/candidate/applications/${app.id}`} className="hover:text-blue-600 transition">
+                      <TransitionLink href={`/candidate/applications/${app.id}`} className="hover:text-blue-600 transition">
                         {app.job.title}
-                      </Link>
+                      </TransitionLink>
                     </h3>
 
                     <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap">
@@ -272,7 +272,7 @@ export function CandidateApplicationsWorkbench({
                   </div>
 
                   <div className="shrink-0 flex items-center gap-2">
-                    <Link
+                    <TransitionLink
                       href={`/candidate/applications/${app.id}`}
                       className={`px-4 py-2 rounded-md text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1 ${
                         actionReq.isActionRequired
@@ -281,7 +281,7 @@ export function CandidateApplicationsWorkbench({
                       }`}
                     >
                       {actionReq.isActionRequired ? "Review & Sign-Off →" : "View Application →"}
-                    </Link>
+                    </TransitionLink>
                   </div>
                 </div>
               );

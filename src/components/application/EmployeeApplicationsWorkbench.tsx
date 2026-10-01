@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
 import type { ApplicationStatus } from "@/generated/prisma";
 import { formatSalary } from "@/lib/utils/status-presenter";
 import { InstantTabs, TabItem } from "@/components/workbench/InstantTabs";
@@ -9,6 +8,7 @@ import { InstantSearch } from "@/components/workbench/InstantSearch";
 import { InstantFilterBar, FilterDropdownConfig } from "@/components/workbench/InstantFilterBar";
 import { TablePagination } from "@/components/workbench/TablePagination";
 import { PendingButton } from "@/components/ui/PendingButton";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 import { createApplicationAction } from "@/lib/application/actions";
 import { syncUrlParams } from "@/lib/client/urlSync";
 
@@ -774,7 +774,7 @@ export function EmployeeApplicationsWorkbench({
 
                       {/* Action Column */}
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <Link
+                        <TransitionLink
                           href={`/employee/applications/${app.id}`}
                           className={`inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold transition ${
                             app.status === "READY"
@@ -783,7 +783,7 @@ export function EmployeeApplicationsWorkbench({
                           }`}
                         >
                           {app.status === "READY" ? "Open Application →" : "Open Workbench →"}
-                        </Link>
+                        </TransitionLink>
                       </td>
                     </tr>
                   );

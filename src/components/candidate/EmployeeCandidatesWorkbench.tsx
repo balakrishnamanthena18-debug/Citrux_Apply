@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 import {
   WorkbenchShell,
   WorkbenchHeader,
@@ -234,12 +234,12 @@ export function EmployeeCandidatesWorkbench({
                           {c.user.firstName?.[0] || (c.user.email?.[0] ? c.user.email[0].toUpperCase() : "?")}
                         </div>
                         <div>
-                          <Link
+                          <TransitionLink
                             href={`/employee/candidates/${c.id}`}
                             className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors"
                           >
                             {[c.user.firstName, c.user.lastName].filter(Boolean).join(" ") || c.user.email}
-                          </Link>
+                          </TransitionLink>
                           <div className="text-[11px] text-slate-400 font-mono">{c.user.email}</div>
                           {c.headline && <div className="text-slate-500 text-[11px] mt-0.5 max-w-xs truncate">{c.headline}</div>}
                         </div>
@@ -295,12 +295,12 @@ export function EmployeeCandidatesWorkbench({
                     </td>
 
                     <td className="px-5 py-3.5 whitespace-nowrap text-right">
-                      <Link
+                      <TransitionLink
                         href={`/employee/candidates/${c.id}`}
                         className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-xs transition-colors"
                       >
                         Inspect 360 →
-                      </Link>
+                      </TransitionLink>
                     </td>
                   </tr>
                 ))}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition } from "react";
-import Link from "next/link";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 import {
   WorkbenchShell,
   WorkbenchHeader,
@@ -12,6 +12,7 @@ import {
   InstantSearch,
 } from "@/components/workbench";
 import { PendingButton } from "@/components/ui/PendingButton";
+import { syncUrlParams } from "@/lib/client/urlSync";
 import type { TaskPriority, TaskStatus } from "@/generated/prisma";
 
 export interface EscalatedTaskItem {
@@ -62,6 +63,16 @@ export function AdminEscalationsWorkbench({
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [isPending, startTransition] = useTransition();
   const [activeTriageTaskId, setActiveTriageTaskId] = useState<string | null>(null);
+
+  const handlePriorityChange = (key: string) => {
+    setPriorityFilter(key);
+    syncUrlParams({ priority: key === "ALL" ? null : key });
+  };
+
+  const handleSearchChange = (term: string) => {
+    setSearchTerm(term);
+    syncUrlParams({ search: term ? term : null });
+  };
 
   const priorities: TabItem[] = useMemo(() => {
     return [
@@ -116,12 +127,12 @@ export function AdminEscalationsWorkbench({
           <InstantTabs
             tabs={priorities}
             activeTab={priorityFilter}
-            onChange={setPriorityFilter}
+            onChange={handlePriorityChange}
           />
           <div className="w-full lg:w-72">
             <InstantSearch
               value={searchTerm}
-              onChange={setSearchTerm}
+              onChange={handleSearchChange}
               placeholder="Search keyword, assignee, candidate... (/)"
             />
           </div>
@@ -139,6 +150,7 @@ export function AdminEscalationsWorkbench({
             onAction={() => {
               setSearchTerm("");
               setPriorityFilter("ALL");
+              syncUrlParams({ search: null, priority: null });
             }}
           />
         ) : (
@@ -161,9 +173,9 @@ export function AdminEscalationsWorkbench({
                   </div>
 
                   <h3 className="text-base font-bold text-slate-900">
-                    <Link href={`/employee/tasks/${task.id}`} className="hover:underline">
+                    <TransitionLink href={`/employee/tasks/${task.id}`} className="hover:underline">
                       {task.title}
-                    </Link>
+                    </TransitionLink>
                   </h3>
 
                   {/* Escalation Reason */}
