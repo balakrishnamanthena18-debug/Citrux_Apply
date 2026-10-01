@@ -17,8 +17,10 @@ function getAdapter(): PrismaPg {
   }
   const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL,
-    max: 10,
-    idleTimeoutMillis: 30000,
+    // Keep per-instance pool small: Supabase Free session pooler caps ~15
+    // clients globally across all serverless isolates.
+    max: 3,
+    idleTimeoutMillis: 5000,
     connectionTimeoutMillis: 5000,
   });
   globalForPrisma.adapter = adapter;

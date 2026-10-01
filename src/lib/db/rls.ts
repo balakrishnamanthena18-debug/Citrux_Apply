@@ -14,8 +14,8 @@ export interface WithRlsOptions {
  * Uses PostgreSQL's parameterized set_config(setting, value, is_local=true) to prevent
  * SQL injection and ensure the context automatically clears upon COMMIT or ROLLBACK.
  *
- * Configures resilient connection wait (15s) and transaction timeouts (30s) to prevent
- * transaction start timeout errors under concurrent server rendering loads.
+ * Configures resilient connection wait and shorter transaction timeouts so
+ * session-mode pooler slots are released quickly under concurrent RSC loads.
  */
 export async function withRlsContext<T>(
   userId: string,
@@ -28,8 +28,8 @@ export async function withRlsContext<T>(
       return fn(tx);
     },
     {
-      maxWait: options?.maxWait ?? 15000,
-      timeout: options?.timeout ?? 30000,
+      maxWait: options?.maxWait ?? 8000,
+      timeout: options?.timeout ?? 12000,
       isolationLevel: options?.isolationLevel,
     }
   );

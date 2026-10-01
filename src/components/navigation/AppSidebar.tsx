@@ -370,7 +370,6 @@ export function AppSidebar({
                   <TransitionLink
                     key={item.href}
                     href={item.href}
-                    prefetch={true}
                     isActive={isActive}
                     onNavigate={() => {
                       if (isMobile && onClose) onClose();
