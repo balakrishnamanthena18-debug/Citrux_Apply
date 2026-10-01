@@ -34,6 +34,11 @@
   }
 }
 
+/* Prevent horizontal page scroll without clipping position:fixed tab bars */
+html {
+  overflow-x: clip;
+}
+
 /* Custom restrained scrollbar for enterprise dense viewports */
 ::-webkit-scrollbar {
   width: 6px;

@@ -400,35 +400,35 @@ export default async function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="mt-8 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-8 xl:grid-cols-5">
             {dashboardData.attentionItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`group rounded-[18px] border px-4 py-3.5 transition ${
+                className={`group rounded-[16px] border px-3 py-3 transition sm:rounded-[18px] sm:px-4 sm:py-3.5 ${
                   item.count > 0
                     ? "border-white/15 bg-white/[0.08] hover:bg-white/[0.14]"
                     : "border-white/8 bg-black/10 hover:bg-black/15"
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/45">
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/45 sm:text-[11px]">
                       {item.label}
                     </div>
-                    <div className="mt-2 text-[1.65rem] font-semibold tracking-[-0.04em] tabular-nums leading-none">
+                    <div className="mt-1.5 text-[1.45rem] font-semibold leading-none tracking-[-0.04em] tabular-nums sm:mt-2 sm:text-[1.65rem]">
                       {item.count}
                     </div>
                   </div>
                   <span
-                    className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-1.5 text-[10px] font-bold tabular-nums ${
+                    className={`mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border px-1 text-[10px] font-bold tabular-nums sm:h-6 sm:min-w-6 sm:px-1.5 ${
                       item.count > 0 ? toneClasses[item.tone] : "border-white/10 bg-white/5 text-white/50"
                     }`}
                   >
                     {item.count > 0 ? "!" : "·"}
                   </span>
                 </div>
-                <p className="mt-2 text-[11px] leading-snug text-white/45 group-hover:text-white/65">
+                <p className="mt-1.5 line-clamp-2 text-[10px] leading-snug text-white/45 group-hover:text-white/65 sm:mt-2 sm:text-[11px]">
                   {item.description}
                 </p>
               </Link>
@@ -465,13 +465,13 @@ export default async function AdminDashboardPage() {
           <Link
             key={metric.label}
             href={metric.href}
-            className="bg-white px-5 py-5 transition hover:bg-[#F7F9F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#12A150]"
+            className="bg-white px-3.5 py-3.5 transition hover:bg-[#F7F9F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#12A150] sm:px-5 sm:py-5"
           >
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">
               {metric.label}
             </div>
             <div
-              className={`mt-3 text-[1.85rem] font-semibold tracking-[-0.04em] tabular-nums ${
+              className={`mt-2 text-[1.55rem] font-semibold tracking-[-0.04em] tabular-nums sm:mt-3 sm:text-[1.85rem] ${
                 metric.accent ? "text-[#12A150]" : "text-[#0F1720]"
               }`}
             >

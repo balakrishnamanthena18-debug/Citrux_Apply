@@ -34,7 +34,7 @@ export function MetricStrip({ items, className = "" }: MetricStripProps) {
               {metric.label}
             </div>
             <div
-              className={`mt-3 text-[1.85rem] font-semibold tracking-[-0.04em] tabular-nums ${
+              className={`mt-2 text-[1.55rem] font-semibold tracking-[-0.04em] tabular-nums sm:mt-3 sm:text-[1.85rem] ${
                 metric.accent ? "text-[#12A150]" : "text-[#0F1720]"
               }`}
             >
@@ -48,7 +48,7 @@ export function MetricStrip({ items, className = "" }: MetricStripProps) {
             <Link
               key={metric.label}
               href={metric.href}
-              className="bg-white px-5 py-5 transition hover:bg-[#F7F9F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#12A150]"
+              className="bg-white px-3.5 py-3.5 transition hover:bg-[#F7F9F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#12A150] sm:px-5 sm:py-5"
             >
               {content}
             </Link>
@@ -56,7 +56,7 @@ export function MetricStrip({ items, className = "" }: MetricStripProps) {
         }
 
         return (
-          <div key={metric.label} className="bg-white px-5 py-5">
+          <div key={metric.label} className="bg-white px-3.5 py-3.5 sm:px-5 sm:py-5">
             {content}
           </div>
         );

@@ -14,6 +14,136 @@ const FALLBACK_POLL_MS = 60_000;
 /** Slow reconciliation poll even when realtime is healthy (ms). */
 const HEALTHY_RECONCILE_MS = 5 * 60_000;
 
+function NotificationPanel({
+  notifications,
+  unreadCount,
+  soundEnabled,
+  onClose,
+  onToggleSound,
+  onMarkAllRead,
+  onMarkRead,
+  variant,
+}: {
+  notifications: any[];
+  unreadCount: number;
+  soundEnabled: boolean;
+  onClose: () => void;
+  onToggleSound: () => void;
+  onMarkAllRead: () => void;
+  onMarkRead: (id: string) => void;
+  variant: "desktop" | "mobile";
+}) {
+  return (
+    <div
+      className={
+        variant === "mobile"
+          ? "flex max-h-[min(80vh,640px)] w-full flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_-12px_40px_rgba(15,23,32,0.18)]"
+          : "absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-[#E5EAE7] bg-white shadow-xl sm:w-96"
+      }
+      role="dialog"
+      aria-label="Notifications"
+    >
+      <div className="flex items-center justify-between border-b border-[#EDF1EF] bg-[#F7F9F8] px-4 py-3">
+        {variant === "mobile" && (
+          <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-[#DDE5E0]" aria-hidden />
+        )}
+        <div className={`flex min-w-0 items-center gap-2 ${variant === "mobile" ? "pt-2" : ""}`}>
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#0F1720]">
+            Notifications
+            {unreadCount > 0 ? ` · ${unreadCount}` : ""}
+          </span>
+          <button
+            type="button"
+            onClick={onToggleSound}
+            title={
+              soundEnabled
+                ? "Notification sound enabled (Click to mute)"
+                : "Notification sound muted (Click to enable)"
+            }
+            className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition ${
+              soundEnabled
+                ? "border-[#12A150]/25 bg-[#12A150]/8 text-[#0B3B2C]"
+                : "border-[#E5EAE7] bg-white text-[#64748B]"
+            }`}
+          >
+            {soundEnabled ? "Sound on" : "Muted"}
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={onMarkAllRead}
+              className="text-xs font-semibold text-[#12A150] hover:text-[#0E8541]"
+            >
+              Mark all read
+            </button>
+          )}
+          {variant === "mobile" && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#64748B] hover:bg-[#EDF1EF]"
+              aria-label="Close notifications"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div
+        className={`divide-y divide-[#EDF1EF] overflow-y-auto ${
+          variant === "mobile" ? "max-h-[min(60vh,480px)]" : "max-h-80"
+        }`}
+      >
+        {notifications.length === 0 ? (
+          <div className="p-8 text-center text-xs text-[#64748B]">No notifications yet.</div>
+        ) : (
+          notifications.map((n) => (
+            <div
+              key={n.id}
+              className={`flex items-start justify-between gap-3 p-3.5 transition hover:bg-[#F7F9F8] ${
+                !n.readAt ? "bg-[#12A150]/[0.04]" : ""
+              }`}
+            >
+              <div className="min-w-0 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-[#0F1720]">{n.title}</span>
+                  {!n.readAt && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#12A150]" />}
+                </div>
+                <p className="text-xs leading-relaxed text-[#64748B]">{n.body}</p>
+                <span className="text-[10px] text-[#94A3B8]">
+                  {new Date(n.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+              {!n.readAt && (
+                <button
+                  type="button"
+                  onClick={() => onMarkRead(n.id)}
+                  className="shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold text-[#64748B] hover:bg-[#EDF1EF] hover:text-[#0F1720]"
+                  title="Mark as read"
+                >
+                  ✓
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+      {variant === "mobile" && (
+        <div
+          className="border-t border-[#EDF1EF] bg-white"
+          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function NotificationsBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -38,6 +168,24 @@ export function NotificationsBell() {
   useEffect(() => {
     soundEnabledRef.current = soundEnabled;
   }, [soundEnabled]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const original = document.body.style.overflow;
+    // Only lock scroll on small screens (mobile sheet).
+    const mq = window.matchMedia("(max-width: 767px)");
+    if (mq.matches) {
+      document.body.style.overflow = "hidden";
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = original;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen]);
 
   const toggleSound = () => {
     const nextState = !soundEnabled;
@@ -90,9 +238,6 @@ export function NotificationsBell() {
     }
   }, [processNotifications]);
 
-  // Deferred initial fetch + adaptive polling + visibility pause.
-  // Do NOT block first paint / competing RSC bandwidth: schedule the first
-  // reconciliation after idle (or a short timeout fallback).
   useEffect(() => {
     let isMounted = true;
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -137,7 +282,6 @@ export function NotificationsBell() {
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        // Visibility recovery stays best-effort and non-blocking.
         void tick();
       }
     };
@@ -155,7 +299,6 @@ export function NotificationsBell() {
     };
   }, [loadNotifications]);
 
-  // Wire RealtimeEventBus → targeted notification refresh (no full router.refresh)
   useEffect(() => {
     const onNotificationEvent = (event: RealtimeEventPayload) => {
       if (
@@ -163,8 +306,6 @@ export function NotificationsBell() {
         event.eventType === "NOTIFICATION_READ" ||
         event.eventType === "NOTIFICATION_ALL_READ"
       ) {
-        // Always reconcile from authoritative API (tenant/recipient scoped) —
-        // never trust broadcast bodies for privileged list content.
         void loadNotifications();
       }
     };
@@ -181,7 +322,6 @@ export function NotificationsBell() {
     const target = previous.find((n) => n.id === id);
     const wasUnread = target && !target.readAt;
 
-    // Immediate presentation feedback; server remains authoritative.
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n))
     );
@@ -202,9 +342,7 @@ export function NotificationsBell() {
     const previousUnread = unreadCount;
     const now = new Date().toISOString();
 
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, readAt: n.readAt || now }))
-    );
+    setNotifications((prev) => prev.map((n) => ({ ...n, readAt: n.readAt || now })));
     setUnreadCount(0);
 
     try {
@@ -215,21 +353,33 @@ export function NotificationsBell() {
     }
   };
 
+  const panelProps = {
+    notifications,
+    unreadCount,
+    soundEnabled,
+    onClose: () => setIsOpen(false),
+    onToggleSound: toggleSound,
+    onMarkAllRead: handleMarkAllRead,
+    onMarkRead: handleMarkRead,
+  };
+
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => {
           setIsOpen(!isOpen);
           if (!isOpen) void loadNotifications();
         }}
-        className="relative p-2 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition"
-        title={
+        className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-[#64748B] transition hover:bg-[#F7F9F8] hover:text-[#0F1720] sm:h-9 sm:w-9 sm:rounded-full"
+        aria-label={
           connectionStatus === "connected"
             ? "Notifications (live)"
             : "Notifications (periodic sync)"
         }
+        aria-expanded={isOpen}
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -238,83 +388,38 @@ export function NotificationsBell() {
           />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
+          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-0.5 text-[10px] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-lg bg-white shadow-xl border border-slate-200 z-50 overflow-hidden">
-          <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-                Notifications ({unreadCount} unread)
-              </span>
-              <button
-                type="button"
-                onClick={toggleSound}
-                title={soundEnabled ? "Notification sound enabled (Click to mute)" : "Notification sound muted (Click to enable)"}
-                className={`text-xs px-1.5 py-0.5 rounded border transition flex items-center gap-1 ${
-                  soundEnabled
-                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                    : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
-                }`}
-              >
-                <span>{soundEnabled ? "🔔 Sound ON" : "🔕 Muted"}</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllRead}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Mark all read
-                </button>
-              )}
-            </div>
+        <>
+          {/* Desktop popover */}
+          <button
+            type="button"
+            className="fixed inset-0 z-40 hidden cursor-default md:block"
+            aria-label="Dismiss notifications"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="relative z-50 hidden md:block">
+            <NotificationPanel {...panelProps} variant="desktop" />
           </div>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-            {notifications.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                No notifications yet.
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`p-3 transition hover:bg-slate-50 flex items-start justify-between gap-3 ${
-                    !n.readAt ? "bg-blue-50/50" : ""
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-900">{n.title}</span>
-                      {!n.readAt && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-600">{n.body}</p>
-                    <span className="text-[10px] text-slate-400">
-                      {new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  {!n.readAt && (
-                    <button
-                      onClick={() => handleMarkRead(n.id)}
-                      className="text-[10px] text-slate-400 hover:text-slate-600 shrink-0"
-                      title="Mark as read"
-                    >
-                      ✓
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
+          {/* Mobile bottom sheet */}
+          <div className="fixed inset-0 z-[60] md:hidden" role="presentation">
+            <button
+              type="button"
+              className="absolute inset-0 bg-[#0B3B2C]/35 transition-opacity duration-200"
+              aria-label="Dismiss notifications"
+              onClick={() => setIsOpen(false)}
+            />
+            <div className="absolute inset-x-0 bottom-0 z-[61] transition-transform duration-200 ease-out">
+              <NotificationPanel {...panelProps} variant="mobile" />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

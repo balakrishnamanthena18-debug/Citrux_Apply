@@ -78,7 +78,7 @@ export function CandidateCommandCenter({
   );
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-16">
+    <div className="mx-auto max-w-6xl space-y-6 pb-6 sm:space-y-8 sm:pb-16">
       <PageHero
         eyebrow="Candidate desk"
         title={`${candidateGreetingTime}, ${candidateName}`}

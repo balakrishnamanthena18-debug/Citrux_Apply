@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
+import { MobileBottomNav } from "./MobileBottomNav";
 import type { Role } from "@/generated/prisma";
 
 interface AppShellProps {
@@ -15,7 +16,6 @@ interface AppShellProps {
 export function AppShell({ role, email, fullName, children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Close drawer on Escape key and prevent background scroll when open
   useEffect(() => {
     if (!mobileMenuOpen) return;
 
@@ -47,23 +47,25 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
         />
       </div>
 
-      {/* Mobile & Tablet Slide-over Drawer (< 1024px / lg:hidden) */}
+      {/* Mobile & Tablet Slide-over Drawer (< 1024px) */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-50 lg:hidden flex"
+          className="fixed inset-0 z-50 flex lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Navigation drawer"
         >
-          {/* Controlled Backdrop (25-30% opacity, minimal/no blur) */}
-          <div
-            className="fixed inset-0 bg-[#0B3B2C]/25 transition-opacity"
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#0B3B2C]/30 transition-opacity duration-200"
             onClick={() => setMobileMenuOpen(false)}
-            aria-hidden="true"
+            aria-label="Close navigation menu"
           />
 
-          {/* Drawer Panel */}
-          <div className="relative flex flex-col w-[min(320px,86vw)] max-w-[320px] bg-white z-50 shadow-xl border-r border-[#E5EAE7] h-full">
+          <div
+            className="relative z-50 flex h-full w-[min(320px,86vw)] max-w-[320px] flex-col border-r border-[#E5EAE7] bg-white shadow-xl transition-transform duration-200 ease-out"
+            style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+          >
             <AppSidebar
               role={role}
               email={email}
@@ -75,18 +77,21 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
         </div>
       )}
 
-      {/* Main Application Container (Offset on Desktop >= 1024px by 256px / lg:pl-64) */}
-      <div className="lg:pl-64 flex flex-col min-h-screen w-full">
+      <div className="flex min-h-screen w-full flex-col lg:pl-64">
         <AppHeader
           role={role}
           email={email}
           fullName={fullName}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        <main
+          className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6 lg:p-8 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 lg:pb-8"
+        >
           {children}
         </main>
       </div>
+
+      <MobileBottomNav role={role} onOpenMore={() => setMobileMenuOpen(true)} />
     </div>
   );
 }
