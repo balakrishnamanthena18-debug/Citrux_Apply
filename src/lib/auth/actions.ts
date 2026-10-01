@@ -51,7 +51,9 @@ async function getClientIp(): Promise<string> {
  * Enforces rate limiting against brute-force attacks and logs audit events.
  */
 export async function signInAction(formData: FormData): Promise<ActionResult<{ redirectUrl: string }>> {
+  let stage = "STAGE_0_START";
   try {
+    stage = "STAGE_1_PARSE_INPUT";
     const rawData = {
       email: formData.get("email"),
       password: formData.get("password"),
@@ -69,11 +71,12 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
     console.log(`[AUTH_FLOW] LOGIN_START email_domain=${normalizedEmail.split("@")[1] ?? "unknown"}`);
 
     // 1. Enforce Distributed Database-Backed Rate Limiting against Brute-Force Attacks
+    stage = "STAGE_2_RATE_LIMIT_CHECK";
     let rateLimitCheck;
     try {
       rateLimitCheck = await checkRateLimit("LOGIN", rateLimitParams);
-    } catch (rlErr) {
-      console.error("[AUTH_FLOW] Rate limiter check error (graceful fallback):", rlErr);
+    } catch (rlErr: any) {
+      console.error("[AUTH_FLOW] Rate limiter check error (graceful fallback):", rlErr?.message);
       rateLimitCheck = { allowed: true, remaining: 5 };
     }
 
@@ -103,7 +106,10 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
 
     console.log("[AUTH_FLOW] RATE_LIMIT_CHECK_COMPLETE");
 
+    stage = "STAGE_3_SUPABASE_CLIENT_CREATE";
     const supabase = await createServerClient();
+
+    stage = "STAGE_4_SUPABASE_AUTH_SIGN_IN";
     const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password: parsed.data.password,
@@ -115,8 +121,8 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
       // Record failed attempt atomically in PostgreSQL
       try {
         await recordFailedAttempt("LOGIN", rateLimitParams);
-      } catch (e) {
-        console.error("[AUTH_FLOW] recordFailedAttempt error:", e);
+      } catch (e: any) {
+        console.error("[AUTH_FLOW] recordFailedAttempt error:", e?.message);
       }
 
       try {
@@ -130,8 +136,8 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
             reason: error?.message ?? "Invalid credentials",
           },
         });
-      } catch (e) {
-        console.error("[AUTH_FLOW] logSystemAuditEvent error:", e);
+      } catch (e: any) {
+        console.error("[AUTH_FLOW] logSystemAuditEvent error:", e?.message);
       }
 
       const errorMessage = error?.message?.toLowerCase().includes("email not confirmed")
@@ -142,6 +148,7 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
     }
 
     // 2. Resolve membership within transaction-local RLS context to verify active status
+    stage = "STAGE_5_RLS_MEMBERSHIP_LOOKUP";
     try {
       const membership = await withRlsContext(data.user.id, async (tx) => {
         return tx.membership.findFirst({
@@ -160,19 +167,21 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
         try {
           await recordFailedAttempt("LOGIN", rateLimitParams);
           await supabase.auth.signOut();
-        } catch (e) {
-          console.error("[AUTH_FLOW] signOut on inactive membership error:", e);
+        } catch (e: any) {
+          console.error("[AUTH_FLOW] signOut on inactive membership error:", e?.message);
         }
         return { success: false, error: "Account is inactive or pending organization approval" };
       }
 
       // 3. Reset rate limit counter on successful authentication
+      stage = "STAGE_6_RATE_LIMIT_RESET";
       try {
         await recordSuccessfulAttempt("LOGIN", rateLimitParams);
-      } catch (e) {
-        console.error("[AUTH_FLOW] recordSuccessfulAttempt error:", e);
+      } catch (e: any) {
+        console.error("[AUTH_FLOW] recordSuccessfulAttempt error:", e?.message);
       }
 
+      stage = "STAGE_7_AUDIT_LOG_SUCCESS";
       try {
         await logUserAuditEvent({
           userId: data.user.id,
@@ -182,10 +191,11 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
           entityId: data.user.id,
           details: { ip: clientIp },
         });
-      } catch (e) {
-        console.error("[AUTH_FLOW] logUserAuditEvent error:", e);
+      } catch (e: any) {
+        console.error("[AUTH_FLOW] logUserAuditEvent error:", e?.message);
       }
 
+      stage = "STAGE_8_REDIRECT_RESOLUTION";
       let redirectUrl = "/candidate";
       if (membership.role === "ADMIN") redirectUrl = "/admin";
       else if (membership.role === "EMPLOYEE") redirectUrl = "/employee";
@@ -194,14 +204,17 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
 
       return { success: true, data: { redirectUrl } };
     } catch (err: any) {
-      console.error("[AUTH_FLOW] Membership resolution error:", err);
+      console.error("[AUTH_FLOW] Membership resolution error:", err?.message || err);
       try {
         await supabase.auth.signOut();
       } catch {}
       return { success: false, error: "Failed to establish user context. Please try again." };
     }
   } catch (globalErr: any) {
-    console.error("[AUTH_FLOW] Unexpected signInAction global exception:", globalErr);
+    console.error(`[AUTH_FLOW] Unexpected signInAction exception at stage [${stage}]:`, {
+      name: globalErr?.name,
+      message: globalErr?.message,
+    });
     const isConnError =
       globalErr?.message?.toLowerCase().includes("fetch") ||
       globalErr?.message?.toLowerCase().includes("connect") ||
@@ -211,7 +224,7 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
       success: false,
       error: isConnError
         ? "Unable to connect to the authentication service. Please check your network and try again."
-        : "An unexpected error occurred during sign in. Please try again.",
+        : `An unexpected error occurred during sign in (${stage}: ${globalErr?.name || "Error"}). Please try again.`,
     };
   }
 }
