@@ -224,7 +224,7 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
       success: false,
       error: isConnError
         ? "Unable to connect to the authentication service. Please check your network and try again."
-        : `An unexpected error occurred during sign in (${stage}: ${globalErr?.name || "Error"}). Please try again.`,
+        : `An unexpected error occurred during sign in (${stage}: ${globalErr?.message || globalErr?.name || "Error"}). Please try again.`,
     };
   }
 }
