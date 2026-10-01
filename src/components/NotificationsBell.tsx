@@ -90,14 +90,25 @@ export function NotificationsBell() {
     }
   }, [processNotifications]);
 
-  // Initial fetch + adaptive polling + visibility pause
+  // Deferred initial fetch + adaptive polling + visibility pause.
+  // Do NOT block first paint / competing RSC bandwidth: schedule the first
+  // reconciliation after idle (or a short timeout fallback).
   useEffect(() => {
     let isMounted = true;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let idleId: number | null = null;
+    let deferTimeout: ReturnType<typeof setTimeout> | null = null;
+    let initialStarted = false;
 
     const tick = async () => {
       if (!isMounted) return;
       await loadNotifications();
+    };
+
+    const startInitial = () => {
+      if (!isMounted || initialStarted) return;
+      initialStarted = true;
+      void tick();
     };
 
     const schedule = (status: ConnectionStatus) => {
@@ -110,7 +121,12 @@ export function NotificationsBell() {
       }, ms);
     };
 
-    void tick();
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(() => startInitial(), { timeout: 1500 });
+    } else {
+      deferTimeout = setTimeout(startInitial, 250);
+    }
+
     schedule(realtimeSubscriptionManager.getStatus());
 
     const unsubStatus = realtimeSubscriptionManager.onStatusChange((status) => {
@@ -121,6 +137,7 @@ export function NotificationsBell() {
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
+        // Visibility recovery stays best-effort and non-blocking.
         void tick();
       }
     };
@@ -129,6 +146,10 @@ export function NotificationsBell() {
     return () => {
       isMounted = false;
       if (intervalId) clearInterval(intervalId);
+      if (idleId != null && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (deferTimeout) clearTimeout(deferTimeout);
       unsubStatus();
       document.removeEventListener("visibilitychange", onVisibility);
     };

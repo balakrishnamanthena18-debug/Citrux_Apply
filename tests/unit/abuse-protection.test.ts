@@ -85,16 +85,15 @@ describe("Abuse Protection & Rate Limiting (tests/unit/abuse-protection.test.ts)
 
     it("blocks abusive API requests exceeding threshold with 429 and Retry-After header", async () => {
       const futureLock = new Date(Date.now() + 60 * 1000);
-      vi.mocked(prisma.rateLimitBucket.findUnique).mockResolvedValue({
-        id: "bucket-api",
-        keyHash: "key-hash",
-        action: "API_REQUEST",
-        windowStart: new Date(),
-        attemptCount: 120,
-        lockedUntil: futureLock,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any);
+      // consumeRateLimit uses a single atomic UPSERT ($queryRaw); locked buckets
+      // are enforced from the RETURNING row, not a prior findUnique.
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([
+        {
+          attemptCount: 121,
+          windowStart: new Date(),
+          lockedUntil: futureLock,
+        },
+      ] as any);
 
       const request = new Request("https://example.com/api/notifications", {
         headers: {
@@ -159,16 +158,13 @@ describe("Abuse Protection & Rate Limiting (tests/unit/abuse-protection.test.ts)
 
     it("blocks excessive AI generation attempts once exhausted", async () => {
       const futureLock = new Date(Date.now() + 120 * 1000);
-      vi.mocked(prisma.rateLimitBucket.findUnique).mockResolvedValue({
-        id: "bucket-ai",
-        keyHash: "key-ai-hash",
-        action: "AI_GENERATION",
-        windowStart: new Date(),
-        attemptCount: 10,
-        lockedUntil: futureLock,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any);
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([
+        {
+          attemptCount: 11,
+          windowStart: new Date(),
+          lockedUntil: futureLock,
+        },
+      ] as any);
 
       const result = await checkAiGenerationRateLimit({
         userId: "candidate-123",

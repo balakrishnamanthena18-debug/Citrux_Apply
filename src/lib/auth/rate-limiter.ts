@@ -334,12 +334,8 @@ export async function consumeRateLimit(
   action: RateLimitAction,
   params: RateLimitKeyParams | string
 ): Promise<RateLimitResult> {
-  // First check if already rate limited
-  const check = await checkRateLimit(action, params);
-  if (!check.allowed) {
-    return check;
-  }
-  // Atomically increment counter
+  // Single atomic UPSERT — recordFailedAttempt already enforces lock / window /
+  // attempt thresholds. A prior findUnique check was a redundant round-trip.
   return recordFailedAttempt(action, params);
 }
 

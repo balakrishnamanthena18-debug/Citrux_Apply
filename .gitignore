@@ -22,6 +22,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.migration-mumbai.env
 
 # Debug logs
 npm-debug.log*
@@ -42,3 +43,10 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local migration artifacts (never commit dumps/manifests)
+storage-migrate-manifest.json
+storage-verify-report.json
+/tmp-migrate/
+.vercel
+.env*

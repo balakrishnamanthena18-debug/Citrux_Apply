@@ -416,26 +416,41 @@ export function EmployeeTasksWorkbench({
                 <div className="grid grid-cols-2 gap-2">
                   <select
                     name="category"
-                    defaultValue="APPLICATION_PREPARATION"
+                    defaultValue="APPLICATION"
                     className="rounded-md border border-slate-300 p-2 text-xs bg-white"
                   >
-                    <option value="APPLICATION_PREPARATION">App Prep</option>
-                    <option value="CANDIDATE_ONBOARDING">Onboarding</option>
-                    <option value="QUALITY_ASSURANCE">QA Review</option>
-                    <option value="COMMUNICATION">Communication</option>
-                    <option value="SYSTEM_ADMIN">System Admin</option>
-                    <option value="OTHER">Other</option>
+                    <option value="CANDIDATE">Candidate</option>
+                    <option value="JOB">Job</option>
+                    <option value="APPLICATION">Application</option>
+                    <option value="QA">QA</option>
+                    <option value="OPERATIONAL">Operational</option>
                   </select>
 
                   <select
                     name="type"
-                    defaultValue="MANUAL_ACTION"
+                    defaultValue="COMPLETE_APPLICATION"
                     className="rounded-md border border-slate-300 p-2 text-xs bg-white"
                   >
-                    <option value="MANUAL_ACTION">Manual Action</option>
-                    <option value="REVIEW">Review</option>
-                    <option value="VERIFICATION">Verification</option>
-                    <option value="OUTREACH">Outreach</option>
+                    <option value="COMPLETE_PROFILE">Complete Profile</option>
+                    <option value="UPLOAD_DOCUMENT">Upload Document</option>
+                    <option value="VERIFY_INFORMATION">Verify Information</option>
+                    <option value="APPROVE_APPLICATION">Approve Application</option>
+                    <option value="PROVIDE_MISSING_INFO">Provide Missing Info</option>
+                    <option value="REVIEW_JOB">Review Job</option>
+                    <option value="QUALIFY_JOB">Qualify Job</option>
+                    <option value="PREPARE_RESUME">Prepare Resume</option>
+                    <option value="PREPARE_COVER_LETTER">Prepare Cover Letter</option>
+                    <option value="PREPARE_SCREENING_ANSWERS">Prepare Screening Answers</option>
+                    <option value="COMPLETE_APPLICATION">Complete Application</option>
+                    <option value="VERIFY_APPLICATION">Verify Application</option>
+                    <option value="SUBMIT_APPLICATION">Submit Application</option>
+                    <option value="RESUME_QA">Resume QA</option>
+                    <option value="APPLICATION_QA">Application QA</option>
+                    <option value="SUBMISSION_QA">Submission QA</option>
+                    <option value="CANDIDATE_ASSIGNMENT">Candidate Assignment</option>
+                    <option value="CANDIDATE_REASSIGNMENT">Candidate Reassignment</option>
+                    <option value="ESCALATION_HANDLING">Escalation Handling</option>
+                    <option value="SUBMISSION_CORRECTION">Submission Correction</option>
                   </select>
                 </div>
               </div>
