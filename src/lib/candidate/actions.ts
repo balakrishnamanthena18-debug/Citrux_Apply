@@ -48,9 +48,12 @@ export interface ActionResult<T = unknown> {
 
 function revalidateCandidateViews() {
   try {
-    revalidatePath("/candidate", "layout");
-    revalidatePath("/employee", "layout");
-    revalidatePath("/admin", "layout");
+    revalidatePath("/candidate");
+    revalidatePath("/candidate/profile");
+    revalidatePath("/employee/candidates");
+    revalidatePath("/admin/candidates");
+    revalidatePath("/employee");
+    revalidatePath("/admin");
   } catch {
     // Safe fallback when executed outside Next.js request context
   }

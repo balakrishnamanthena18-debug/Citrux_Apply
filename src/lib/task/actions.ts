@@ -44,8 +44,8 @@ function revalidateTaskViews(taskId?: string) {
     revalidatePath("/employee/tasks");
     revalidatePath("/admin/tasks");
     revalidatePath("/admin/tasks/escalations");
-    revalidatePath("/employee", "layout");
-    revalidatePath("/admin", "layout");
+    revalidatePath("/employee");
+    revalidatePath("/admin");
     if (taskId) {
       revalidatePath(`/employee/tasks/${taskId}`);
     }

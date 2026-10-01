@@ -31,6 +31,8 @@ import {
   AuthorizationError,
 } from "@/lib/errors";
 import { emailNotificationService } from "@/lib/email";
+import { publishRealtimeEvent } from "@/lib/realtime/publish";
+import type { SubscriptionScope } from "@/lib/realtime/types";
 
 export interface ActionResult<T = unknown> {
   success: boolean;
@@ -38,13 +40,27 @@ export interface ActionResult<T = unknown> {
   error?: string;
 }
 
+function scopeForPublish(
+  ctx: { role: Role; organizationId: string; userId: string },
+  recipientRoleHint?: "CANDIDATE" | "EMPLOYEE" | "ADMIN"
+): SubscriptionScope {
+  const role =
+    recipientRoleHint ||
+    (ctx.role === Role.CANDIDATE ? "CANDIDATE" : ctx.role === Role.ADMIN ? "ADMIN" : "EMPLOYEE");
+  return {
+    role,
+    organizationId: ctx.organizationId,
+    userId: ctx.userId,
+    candidateId: role === "CANDIDATE" ? ctx.userId : null,
+  };
+}
+
 function revalidateCommunicationViews(conversationId?: string) {
   try {
     revalidatePath("/candidate/messages");
     revalidatePath("/employee/messages");
-    revalidatePath("/candidate", "layout");
-    revalidatePath("/employee", "layout");
-    revalidatePath("/admin", "layout");
+    revalidatePath("/candidate");
+    revalidatePath("/employee");
     if (conversationId) {
       revalidatePath(`/candidate/messages/${conversationId}`);
       revalidatePath(`/employee/messages/${conversationId}`);
@@ -131,8 +147,9 @@ export async function createConversationAction(
         ? candidate.assignedEmployeeId || null
         : candidate.userId;
 
+      let notificationId: string | null = null;
       if (recipientId) {
-        await tx.notification.create({
+        const notif = await tx.notification.create({
           data: {
             organizationId: ctx.organizationId,
             recipientId,
@@ -143,9 +160,10 @@ export async function createConversationAction(
             relatedEntityId: conv.id,
           },
         });
+        notificationId = notif.id;
       }
 
-      return { conv, candidate, recipientId };
+      return { conv, candidate, recipientId, notificationId };
     });
 
     // 5. Audit Logging
@@ -162,6 +180,27 @@ export async function createConversationAction(
       },
     });
 
+    if (conversation.notificationId && conversation.recipientId) {
+      const recipientIsCandidate = ctx.role !== Role.CANDIDATE;
+      void publishRealtimeEvent(
+        {
+          ...scopeForPublish(ctx, recipientIsCandidate ? "CANDIDATE" : "EMPLOYEE"),
+          userId: conversation.recipientId,
+          candidateId: recipientIsCandidate ? conversation.candidate.userId : null,
+        },
+        {
+          entityType: "Notification",
+          entityId: conversation.notificationId,
+          eventType: "NOTIFICATION_CREATED",
+          data: {
+            id: conversation.notificationId,
+            title: `New conversation: ${parsed.data.subject}`,
+            body: parsed.data.initialMessage.slice(0, 150),
+            readAt: null,
+          },
+        }
+      );
+    }
     // 6. Safe transactional email dispatch
     const isCandidateSender = ctx.role === Role.CANDIDATE;
     const recipientEmail = isCandidateSender
@@ -242,8 +281,9 @@ export async function sendMessageAction(
         ? conv.candidate.assignedEmployeeId || null
         : conv.candidate.userId;
 
+      let notificationId: string | null = null;
       if (recipientId) {
-        await tx.notification.create({
+        const notif = await tx.notification.create({
           data: {
             organizationId: ctx.organizationId,
             recipientId,
@@ -254,9 +294,10 @@ export async function sendMessageAction(
             relatedEntityId: conv.id,
           },
         });
+        notificationId = notif.id;
       }
 
-      return { message, conv, recipientId };
+      return { message, conv, recipientId, notificationId };
     });
 
     // 4. Audit Logging
@@ -271,6 +312,29 @@ export async function sendMessageAction(
         senderRole: ctx.role,
       },
     });
+
+    if (result.notificationId && result.recipientId) {
+      const recipientIsCandidate = ctx.role !== Role.CANDIDATE;
+      void publishRealtimeEvent(
+        {
+          ...scopeForPublish(ctx, recipientIsCandidate ? "CANDIDATE" : "EMPLOYEE"),
+          userId: result.recipientId,
+          organizationId: ctx.organizationId,
+          candidateId: recipientIsCandidate ? result.conv.candidate.userId : null,
+        },
+        {
+          entityType: "Notification",
+          entityId: result.notificationId,
+          eventType: "NOTIFICATION_CREATED",
+          data: {
+            id: result.notificationId,
+            title: `New reply in "${result.conv.subject}"`,
+            body: parsed.data.body.slice(0, 150),
+            readAt: null,
+          },
+        }
+      );
+    }
 
     // 5. Safe transactional email dispatch
     const isCandidateSender = ctx.role === Role.CANDIDATE;

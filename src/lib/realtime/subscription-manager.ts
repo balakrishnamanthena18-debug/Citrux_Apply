@@ -1,20 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import { RealtimeEventPayload, SubscriptionScope, ConnectionStatus } from "./types";
 import { realtimeBus } from "./event-bus";
+import { getChannelName } from "./channels";
 
-/**
- * Builds the canonical, secure channel name based on authenticated user scope.
- * Never leaks private identifiers across tenant boundaries.
- */
-export function getChannelName(scope: SubscriptionScope): string {
-  if (scope.role === "CANDIDATE") {
-    return `candidate:${scope.candidateId || scope.userId}`;
-  }
-  if (scope.role === "TEAM_LEAD" && scope.teamId) {
-    return `team:${scope.organizationId}:${scope.teamId}`;
-  }
-  return `org:${scope.organizationId}`;
-}
+export { getChannelName } from "./channels";
 
 export class RealtimeSubscriptionManager {
   private activeChannel: any = null;

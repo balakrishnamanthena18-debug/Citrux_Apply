@@ -57,13 +57,15 @@ export interface ActionResult<T = unknown> {
 
 function revalidateApplicationViews(applicationId?: string) {
   try {
+    // Phase 10: path-scoped revalidation (avoid layout-wide RSC storms)
     revalidatePath("/employee/application-log");
     revalidatePath("/employee/applications");
     revalidatePath("/employee/jobs");
+    revalidatePath("/employee");
     revalidatePath("/candidate/applications");
-    revalidatePath("/employee", "layout");
-    revalidatePath("/candidate", "layout");
-    revalidatePath("/admin", "layout");
+    revalidatePath("/candidate");
+    revalidatePath("/admin/applications");
+    revalidatePath("/admin");
     if (applicationId) {
       revalidatePath(`/employee/applications/${applicationId}`);
       revalidatePath(`/candidate/applications/${applicationId}`);

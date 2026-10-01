@@ -24,26 +24,6 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
   const { candidates, metrics, initialCandidateSummary } = await withRlsContext(
     ctx.userId,
     async (tx) => {
-      // 1. Fetch available candidates in organization
-      const candRecords = await tx.candidate.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          status: { not: "ARCHIVED" },
-        },
-        include: { user: true },
-        orderBy: [{ user: { firstName: "asc" } }, { user: { lastName: "asc" } }],
-      });
-
-      const candidatesList: CandidateOption[] = candRecords.map((c) => ({
-        id: c.id,
-        fullName:
-          `${c.user.firstName || ""} ${c.user.lastName || ""}`.trim() || c.user.email,
-        email: c.user.email,
-        status: c.status,
-        applicationAuthorizationMode: c.applicationAuthorizationMode,
-      }));
-
-      // 2. Authoritative Operational Derived Metrics
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const dayOfWeek = now.getDay();
@@ -54,45 +34,64 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
       );
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const todayCount = await tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-          createdAt: { gte: startOfToday },
-        },
-      });
-      const weekCount = await tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-          createdAt: { gte: startOfWeek },
-        },
-      });
-      const monthCount = await tx.application.count({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-          createdAt: { gte: startOfMonth },
-        },
-      });
-      const activeCandidates = await tx.application.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-        },
-        distinct: ["candidateId"],
-        select: { candidateId: true },
-      });
-      const submittedApps = await tx.application.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-        },
-        include: { job: { select: { source: true } } },
-      });
+      const submittedWhere = {
+        organizationId: ctx.organizationId,
+        status: ApplicationStatus.SUBMITTED,
+      } as const;
 
+      // Phase 10: Parallelize independent first-paint queries (was sequential waterfall).
+      // Lean submitted select replaces separate distinct-candidate + full include scans.
+      const [candRecords, todayCount, weekCount, monthCount, submittedLean] = await Promise.all([
+        tx.candidate.findMany({
+          where: {
+            organizationId: ctx.organizationId,
+            status: { not: "ARCHIVED" },
+          },
+          select: {
+            id: true,
+            status: true,
+            applicationAuthorizationMode: true,
+            user: {
+              select: { firstName: true, lastName: true, email: true },
+            },
+          },
+          orderBy: [{ user: { firstName: "asc" } }, { user: { lastName: "asc" } }],
+          take: 500,
+        }),
+        tx.application.count({
+          where: { ...submittedWhere, createdAt: { gte: startOfToday } },
+        }),
+        tx.application.count({
+          where: { ...submittedWhere, createdAt: { gte: startOfWeek } },
+        }),
+        tx.application.count({
+          where: { ...submittedWhere, createdAt: { gte: startOfMonth } },
+        }),
+        tx.application.findMany({
+          where: submittedWhere,
+          select: {
+            candidateId: true,
+            job: { select: { source: true } },
+          },
+          // Bound histogram scan; desk metrics remain operationally useful within window
+          take: 2000,
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+
+      const candidatesList: CandidateOption[] = candRecords.map((c) => ({
+        id: c.id,
+        fullName:
+          `${c.user.firstName || ""} ${c.user.lastName || ""}`.trim() || c.user.email,
+        email: c.user.email,
+        status: c.status,
+        applicationAuthorizationMode: c.applicationAuthorizationMode,
+      }));
+
+      const candidateIds = new Set<string>();
       const sourceCounts: Record<string, number> = {};
-      for (const app of submittedApps) {
+      for (const app of submittedLean) {
+        candidateIds.add(app.candidateId);
         const src = app.job.source || "Other";
         sourceCounts[src] = (sourceCounts[src] || 0) + 1;
       }
@@ -101,53 +100,68 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
         todayCount,
         weekCount,
         monthCount,
-        activeCandidatesWorked: activeCandidates.length,
+        activeCandidatesWorked: candidateIds.size,
         sourceCounts,
       };
 
-      // 3. Initial Candidate Summary if candidateId provided
       let candSummary: CandidateLogSummary | null = null;
       if (selectedCandidateId) {
         const targetCand = candRecords.find((c) => c.id === selectedCandidateId);
         if (targetCand) {
-          const cToday = await tx.application.count({
-            where: {
-              candidateId: targetCand.id,
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfToday },
-            },
-          });
-          const cWeek = await tx.application.count({
-            where: {
-              candidateId: targetCand.id,
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfWeek },
-            },
-          });
-          const cTotal = await tx.application.count({
-            where: {
-              candidateId: targetCand.id,
-              organizationId: ctx.organizationId,
-              status: ApplicationStatus.SUBMITTED,
-            },
-          });
-          const cRecent = await tx.application.findMany({
-            where: {
-              candidateId: targetCand.id,
-              organizationId: ctx.organizationId,
-            },
-            include: {
-              job: true,
-              submissions: {
-                orderBy: { attemptNumber: "desc" },
-                take: 1,
+          const candidateScope = {
+            candidateId: targetCand.id,
+            organizationId: ctx.organizationId,
+          } as const;
+
+          // Candidate-specific queries are independent of each other — parallelize.
+          const [cToday, cWeek, cTotal, cRecent] = await Promise.all([
+            tx.application.count({
+              where: {
+                ...candidateScope,
+                status: ApplicationStatus.SUBMITTED,
+                createdAt: { gte: startOfToday },
               },
-            },
-            orderBy: { createdAt: "desc" },
-            take: 10,
-          });
+            }),
+            tx.application.count({
+              where: {
+                ...candidateScope,
+                status: ApplicationStatus.SUBMITTED,
+                createdAt: { gte: startOfWeek },
+              },
+            }),
+            tx.application.count({
+              where: {
+                ...candidateScope,
+                status: ApplicationStatus.SUBMITTED,
+              },
+            }),
+            tx.application.findMany({
+              where: candidateScope,
+              select: {
+                id: true,
+                status: true,
+                createdAt: true,
+                job: {
+                  select: {
+                    title: true,
+                    companyName: true,
+                    source: true,
+                    location: true,
+                    isRemote: true,
+                    salaryMin: true,
+                    salaryMax: true,
+                  },
+                },
+                submissions: {
+                  orderBy: { attemptNumber: "desc" },
+                  take: 1,
+                  select: { submittedAt: true },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+              take: 10,
+            }),
+          ]);
 
           candSummary = {
             candidate: {

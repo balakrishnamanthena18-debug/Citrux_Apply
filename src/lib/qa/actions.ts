@@ -31,9 +31,10 @@ function revalidateQaViews(applicationId?: string) {
   try {
     revalidatePath("/employee/applications");
     revalidatePath("/candidate/applications");
-    revalidatePath("/employee", "layout");
-    revalidatePath("/candidate", "layout");
-    revalidatePath("/admin", "layout");
+    revalidatePath("/employee");
+    revalidatePath("/candidate");
+    revalidatePath("/admin/applications");
+    revalidatePath("/admin");
     if (applicationId) {
       revalidatePath(`/employee/applications/${applicationId}`);
       revalidatePath(`/candidate/applications/${applicationId}`);

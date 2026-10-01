@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/generated/prisma";
 import { signOutAction } from "@/lib/auth/actions";
+import { TransitionLink } from "@/components/ui/TransitionLink";
 
 interface AppSidebarProps {
   role: Role;
@@ -367,10 +367,11 @@ export function AppSidebar({
                     : pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"));
 
                 return (
-                  <Link
+                  <TransitionLink
                     key={item.href}
                     href={item.href}
-                    onClick={() => {
+                    isActive={isActive}
+                    onNavigate={() => {
                       if (isMobile && onClose) onClose();
                     }}
                     className={`group flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-all ${
@@ -386,7 +387,7 @@ export function AppSidebar({
                     {item.highlight && (
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
                     )}
-                  </Link>
+                  </TransitionLink>
                 );
               })}
             </div>

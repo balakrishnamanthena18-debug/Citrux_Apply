@@ -45,9 +45,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  /**
+   * Phase 10: Middleware uses getSession() for presence/routing only (local JWT read).
+   * Cryptographic identity + membership + RLS remain enforced in layout/page via getUser()
+   * inside getAuthenticatedContext(). Forged cookies cannot obtain privileged data.
+   */
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const hasSession = !!session?.user;
 
   const path = request.nextUrl.pathname;
 
@@ -67,13 +73,13 @@ export async function middleware(request: NextRequest) {
 
   const isServerAction = request.headers.has("next-action");
 
-  if (!user && isProtectedPath && !isServerAction) {
+  if (!hasSession && isProtectedPath && !isServerAction) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirectTo", path);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isAuthPath && !path.startsWith("/api/auth")) {
+  if (hasSession && isAuthPath && !path.startsWith("/api/auth")) {
     return NextResponse.redirect(new URL("/candidate", request.url));
   }
 

@@ -2,16 +2,25 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  listNotificationsAction,
   markNotificationReadAction,
   markAllNotificationsReadAction,
 } from "@/lib/communication/actions";
 import { playNotificationSound } from "@/lib/utils/audio";
+import { realtimeBus, realtimeSubscriptionManager } from "@/lib/realtime";
+import type { ConnectionStatus, RealtimeEventPayload } from "@/lib/realtime";
+
+/** Fallback poll when realtime is disconnected (ms). */
+const FALLBACK_POLL_MS = 60_000;
+/** Slow reconciliation poll even when realtime is healthy (ms). */
+const HEALTHY_RECONCILE_MS = 5 * 60_000;
 
 export function NotificationsBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(() =>
+    realtimeSubscriptionManager.getStatus()
+  );
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("oos_notification_sound_enabled");
@@ -22,9 +31,13 @@ export function NotificationsBell() {
     return true;
   });
 
-  // Track whether we've completed the initial load so we only chime on new incoming items
   const isInitialLoadRef = useRef(true);
   const knownNotificationIdsRef = useRef<Set<string>>(new Set());
+  const soundEnabledRef = useRef(soundEnabled);
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
 
   const toggleSound = () => {
     const nextState = !soundEnabled;
@@ -43,11 +56,9 @@ export function NotificationsBell() {
     setUnreadCount(unread);
 
     if (isInitialLoadRef.current) {
-      // First load: just record known IDs without chiming
       items.forEach((n: any) => knownNotificationIdsRef.current.add(n.id));
       isInitialLoadRef.current = false;
     } else {
-      // Check if there are newly arrived unread notifications
       let hasNewUnread = false;
       for (const n of items) {
         if (!knownNotificationIdsRef.current.has(n.id) && !n.readAt) {
@@ -55,17 +66,17 @@ export function NotificationsBell() {
           break;
         }
       }
-
-      // Update known ID set
       items.forEach((n: any) => knownNotificationIdsRef.current.add(n.id));
-
-      if (hasNewUnread && soundEnabled) {
+      if (hasNewUnread && soundEnabledRef.current) {
         playNotificationSound();
       }
     }
-  }, [soundEnabled]);
+  }, []);
 
   const loadNotifications = useCallback(async () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
     try {
       const res = await fetch("/api/notifications?limit=15");
       if (res.ok) {
@@ -79,40 +90,84 @@ export function NotificationsBell() {
     }
   }, [processNotifications]);
 
+  // Initial fetch + adaptive polling + visibility pause
   useEffect(() => {
     let isMounted = true;
-    const fetchNotifications = async () => {
-      try {
-        const res = await fetch("/api/notifications?limit=15");
-        if (isMounted && res.ok) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            processNotifications(json.data.notifications);
-          }
-        }
-      } catch {
-        // Best-effort network fetch
-      }
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const tick = async () => {
+      if (!isMounted) return;
+      await loadNotifications();
     };
 
-    fetchNotifications();
+    const schedule = (status: ConnectionStatus) => {
+      if (intervalId) clearInterval(intervalId);
+      const ms = status === "connected" ? HEALTHY_RECONCILE_MS : FALLBACK_POLL_MS;
+      intervalId = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          void tick();
+        }
+      }, ms);
+    };
 
-    const interval = setInterval(fetchNotifications, 10000);
+    void tick();
+    schedule(realtimeSubscriptionManager.getStatus());
+
+    const unsubStatus = realtimeSubscriptionManager.onStatusChange((status) => {
+      if (!isMounted) return;
+      setConnectionStatus(status);
+      schedule(status);
+    });
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void tick();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (intervalId) clearInterval(intervalId);
+      unsubStatus();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [processNotifications]);
+  }, [loadNotifications]);
+
+  // Wire RealtimeEventBus → targeted notification refresh (no full router.refresh)
+  useEffect(() => {
+    const onNotificationEvent = (event: RealtimeEventPayload) => {
+      if (
+        event.eventType === "NOTIFICATION_CREATED" ||
+        event.eventType === "NOTIFICATION_READ" ||
+        event.eventType === "NOTIFICATION_ALL_READ"
+      ) {
+        // Always reconcile from authoritative API (tenant/recipient scoped) —
+        // never trust broadcast bodies for privileged list content.
+        void loadNotifications();
+      }
+    };
+
+    const unsubType = realtimeBus.subscribeToEntityType("Notification", onNotificationEvent);
+    return () => {
+      unsubType();
+    };
+  }, [loadNotifications]);
 
   const handleMarkRead = async (id: string) => {
     await markNotificationReadAction({ notificationId: id });
-    loadNotifications();
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
   };
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsReadAction();
-    loadNotifications();
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
+    );
+    setUnreadCount(0);
   };
 
   return (
@@ -120,10 +175,14 @@ export function NotificationsBell() {
       <button
         onClick={() => {
           setIsOpen(!isOpen);
-          if (!isOpen) loadNotifications();
+          if (!isOpen) void loadNotifications();
         }}
         className="relative p-2 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition"
-        title="Notifications"
+        title={
+          connectionStatus === "connected"
+            ? "Notifications (live)"
+            : "Notifications (periodic sync)"
+        }
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

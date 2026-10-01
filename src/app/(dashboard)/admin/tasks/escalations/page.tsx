@@ -23,6 +23,7 @@ export default async function AdminTaskEscalationsPage() {
           application: { include: { job: true } },
         },
         orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+        take: 100,
       }),
       tx.membership.findMany({
         where: {

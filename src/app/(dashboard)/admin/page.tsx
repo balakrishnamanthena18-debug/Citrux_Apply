@@ -151,8 +151,9 @@ export default async function AdminDashboardPage() {
           designation: true,
         },
         orderBy: { createdAt: "asc" },
+        take: 200,
       }),
-      // Tasks for workload mapping
+      // Phase 10: Lean bounded workload inputs (was unbounded findMany of all assigned tasks/apps)
       tx.task.findMany({
         where: {
           organizationId: ctx.organizationId,
@@ -162,8 +163,9 @@ export default async function AdminDashboardPage() {
           assignedEmployeeId: true,
           status: true,
         },
+        take: 2000,
+        orderBy: { updatedAt: "desc" },
       }),
-      // Applications for workload mapping
       tx.application.findMany({
         where: {
           organizationId: ctx.organizationId,
@@ -180,6 +182,8 @@ export default async function AdminDashboardPage() {
         select: {
           assignedEmployeeId: true,
         },
+        take: 2000,
+        orderBy: { updatedAt: "desc" },
       }),
       // Recent Audit Activity
       tx.auditEvent.findMany({
