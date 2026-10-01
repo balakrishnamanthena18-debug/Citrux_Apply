@@ -258,10 +258,10 @@ export function ApplicationLogWorkbench({
   return (
     <div className="max-w-[1240px] mx-auto space-y-6 pb-20">
       {/* 1. Compact Header (~110px) */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-[20px] border border-[#E5EAE7]/90 shadow-2xs overflow-hidden">
         <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <nav className="flex items-center space-x-1.5 text-xs text-slate-400 font-medium" aria-label="Breadcrumb">
+            <nav className="flex items-center space-x-1.5 text-xs text-[#94A3B8] font-medium" aria-label="Breadcrumb">
               <Link href="/employee" className="hover:text-blue-600 transition-colors">
                 OOS
               </Link>
@@ -270,15 +270,15 @@ export function ApplicationLogWorkbench({
                 Operations
               </Link>
               <span>/</span>
-              <span className="text-slate-600">Application Desk</span>
+              <span className="text-[#64748B]">Application Desk</span>
             </nav>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Application Desk</h1>
+              <h1 className="text-xl font-bold text-[#0F1720] tracking-tight">Application Desk</h1>
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 Fast Intake
               </span>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[#64748B]">
               Initialize canonical applications, bind candidates to sourced jobs, and launch operational workbenches.
             </p>
           </div>
@@ -286,13 +286,13 @@ export function ApplicationLogWorkbench({
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/employee/applications"
-              className="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition shadow-2xs"
+              className="inline-flex items-center px-3 py-1.5 rounded-[16px] border border-[#E5EAE7] bg-white text-[#334155] hover:bg-[#F7F9F8] hover:text-[#0F1720] text-xs font-medium transition shadow-2xs"
             >
               All Applications →
             </Link>
             <Link
               href="/employee/jobs"
-              className="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition shadow-2xs"
+              className="inline-flex items-center px-3 py-1.5 rounded-[16px] border border-[#E5EAE7] bg-white text-[#334155] hover:bg-[#F7F9F8] hover:text-[#0F1720] text-xs font-medium transition shadow-2xs"
             >
               Job Catalog →
             </Link>
@@ -300,40 +300,40 @@ export function ApplicationLogWorkbench({
         </div>
 
         {/* Integrated Horizontal Metrics Rail */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-t border-slate-100 bg-slate-50/50 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-[#EDF1EF] border-t border-[#EDF1EF] bg-[#F7F9F8]/50 text-xs">
           <div className="px-6 py-2.5">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Submitted Today</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+            <div className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">Submitted Today</div>
+            <div className="text-base font-bold text-[#0F1720] mt-0.5">
               {initialMetrics.todayCount}
-              <span className="text-[11px] font-normal text-slate-400 ml-1.5">portal submissions</span>
+              <span className="text-[11px] font-normal text-[#94A3B8] ml-1.5">portal submissions</span>
             </div>
           </div>
           <div className="px-6 py-2.5">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+            <div className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">This Week</div>
+            <div className="text-base font-bold text-[#0F1720] mt-0.5">
               {initialMetrics.weekCount}
-              <span className="text-[11px] font-normal text-slate-400 ml-1.5">past 7 days</span>
+              <span className="text-[11px] font-normal text-[#94A3B8] ml-1.5">past 7 days</span>
             </div>
           </div>
           <div className="px-6 py-2.5">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Month</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+            <div className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">This Month</div>
+            <div className="text-base font-bold text-[#0F1720] mt-0.5">
               {initialMetrics.monthCount}
-              <span className="text-[11px] font-normal text-slate-400 ml-1.5">calendar month</span>
+              <span className="text-[11px] font-normal text-[#94A3B8] ml-1.5">calendar month</span>
             </div>
           </div>
           <div className="px-6 py-2.5">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Candidates</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+            <div className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">Active Candidates</div>
+            <div className="text-base font-bold text-[#0F1720] mt-0.5">
               {initialMetrics.activeCandidatesWorked}
-              <span className="text-[11px] font-normal text-slate-400 ml-1.5">managed in org</span>
+              <span className="text-[11px] font-normal text-[#94A3B8] ml-1.5">managed in org</span>
             </div>
           </div>
           <div className="px-6 py-2.5 col-span-2 sm:col-span-1">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Intake SLA</div>
+            <div className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">Intake SLA</div>
             <div className="text-base font-bold text-emerald-600 mt-0.5">
               99.4%
-              <span className="text-[11px] font-normal text-slate-400 ml-1.5">canonical pace</span>
+              <span className="text-[11px] font-normal text-[#94A3B8] ml-1.5">canonical pace</span>
             </div>
           </div>
         </div>
@@ -341,17 +341,17 @@ export function ApplicationLogWorkbench({
 
       {/* Success Notification Banner */}
       {successResult && (
-        <div className="p-5 bg-emerald-50/80 border border-emerald-200 rounded-xl shadow-2xs space-y-3 transition-all">
+        <div className="p-5 bg-emerald-50/80 border border-emerald-200 rounded-[20px] shadow-2xs space-y-3 transition-all">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              <span className="w-8 h-8 rounded-[16px] bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
                 ✓
               </span>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-[#0F1720]">
                   Application Created & Initialized in Lifecycle
                 </h3>
-                <p className="text-xs text-slate-600 mt-0.5">
+                <p className="text-xs text-[#64748B] mt-0.5">
                   <strong>{successResult.role}</strong> at <strong>{successResult.company}</strong> for candidate <strong>{successResult.candidateName}</strong> initialized in status <span className="font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded text-[11px]">DISCOVERED</span>.
                 </p>
               </div>
@@ -360,14 +360,14 @@ export function ApplicationLogWorkbench({
             <div className="flex items-center gap-2 self-start sm:self-center">
               <Link
                 href={`/employee/applications/${successResult.applicationId}`}
-                className="inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition"
+                className="inline-flex items-center px-4 py-2 rounded-[16px] text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition"
               >
                 Open Application Workbench →
               </Link>
               <button
                 type="button"
                 onClick={() => handleResetForm(true)}
-                className="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition"
+                className="inline-flex items-center px-3 py-2 rounded-[16px] text-xs font-semibold bg-white text-[#334155] border border-[#DDE5E0] hover:bg-[#F7F9F8] transition"
               >
                 + Start Another
               </button>
@@ -378,7 +378,7 @@ export function ApplicationLogWorkbench({
 
       {/* Error Alert */}
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center justify-between shadow-2xs">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-[20px] text-rose-800 text-xs font-semibold flex items-center justify-between shadow-2xs">
           <div className="flex items-center space-x-2">
             <span>⚠️</span>
             <span>{error}</span>
@@ -394,14 +394,14 @@ export function ApplicationLogWorkbench({
       )}
 
       {/* 2. Unified Operational Workspace */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden divide-y divide-slate-100">
+      <div className="bg-white rounded-[20px] border border-[#E5EAE7]/90 shadow-2xs overflow-hidden divide-y divide-[#EDF1EF]">
         {/* SECTION 1: CANDIDATE SELECTION (Salesforce/Linear Combobox) */}
         <div className="p-6 sm:p-8 space-y-4">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-slate-700">
+            <label className="text-xs font-semibold text-[#334155]">
               Candidate <span className="text-rose-500">*</span>
             </label>
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-[#94A3B8]">
               Select candidate to link intake package
             </span>
           </div>
@@ -411,25 +411,25 @@ export function ApplicationLogWorkbench({
             <button
               type="button"
               onClick={() => setIsComboboxOpen(!isComboboxOpen)}
-              className="w-full text-left bg-white hover:bg-slate-50/60 border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 rounded-lg p-3.5 flex items-center justify-between transition"
+              className="w-full text-left bg-white hover:bg-[#F7F9F8]/60 border border-[#DDE5E0] focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 rounded-[16px] p-3.5 flex items-center justify-between transition"
             >
               {selectedCandidate ? (
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-[16px] bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                     {getInitials(selectedCandidate.fullName)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-900 truncate">
+                    <div className="text-sm font-semibold text-[#0F1720] truncate">
                       {selectedCandidate.fullName}
                     </div>
-                    <div className="text-xs text-slate-500 truncate">
+                    <div className="text-xs text-[#64748B] truncate">
                       {selectedCandidate.email}
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-semibold">
+                <div className="flex items-center gap-2 text-sm text-[#94A3B8]">
+                  <span className="w-8 h-8 rounded-[16px] bg-[#EDF1EF] text-[#94A3B8] flex items-center justify-center text-xs font-semibold">
                     👤
                   </span>
                   <span>Search and select candidate...</span>
@@ -451,7 +451,7 @@ export function ApplicationLogWorkbench({
                   </span>
                 )}
                 <svg
-                  className={`w-4 h-4 text-slate-400 transition-transform ${
+                  className={`w-4 h-4 text-[#94A3B8] transition-transform ${
                     isComboboxOpen ? "rotate-180" : ""
                   }`}
                   fill="none"
@@ -465,11 +465,11 @@ export function ApplicationLogWorkbench({
 
             {/* Combobox Dropdown Popover */}
             {isComboboxOpen && (
-              <div className="absolute z-30 mt-1.5 w-full bg-white rounded-lg border border-slate-200 shadow-lg overflow-hidden animate-in fade-in duration-150">
-                <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+              <div className="absolute z-30 mt-1.5 w-full bg-white rounded-[16px] border border-[#E5EAE7] shadow-lg overflow-hidden animate-in fade-in duration-150">
+                <div className="p-2 border-b border-[#EDF1EF] bg-[#F7F9F8]/50">
                   <div className="relative">
                     <svg
-                      className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                      className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -482,14 +482,14 @@ export function ApplicationLogWorkbench({
                       placeholder="Search by candidate name or email..."
                       value={candidateSearchQuery}
                       onChange={(e) => setCandidateSearchQuery(e.target.value)}
-                      className="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20"
+                      className="w-full text-xs pl-9 pr-3 py-2 border border-[#E5EAE7] rounded-md focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20"
                     />
                   </div>
                 </div>
 
                 <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 p-1">
                   {filteredCandidates.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-400">
+                    <div className="p-4 text-center text-xs text-[#94A3B8]">
                       No matching candidates found.
                     </div>
                   ) : (
@@ -503,21 +503,21 @@ export function ApplicationLogWorkbench({
                           className={`w-full text-left p-2.5 rounded-md flex items-center justify-between transition ${
                             isSelected
                               ? "bg-blue-50/80 text-blue-900 font-semibold"
-                              : "hover:bg-slate-50 text-slate-800"
+                              : "hover:bg-[#F7F9F8] text-[#0F1720]"
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center shrink-0">
+                            <div className="w-7 h-7 rounded-md bg-[#EDF1EF] text-[#334155] font-bold text-[11px] flex items-center justify-center shrink-0">
                               {getInitials(c.fullName)}
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-semibold truncate">{c.fullName}</div>
-                              <div className="text-[11px] text-slate-400 truncate">{c.email}</div>
+                              <div className="text-[11px] text-[#94A3B8] truncate">{c.email}</div>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[10px] text-[#94A3B8]">
                               {c.applicationAuthorizationMode === "MANAGED" ? "Managed" : "Review Required"}
                             </span>
                             {isSelected && <span className="text-xs text-blue-600 font-bold">✓</span>}
@@ -533,7 +533,7 @@ export function ApplicationLogWorkbench({
 
           {/* Selected Candidate Operational Sub-Rail */}
           {isLoadingCandidate && (
-            <div className="text-xs text-slate-400 py-3 flex items-center gap-2">
+            <div className="text-xs text-[#94A3B8] py-3 flex items-center gap-2">
               <svg className="animate-spin h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -543,24 +543,24 @@ export function ApplicationLogWorkbench({
           )}
 
           {candidateSummary && !isLoadingCandidate && (
-            <div className="bg-slate-50/80 rounded-lg p-4 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-4 text-slate-600">
-                <span className="font-semibold text-slate-700">Candidate throughput:</span>
-                <span className="text-slate-500">
-                  Today: <strong className="text-slate-900">{candidateSummary.metrics.today}</strong>
+            <div className="bg-[#F7F9F8]/80 rounded-[16px] p-4 border border-[#E5EAE7]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-4 text-[#64748B]">
+                <span className="font-semibold text-[#334155]">Candidate throughput:</span>
+                <span className="text-[#64748B]">
+                  Today: <strong className="text-[#0F1720]">{candidateSummary.metrics.today}</strong>
                 </span>
                 <span>•</span>
-                <span className="text-slate-500">
-                  This week: <strong className="text-slate-900">{candidateSummary.metrics.thisWeek}</strong>
+                <span className="text-[#64748B]">
+                  This week: <strong className="text-[#0F1720]">{candidateSummary.metrics.thisWeek}</strong>
                 </span>
                 <span>•</span>
-                <span className="text-slate-500">
-                  Total submitted: <strong className="text-slate-900">{candidateSummary.metrics.totalSubmitted}</strong>
+                <span className="text-[#64748B]">
+                  Total submitted: <strong className="text-[#0F1720]">{candidateSummary.metrics.totalSubmitted}</strong>
                 </span>
               </div>
 
               {candidateSummary.recentApplications.length > 0 && candidateSummary.recentApplications[0] && (
-                <div className="text-slate-500 flex items-center gap-2">
+                <div className="text-[#64748B] flex items-center gap-2">
                   <span>Last role: <strong>{candidateSummary.recentApplications[0].title}</strong></span>
                   <Link
                     href={`/employee/applications?candidateId=${candidateSummary.candidate.id}`}
@@ -578,13 +578,13 @@ export function ApplicationLogWorkbench({
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           {/* Group 1: Primary Job Details */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            <h2 className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
               Job Details
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Company name <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -593,12 +593,12 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. Airbnb"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Job title <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -607,18 +607,18 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. Staff Frontend Platform Engineer"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Source <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] transition"
                 >
                   {SOURCES.map((s) => (
                     <option key={s} value={s}>
@@ -629,7 +629,7 @@ export function ApplicationLogWorkbench({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   External job URL
                 </label>
                 <input
@@ -637,16 +637,16 @@ export function ApplicationLogWorkbench({
                   placeholder="https://..."
                   value={externalUrl}
                   onChange={(e) => setExternalUrl(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
             </div>
           </div>
 
           {/* Group 2: Work Model & Specifications */}
-          <div className="space-y-4 pt-4 border-t border-slate-100">
+          <div className="space-y-4 pt-4 border-t border-[#EDF1EF]">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              <h2 className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
                 Work Model & Compensation
               </h2>
               <button
@@ -660,7 +660,7 @@ export function ApplicationLogWorkbench({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Location
                 </label>
                 <input
@@ -668,18 +668,18 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. Remote / San Francisco"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Employment type
                 </label>
                 <select
                   value={employmentType}
                   onChange={(e) => setEmploymentType(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] transition"
                 >
                   {EMPLOYMENT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -695,9 +695,9 @@ export function ApplicationLogWorkbench({
                     type="checkbox"
                     checked={isRemote}
                     onChange={(e) => setIsRemote(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-[#DDE5E0] text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="ml-2.5 text-xs font-medium text-slate-700">
+                  <span className="ml-2.5 text-xs font-medium text-[#334155]">
                     Remote eligible
                   </span>
                 </label>
@@ -706,7 +706,7 @@ export function ApplicationLogWorkbench({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Salary minimum ($)
                 </label>
                 <input
@@ -714,12 +714,12 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. 195000"
                   value={salaryMin}
                   onChange={(e) => setSalaryMin(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Salary maximum ($)
                 </label>
                 <input
@@ -727,7 +727,7 @@ export function ApplicationLogWorkbench({
                   placeholder="e.g. 240000"
                   value={salaryMax}
                   onChange={(e) => setSalaryMax(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] px-3.5 h-11 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
             </div>
@@ -735,9 +735,9 @@ export function ApplicationLogWorkbench({
 
           {/* Group 3: Optional Description & Internal Notes */}
           {showOptionalFields && (
-            <div className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in duration-150">
+            <div className="space-y-4 pt-4 border-t border-[#EDF1EF] animate-in fade-in duration-150">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Job description & key qualifications
                 </label>
                 <textarea
@@ -745,12 +745,12 @@ export function ApplicationLogWorkbench({
                   placeholder="Paste key role requirements or summary..."
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg p-3 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] p-3 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-xs font-medium text-[#64748B] mb-1">
                   Internal staff notes (blind to candidate)
                 </label>
                 <textarea
@@ -758,18 +758,18 @@ export function ApplicationLogWorkbench({
                   placeholder="Optional internal notes or directives for preparation & QA team..."
                   value={internalNotes}
                   onChange={(e) => setInternalNotes(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-lg p-3 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition"
+                  className="w-full text-xs border border-[#DDE5E0] rounded-[16px] p-3 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 text-[#0F1720] placeholder:text-[#94A3B8] transition"
                 />
               </div>
             </div>
           )}
 
           {/* SECTION 3: PRIMARY ACTION BAR */}
-          <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="pt-6 border-t border-[#EDF1EF] flex flex-col sm:flex-row items-center justify-between gap-4">
             <button
               type="button"
               onClick={() => handleResetForm(true)}
-              className="text-xs font-medium text-slate-500 hover:text-slate-800 transition underline order-2 sm:order-1"
+              className="text-xs font-medium text-[#64748B] hover:text-[#0F1720] transition underline order-2 sm:order-1"
             >
               Clear form
             </button>
@@ -777,7 +777,7 @@ export function ApplicationLogWorkbench({
             <button
               type="submit"
               disabled={isPending || !selectedCandidateId}
-              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-11 rounded-lg text-xs font-semibold text-white shadow-2xs transition order-1 sm:order-2 ${
+              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-11 rounded-[16px] text-xs font-semibold text-white shadow-2xs transition order-1 sm:order-2 ${
                 isPending || !selectedCandidateId
                   ? "bg-slate-300 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
@@ -802,21 +802,21 @@ export function ApplicationLogWorkbench({
         </form>
 
         {/* SECTION 4: APPLICATIONS BY SOURCE BREAKDOWN */}
-        <div className="p-6 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <span className="font-semibold text-slate-600">
+        <div className="p-6 bg-[#F7F9F8]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <span className="font-semibold text-[#64748B]">
             Source distribution:
           </span>
           <div className="flex flex-wrap items-center gap-2">
             {Object.keys(initialMetrics.sourceCounts).length === 0 ? (
-              <span className="text-slate-400 italic">No submissions recorded yet</span>
+              <span className="text-[#94A3B8] italic">No submissions recorded yet</span>
             ) : (
               Object.entries(initialMetrics.sourceCounts).map(([src, count]) => (
                 <span
                   key={src}
-                  className="inline-flex items-center px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 text-xs shadow-2xs"
+                  className="inline-flex items-center px-2.5 py-1 rounded-md bg-white border border-[#E5EAE7] text-[#334155] text-xs shadow-2xs"
                 >
-                  <span className="text-slate-600">{src}:</span>
-                  <strong className="ml-1 text-slate-900">{count}</strong>
+                  <span className="text-[#64748B]">{src}:</span>
+                  <strong className="ml-1 text-[#0F1720]">{count}</strong>
                 </span>
               ))
             )}

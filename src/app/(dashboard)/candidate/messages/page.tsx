@@ -34,10 +34,10 @@ export default async function CandidateMessagesPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#E5EAE7] pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Messages & Communications</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">Messages & Communications</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Direct, transparent communication with your assigned operations specialists.
           </p>
         </div>
@@ -45,8 +45,8 @@ export default async function CandidateMessagesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left: New Conversation Starter */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">Start a New Conversation</h2>
+        <div className="bg-white p-6 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)] space-y-4">
+          <h2 className="text-sm font-bold text-[#0F1720] uppercase tracking-wide">Start a New Conversation</h2>
           <form
             action={async (formData: FormData) => {
               "use server";
@@ -60,24 +60,24 @@ export default async function CandidateMessagesPage() {
             className="space-y-3"
           >
             <div>
-              <label className="block text-xs font-semibold text-slate-700">Subject</label>
+              <label className="block text-xs font-semibold text-[#334155]">Subject</label>
               <input
                 name="subject"
                 required
                 maxLength={200}
                 placeholder="Question about profile / applications..."
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-1 focus:ring-slate-900"
+                className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:ring-1 focus:ring-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700">Message</label>
+              <label className="block text-xs font-semibold text-[#334155]">Message</label>
               <textarea
                 name="message"
                 required
                 rows={4}
                 maxLength={4000}
                 placeholder="Write your message here..."
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-1 focus:ring-slate-900 font-sans"
+                className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:ring-1 focus:ring-slate-900 font-sans"
               />
             </div>
             <button
@@ -91,9 +91,9 @@ export default async function CandidateMessagesPage() {
 
         {/* Right: Conversation List */}
         <div className="md:col-span-2 space-y-3">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">Your Conversations</h2>
+          <h2 className="text-sm font-bold text-[#0F1720] uppercase tracking-wide">Your Conversations</h2>
           {conversations.length === 0 ? (
-            <div className="bg-white p-8 rounded-lg border border-slate-200 text-center text-xs text-slate-500">
+            <div className="bg-white p-8 rounded-[16px] border border-[#E5EAE7] text-center text-xs text-[#64748B]">
               No conversations yet. Start a conversation on the left to message your specialist.
             </div>
           ) : (
@@ -106,32 +106,32 @@ export default async function CandidateMessagesPage() {
                   key={conv.id}
                   href={`/candidate/messages/${conv.id}`}
                   prefetch={false}
-                  className={`block p-4 rounded-lg border transition hover:shadow-sm ${
-                    isUnread ? "bg-blue-50/40 border-blue-200" : "bg-white border-slate-200 hover:border-slate-300"
+                  className={`block p-4 rounded-[16px] border transition hover:shadow-[0_10px_40px_rgba(15,23,32,0.03)] ${
+                    isUnread ? "bg-blue-50/40 border-blue-200" : "bg-white border-[#E5EAE7] hover:border-[#DDE5E0]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-slate-900">{conv.subject}</span>
+                      <span className="font-semibold text-sm text-[#0F1720]">{conv.subject}</span>
                       {isUnread && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white">
                           NEW
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-[#94A3B8]">
                       {new Date(conv.lastMessageAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                     </span>
                   </div>
 
                   {conv.application && (
-                    <div className="mt-1 text-[11px] text-slate-500 font-medium">
+                    <div className="mt-1 text-[11px] text-[#64748B] font-medium">
                       Linked Application: {conv.application.job.title} at {conv.application.job.companyName}
                     </div>
                   )}
 
                   {lastMsg && (
-                    <p className="mt-2 text-xs text-slate-600 line-clamp-1">
+                    <p className="mt-2 text-xs text-[#64748B] line-clamp-1">
                       <span className="font-semibold">{lastMsg.senderRole === "CANDIDATE" ? "You: " : "Staff: "}</span>
                       {lastMsg.body}
                     </p>

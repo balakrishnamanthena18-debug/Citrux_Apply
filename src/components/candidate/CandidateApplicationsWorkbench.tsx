@@ -116,8 +116,8 @@ export function CandidateApplicationsWorkbench({
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">My Applications</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold tracking-tight text-[#0F1720]">My Applications</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Authoritative visibility and transparent status for every job opportunity managed on your behalf.
           </p>
         </div>
@@ -128,16 +128,16 @@ export function CandidateApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleTabChange("ALL")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-3.5 rounded-[16px] border shadow-2xs transition-all text-left cursor-pointer ${
             activeTab === "ALL"
               ? "bg-slate-900 text-white border-slate-900"
-              : "bg-white border-slate-200 hover:border-slate-300"
+              : "bg-white border-[#E5EAE7] hover:border-[#DDE5E0]"
           }`}
         >
-          <div className={`text-[11px] font-semibold uppercase tracking-wider ${activeTab === "ALL" ? "text-slate-300" : "text-slate-500"}`}>
+          <div className={`text-[11px] font-semibold uppercase tracking-wider ${activeTab === "ALL" ? "text-slate-300" : "text-[#64748B]"}`}>
             Total Applications
           </div>
-          <div className={`text-xl font-bold mt-1 ${activeTab === "ALL" ? "text-white" : "text-slate-900"}`}>
+          <div className={`text-xl font-bold mt-1 ${activeTab === "ALL" ? "text-white" : "text-[#0F1720]"}`}>
             {counts.ALL}
           </div>
         </button>
@@ -145,10 +145,10 @@ export function CandidateApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleTabChange("SUBMITTED")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-3.5 rounded-[16px] border shadow-2xs transition-all text-left cursor-pointer ${
             activeTab === "SUBMITTED"
               ? "bg-emerald-700 text-white border-emerald-700"
-              : "bg-white border-slate-200 hover:border-emerald-300"
+              : "bg-white border-[#E5EAE7] hover:border-emerald-300"
           }`}
         >
           <div className={`text-[11px] font-semibold uppercase tracking-wider ${activeTab === "SUBMITTED" ? "text-emerald-100" : "text-emerald-700"}`}>
@@ -162,10 +162,10 @@ export function CandidateApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleTabChange("IN_PROGRESS")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-3.5 rounded-[16px] border shadow-2xs transition-all text-left cursor-pointer ${
             activeTab === "IN_PROGRESS"
               ? "bg-blue-600 text-white border-blue-600"
-              : "bg-white border-slate-200 hover:border-blue-300"
+              : "bg-white border-[#E5EAE7] hover:border-blue-300"
           }`}
         >
           <div className={`text-[11px] font-semibold uppercase tracking-wider ${activeTab === "IN_PROGRESS" ? "text-blue-100" : "text-blue-700"}`}>
@@ -179,10 +179,10 @@ export function CandidateApplicationsWorkbench({
         <button
           type="button"
           onClick={() => handleTabChange("AWAITING_ACTION")}
-          className={`p-3.5 rounded-lg border shadow-2xs transition-all text-left cursor-pointer ${
+          className={`p-3.5 rounded-[16px] border shadow-2xs transition-all text-left cursor-pointer ${
             activeTab === "AWAITING_ACTION"
               ? "bg-amber-600 text-white border-amber-600"
-              : "bg-white border-slate-200 hover:border-amber-300"
+              : "bg-white border-[#E5EAE7] hover:border-amber-300"
           }`}
         >
           <div className={`text-[11px] font-semibold uppercase tracking-wider ${activeTab === "AWAITING_ACTION" ? "text-amber-100" : "text-amber-700"}`}>
@@ -207,17 +207,17 @@ export function CandidateApplicationsWorkbench({
       </div>
 
       {/* Applications List */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-[16px] border border-[#E5EAE7] shadow-2xs overflow-hidden">
         {filteredApps.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
+          <div className="p-12 text-center text-[#64748B]">
             <div className="text-3xl mb-2">📋</div>
-            <h3 className="text-sm font-semibold text-slate-900">No applications in this view</h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <h3 className="text-sm font-semibold text-[#0F1720]">No applications in this view</h3>
+            <p className="text-xs text-[#94A3B8] mt-1">
               Opportunities matching your profile and preferences will appear here as they are discovered and prepared.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-[#EDF1EF]">
             {paginatedApps.map((app) => {
               const presentation = getCandidateStatusPresentation(app.status);
               const actionReq = getCandidateActionRequirement(app.status);
@@ -227,7 +227,7 @@ export function CandidateApplicationsWorkbench({
               return (
                 <div
                   key={app.id}
-                  className="p-5 hover:bg-slate-50/75 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  className="p-5 hover:bg-[#F7F9F8]/75 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -241,28 +241,28 @@ export function CandidateApplicationsWorkbench({
                         </span>
                       )}
 
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-[#94A3B8]">
                         Updated {new Date(app.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                       </span>
                     </div>
 
-                    <h3 className="text-base font-semibold text-slate-900">
+                    <h3 className="text-base font-semibold text-[#0F1720]">
                       <TransitionLink href={`/candidate/applications/${app.id}`} className="hover:text-blue-600 transition">
                         {app.job.title}
                       </TransitionLink>
                     </h3>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap">
-                      <span className="font-semibold text-slate-800">{app.job.companyName}</span>
+                    <div className="flex items-center gap-2 text-xs text-[#64748B] flex-wrap">
+                      <span className="font-semibold text-[#0F1720]">{app.job.companyName}</span>
                       <span>•</span>
                       <span>{app.job.isRemote ? "🌐 Remote" : app.job.location || "On-site"}</span>
                       <span>•</span>
-                      <span className={salaryText === "Salary not disclosed" ? "text-slate-400" : "text-emerald-700 font-semibold"}>
+                      <span className={salaryText === "Salary not disclosed" ? "text-[#94A3B8]" : "text-emerald-700 font-semibold"}>
                         {salaryText}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-500">{presentation.description}</p>
+                    <p className="text-xs text-[#64748B]">{presentation.description}</p>
 
                     {app.status === "SUBMITTED" && latestSub && (
                       <div className="text-[11px] text-emerald-800 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded inline-block">

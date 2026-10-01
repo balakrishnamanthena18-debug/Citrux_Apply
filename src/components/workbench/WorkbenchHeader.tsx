@@ -20,23 +20,23 @@ export function WorkbenchHeader({
   className = "",
 }: WorkbenchHeaderProps) {
   const badgeStyles: Record<string, string> = {
-    neutral: "bg-[#F0F4F2] text-[#64748B] border-[#E5EAE7]",
+    neutral: "bg-[#F7F9F8] text-[#64748B] border-[#E5EAE7]",
     emerald: "bg-[#12A150]/10 text-[#0B3B2C] border-[#12A150]/25",
-    amber: "bg-[#D97706]/10 text-[#B45309] border-[#D97706]/20",
-    indigo: "bg-[#0B3B2C]/10 text-[#0B3B2C] border-[#0B3B2C]/20",
-    rose: "bg-[#DC2626]/10 text-[#DC2626] border-[#DC2626]/20",
+    amber: "bg-amber-50 text-amber-800 border-amber-200/80",
+    indigo: "bg-[#0B3B2C]/8 text-[#0B3B2C] border-[#0B3B2C]/15",
+    rose: "bg-rose-50 text-rose-700 border-rose-200/80",
   };
 
   return (
     <div
-      className={`px-5 py-4 border-b border-[#EDF1EF] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${className}`}
+      className={`px-5 py-5 border-b border-[#EDF1EF] bg-[#FCFDFC] flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${className}`}
     >
-      <div className="space-y-0.5">
+      <div className="space-y-1 min-w-0">
         <div className="flex items-center gap-2.5">
-          <h1 className="text-base font-bold text-[#0F1720] tracking-tight">{title}</h1>
+          <h1 className="text-lg font-semibold tracking-[-0.03em] text-[#0F1720]">{title}</h1>
           {badge !== undefined && (
             <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tabular-nums border ${
                 badgeStyles[badgeVariant] || badgeStyles.neutral
               }`}
             >
@@ -44,7 +44,7 @@ export function WorkbenchHeader({
             </span>
           )}
         </div>
-        {description && <p className="text-xs text-[#64748B]">{description}</p>}
+        {description && <p className="text-xs text-[#64748B] leading-relaxed">{description}</p>}
       </div>
 
       {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}

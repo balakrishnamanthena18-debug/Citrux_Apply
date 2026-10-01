@@ -41,14 +41,14 @@ export default async function AdminPrivacyPage() {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Privacy & Data Subject Governance</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">Privacy & Data Subject Governance</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Admin-assisted privacy queue: Verify identity, execute export/correction, and conduct compliant data deletion preserving required records.
           </p>
         </div>
         <Link
           href="/admin"
-          className="text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-md hover:bg-slate-50 shadow-sm"
+          className="text-sm font-medium text-[#64748B] hover:text-[#0F1720] bg-white border border-[#E5EAE7] px-3 py-1.5 rounded-md hover:bg-[#F7F9F8] shadow-[0_10px_40px_rgba(15,23,32,0.03)]"
         >
           ← Back to Admin Console
         </Link>
@@ -56,75 +56,75 @@ export default async function AdminPrivacyPage() {
 
       {/* Overview Counts */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Pending Verification</div>
+        <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
+          <div className="text-xs font-medium text-[#64748B]">Pending Verification</div>
           <div className="mt-1 text-2xl font-bold text-amber-600">
             {requests.filter((r) => r.status === PrivacyRequestStatus.PENDING).length}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Identity Verified / Ready</div>
+        <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
+          <div className="text-xs font-medium text-[#64748B]">Identity Verified / Ready</div>
           <div className="mt-1 text-2xl font-bold text-blue-600">
             {requests.filter((r) => r.status === PrivacyRequestStatus.IDENTITY_VERIFIED).length}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Completed Requests</div>
+        <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
+          <div className="text-xs font-medium text-[#64748B]">Completed Requests</div>
           <div className="mt-1 text-2xl font-bold text-green-600">
             {requests.filter((r) => r.status === PrivacyRequestStatus.COMPLETED).length}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Rejected Requests</div>
-          <div className="mt-1 text-2xl font-bold text-slate-600">
+        <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
+          <div className="text-xs font-medium text-[#64748B]">Rejected Requests</div>
+          <div className="mt-1 text-2xl font-bold text-[#64748B]">
             {requests.filter((r) => r.status === PrivacyRequestStatus.REJECTED).length}
           </div>
         </div>
       </div>
 
       {/* Privacy Requests Queue Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-          <h2 className="text-sm font-semibold text-slate-900">Privacy Request Queue ({requests.length})</h2>
+      <div className="bg-white rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8]">
+          <h2 className="text-sm font-semibold text-[#0F1720]">Privacy Request Queue ({requests.length})</h2>
         </div>
 
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+        <table className="min-w-full divide-y divide-[#E5EAE7]">
+          <thead className="bg-[#F7F9F8]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Candidate & Request
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Timestamps & Governance
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Action & Governance Control
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-slate-200">
+          <tbody className="bg-white divide-y divide-[#E5EAE7]">
             {requests.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-500 text-sm">
+                <td colSpan={5} className="px-6 py-8 text-center text-[#64748B] text-sm">
                   No privacy requests currently in queue.
                 </td>
               </tr>
             ) : (
               requests.map((req) => (
-                <tr key={req.id} className="hover:bg-slate-50">
+                <tr key={req.id} className="hover:bg-[#F7F9F8]">
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-[#0F1720]">
                       {req.candidate.user.firstName} {req.candidate.user.lastName}
                     </div>
-                    <div className="text-xs text-slate-500">{req.candidate.user.email}</div>
+                    <div className="text-xs text-[#64748B]">{req.candidate.user.email}</div>
                     {req.scopeDetails && (
-                      <div className="mt-1 text-xs text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200">
+                      <div className="mt-1 text-xs text-[#64748B] bg-[#F7F9F8] p-1.5 rounded border border-[#E5EAE7]">
                         <span className="font-medium">Details:</span> {req.scopeDetails}
                       </div>
                     )}
@@ -151,13 +151,13 @@ export default async function AdminPrivacyPage() {
                           ? "bg-blue-100 text-blue-800"
                           : req.status === PrivacyRequestStatus.PENDING
                           ? "bg-amber-100 text-amber-800"
-                          : "bg-slate-100 text-slate-800"
+                          : "bg-[#EDF1EF] text-[#0F1720]"
                       }`}
                     >
                       {req.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-xs text-slate-500 space-y-1">
+                  <td className="px-6 py-4 text-xs text-[#64748B] space-y-1">
                     <div>Requested: {new Date(req.requestedAt).toLocaleString()}</div>
                     {req.verifiedAt && (
                       <div className="text-blue-700">
@@ -172,7 +172,7 @@ export default async function AdminPrivacyPage() {
                       </div>
                     )}
                     {req.resolutionNotes && (
-                      <div className="text-slate-600 italic">Note: {req.resolutionNotes}</div>
+                      <div className="text-[#64748B] italic">Note: {req.resolutionNotes}</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-y-2">
@@ -195,7 +195,7 @@ export default async function AdminPrivacyPage() {
                           />
                           <button
                             type="submit"
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow-sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow-[0_10px_40px_rgba(15,23,32,0.03)]"
                           >
                             Verify Identity
                           </button>
@@ -244,7 +244,7 @@ export default async function AdminPrivacyPage() {
                         >
                           <button
                             type="submit"
-                            className={`px-3 py-1 rounded text-white shadow-sm font-medium ${
+                            className={`px-3 py-1 rounded text-white shadow-[0_10px_40px_rgba(15,23,32,0.03)] font-medium ${
                               req.requestType === PrivacyRequestType.DATA_DELETION
                                 ? "bg-red-600 hover:bg-red-700"
                                 : "bg-green-600 hover:bg-green-700"
@@ -279,7 +279,7 @@ export default async function AdminPrivacyPage() {
                     )}
 
                     {req.status === PrivacyRequestStatus.IDENTITY_VERIFIED && ctx.role !== Role.ADMIN && (
-                      <span className="text-xs text-slate-500 italic">
+                      <span className="text-xs text-[#64748B] italic">
                         Verified. Awaiting Admin Execution.
                       </span>
                     )}
@@ -291,7 +291,7 @@ export default async function AdminPrivacyPage() {
                     )}
 
                     {req.status === PrivacyRequestStatus.REJECTED && (
-                      <span className="text-xs text-slate-500 font-semibold">
+                      <span className="text-xs text-[#64748B] font-semibold">
                         ✕ Rejected
                       </span>
                     )}

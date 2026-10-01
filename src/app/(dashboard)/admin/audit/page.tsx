@@ -61,28 +61,28 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Authoritative Audit Trail</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">Authoritative Audit Trail</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Immutable, append-only security and operational audit records for organization governance.
           </p>
         </div>
         <Link
           href="/admin"
-          className="text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-md hover:bg-slate-50 shadow-sm"
+          className="text-sm font-medium text-[#64748B] hover:text-[#0F1720] bg-white border border-[#E5EAE7] px-3 py-1.5 rounded-md hover:bg-[#F7F9F8] shadow-[0_10px_40px_rgba(15,23,32,0.03)]"
         >
           ← Back to Admin Console
         </Link>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+      <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
         <form method="GET" className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="block text-xs font-medium text-slate-700">Audit Action</label>
+            <label className="block text-xs font-medium text-[#334155]">Audit Action</label>
             <select
               name="action"
               defaultValue={selectedAction ?? ""}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 bg-white"
+              className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 bg-white"
             >
               <option value="">All Actions</option>
               {Object.values(AuditAction).map((act) => (
@@ -94,22 +94,22 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700">Entity Type</label>
+            <label className="block text-xs font-medium text-[#334155]">Entity Type</label>
             <input
               name="entityType"
               defaultValue={selectedEntityType ?? ""}
               placeholder="e.g. Membership, PrivacyRequest..."
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700">Actor UUID</label>
+            <label className="block text-xs font-medium text-[#334155]">Actor UUID</label>
             <input
               name="actorUserId"
               defaultValue={selectedActor ?? ""}
               placeholder="Filter by Actor User ID"
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
           </div>
 
@@ -122,7 +122,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
             </button>
             <Link
               href="/admin/audit"
-              className="rounded-md bg-white border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-md bg-white border border-[#DDE5E0] px-3 py-1.5 text-xs font-medium text-[#334155] hover:bg-[#F7F9F8]"
             >
               Reset
             </Link>
@@ -131,65 +131,65 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
       </div>
 
       {/* Audit Log Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-          <span className="text-xs font-semibold text-slate-700">
+      <div className="bg-white rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex justify-between items-center">
+          <span className="text-xs font-semibold text-[#334155]">
             Showing {auditEvents.length} of {totalCount} events (Page {currentPage} of {totalPages})
           </span>
         </div>
 
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+        <table className="min-w-full divide-y divide-[#E5EAE7]">
+          <thead className="bg-[#F7F9F8]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Timestamp (UTC)
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Action
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Actor
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Entity
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
                 Details & Metadata
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-slate-200 font-mono text-xs">
+          <tbody className="bg-white divide-y divide-[#E5EAE7] font-mono text-xs">
             {auditEvents.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-500 font-sans text-sm">
+                <td colSpan={5} className="px-6 py-8 text-center text-[#64748B] font-sans text-sm">
                   No audit events found matching criteria.
                 </td>
               </tr>
             ) : (
               auditEvents.map((event) => (
-                <tr key={event.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-3 whitespace-nowrap text-slate-600">
+                <tr key={event.id} className="hover:bg-[#F7F9F8]">
+                  <td className="px-6 py-3 whitespace-nowrap text-[#64748B]">
                     {new Date(event.createdAt).toISOString()}
                   </td>
                   <td className="px-6 py-3 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#EDF1EF] text-[#0F1720] border border-[#E5EAE7]">
                       {event.action}
                     </span>
                   </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-slate-700 font-sans">
+                  <td className="px-6 py-3 whitespace-nowrap text-[#334155] font-sans">
                     {event.actor ? (
                       <div>
-                        <div className="font-medium text-slate-900">{event.actor.firstName} {event.actor.lastName}</div>
-                        <div className="text-xs text-slate-500 font-mono">{event.actor.email}</div>
+                        <div className="font-medium text-[#0F1720]">{event.actor.firstName} {event.actor.lastName}</div>
+                        <div className="text-xs text-[#64748B] font-mono">{event.actor.email}</div>
                       </div>
                     ) : (
-                      <span className="text-slate-500">{event.actorType}</span>
+                      <span className="text-[#64748B]">{event.actorType}</span>
                     )}
                   </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-slate-600">
+                  <td className="px-6 py-3 whitespace-nowrap text-[#64748B]">
                     {event.entityType}:{event.entityId ?? "N/A"}
                   </td>
-                  <td className="px-6 py-3 text-slate-500 max-w-md break-all">
+                  <td className="px-6 py-3 text-[#64748B] max-w-md break-all">
                     {event.details ? JSON.stringify(event.details) : "-"}
                   </td>
                 </tr>
@@ -200,22 +200,22 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+          <div className="px-6 py-3 bg-[#F7F9F8] border-t border-[#E5EAE7] flex justify-between items-center">
             <Link
               href={`/admin/audit?page=${Math.max(1, currentPage - 1)}${selectedAction ? `&action=${selectedAction}` : ""}${selectedEntityType ? `&entityType=${selectedEntityType}` : ""}`}
               className={`px-3 py-1 rounded text-xs font-medium border bg-white ${
-                currentPage === 1 ? "pointer-events-none opacity-50 text-slate-400" : "text-slate-700 hover:bg-slate-100"
+                currentPage === 1 ? "pointer-events-none opacity-50 text-[#94A3B8]" : "text-[#334155] hover:bg-[#EDF1EF]"
               }`}
             >
               Previous
             </Link>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-[#64748B]">
               Page {currentPage} of {totalPages}
             </span>
             <Link
               href={`/admin/audit?page=${Math.min(totalPages, currentPage + 1)}${selectedAction ? `&action=${selectedAction}` : ""}${selectedEntityType ? `&entityType=${selectedEntityType}` : ""}`}
               className={`px-3 py-1 rounded text-xs font-medium border bg-white ${
-                currentPage === totalPages ? "pointer-events-none opacity-50 text-slate-400" : "text-slate-700 hover:bg-slate-100"
+                currentPage === totalPages ? "pointer-events-none opacity-50 text-[#94A3B8]" : "text-[#334155] hover:bg-[#EDF1EF]"
               }`}
             >
               Next

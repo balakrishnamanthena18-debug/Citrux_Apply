@@ -362,8 +362,8 @@ export function EmployeeTasksWorkbench({
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Task Command & Execution</h1>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">Task Command & Execution</h1>
+          <p className="mt-1 text-xs text-[#64748B] font-medium">
             Operational assignments, candidate checklist workflows, SLA deadlines, and QA verifications.
           </p>
         </div>
@@ -383,12 +383,12 @@ export function EmployeeTasksWorkbench({
 
       {/* Create Task Drawer / Form (Controlled by Task Governance) */}
       {isCreateOpen && canCreateTask && (
-        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-2xs space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+        <div className="bg-white p-5 rounded-[16px] border border-[#E5EAE7] shadow-2xs space-y-4">
+          <div className="border-b border-[#EDF1EF] pb-3">
+            <h2 className="text-sm font-bold text-[#0F1720] uppercase tracking-wide">
               Create New Task Assignment
             </h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-[#64748B] mt-0.5">
               Task governance enforces designated creators, assignees, and checklist rules.
             </p>
           </div>
@@ -402,22 +402,22 @@ export function EmployeeTasksWorkbench({
           <form onSubmit={handleCreateSubmit} className="space-y-3 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Task Title *</label>
+                <label className="block font-semibold text-[#334155] mb-1">Task Title *</label>
                 <input
                   name="title"
                   required
                   placeholder="e.g. Verify Candidate Resume & QA Screening Answers"
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-500"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Category & Type *</label>
+                <label className="block font-semibold text-[#334155] mb-1">Category & Type *</label>
                 <div className="grid grid-cols-2 gap-2">
                   <select
                     name="category"
                     defaultValue="APPLICATION"
-                    className="rounded-md border border-slate-300 p-2 text-xs bg-white"
+                    className="rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                   >
                     <option value="CANDIDATE">Candidate</option>
                     <option value="JOB">Job</option>
@@ -429,7 +429,7 @@ export function EmployeeTasksWorkbench({
                   <select
                     name="type"
                     defaultValue="COMPLETE_APPLICATION"
-                    className="rounded-md border border-slate-300 p-2 text-xs bg-white"
+                    className="rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                   >
                     <option value="COMPLETE_PROFILE">Complete Profile</option>
                     <option value="UPLOAD_DOCUMENT">Upload Document</option>
@@ -458,11 +458,11 @@ export function EmployeeTasksWorkbench({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Priority</label>
+                <label className="block font-semibold text-[#334155] mb-1">Priority</label>
                 <select
                   name="priority"
                   defaultValue="NORMAL"
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs bg-white"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                 >
                   <option value="LOW">Low</option>
                   <option value="NORMAL">Normal</option>
@@ -472,20 +472,20 @@ export function EmployeeTasksWorkbench({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Due Date</label>
+                <label className="block font-semibold text-[#334155] mb-1">Due Date</label>
                 <input
                   type="date"
                   name="dueDate"
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs bg-white"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Assignee</label>
+                <label className="block font-semibold text-[#334155] mb-1">Assignee</label>
                 <select
                   name="assignedEmployeeId"
                   defaultValue={currentUserId}
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs bg-white"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                 >
                   <option value="">Unassigned</option>
                   {staffMembers.map((s) => (
@@ -499,10 +499,10 @@ export function EmployeeTasksWorkbench({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Linked Candidate</label>
+                <label className="block font-semibold text-[#334155] mb-1">Linked Candidate</label>
                 <select
                   name="candidateId"
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs bg-white"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                 >
                   <option value="">None</option>
                   {candidates.map((c) => (
@@ -514,10 +514,10 @@ export function EmployeeTasksWorkbench({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Linked Job</label>
+                <label className="block font-semibold text-[#334155] mb-1">Linked Job</label>
                 <select
                   name="jobId"
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs bg-white"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                 >
                   <option value="">None</option>
                   {jobs.map((j) => (
@@ -529,10 +529,10 @@ export function EmployeeTasksWorkbench({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Linked Application</label>
+                <label className="block font-semibold text-[#334155] mb-1">Linked Application</label>
                 <select
                   name="applicationId"
-                  className="w-full rounded-md border border-slate-300 p-2 text-xs bg-white"
+                  className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs bg-white"
                 >
                   <option value="">None</option>
                   {applications.map((a) => (
@@ -545,12 +545,12 @@ export function EmployeeTasksWorkbench({
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Task Checklists (one item per line)</label>
+              <label className="block font-semibold text-[#334155] mb-1">Task Checklists (one item per line)</label>
               <textarea
                 name="checklistItems"
                 rows={3}
                 placeholder="1. Review resume summary&#10;2. Check application answers&#10;3. Submit to portal"
-                className="w-full rounded-md border border-slate-300 p-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                className="w-full rounded-md border border-[#DDE5E0] p-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
               />
             </div>
 
@@ -558,7 +558,7 @@ export function EmployeeTasksWorkbench({
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-md border border-[#DDE5E0] bg-white text-[#334155] text-xs font-semibold hover:bg-[#F7F9F8] cursor-pointer"
               >
                 Cancel
               </button>
@@ -571,7 +571,7 @@ export function EmployeeTasksWorkbench({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+      <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           <InstantSearch
             value={searchTerm}
@@ -589,20 +589,20 @@ export function EmployeeTasksWorkbench({
           />
         </div>
 
-        <div className="text-[11px] text-slate-500 shrink-0">
-          Showing <span className="font-semibold text-slate-900">{filteredTasks.length}</span> tasks
+        <div className="text-[11px] text-[#64748B] shrink-0">
+          Showing <span className="font-semibold text-[#0F1720]">{filteredTasks.length}</span> tasks
         </div>
       </div>
 
       {/* Task List / Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-[16px] border border-[#E5EAE7] shadow-2xs overflow-hidden">
         {filteredTasks.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-500">
-            <p className="font-semibold text-slate-700">No operational tasks match the selected view.</p>
-            <p className="mt-1 text-slate-400">Switch tabs or create a new task.</p>
+          <div className="p-12 text-center text-xs text-[#64748B]">
+            <p className="font-semibold text-[#334155]">No operational tasks match the selected view.</p>
+            <p className="mt-1 text-[#94A3B8]">Switch tabs or create a new task.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-[#EDF1EF]">
             {paginatedTasks.map((t) => {
               const candName = t.candidate?.user
                 ? [t.candidate.user.firstName, t.candidate.user.lastName].filter(Boolean).join(" ") || t.candidate.user.email
@@ -614,7 +614,7 @@ export function EmployeeTasksWorkbench({
               return (
                 <div
                   key={t.id}
-                  className="p-4 hover:bg-slate-50/75 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  className="p-4 hover:bg-[#F7F9F8]/75 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -624,7 +624,7 @@ export function EmployeeTasksWorkbench({
                             ? "bg-rose-100 text-rose-800 border border-rose-200"
                             : t.priority === "HIGH"
                             ? "bg-amber-100 text-amber-800 border border-amber-200"
-                            : "bg-slate-100 text-slate-700"
+                            : "bg-[#EDF1EF] text-[#334155]"
                         }`}
                       >
                         {t.priority}
@@ -645,30 +645,30 @@ export function EmployeeTasksWorkbench({
                       </span>
 
                       {t.dueDate && (
-                        <span className="text-xs text-slate-500 font-medium">
+                        <span className="text-xs text-[#64748B] font-medium">
                           ⏱ Due {new Date(t.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}
                         </span>
                       )}
                     </div>
 
-                    <h3 className="text-sm font-semibold text-slate-900">
+                    <h3 className="text-sm font-semibold text-[#0F1720]">
                       <TransitionLink href={`/employee/tasks/${t.id}`} className="hover:text-blue-600 transition">
                         {t.title}
                       </TransitionLink>
                     </h3>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-                      <span>Candidate: <strong className="text-slate-700">{candName}</strong></span>
+                    <div className="flex items-center gap-2 text-xs text-[#64748B] flex-wrap">
+                      <span>Candidate: <strong className="text-[#334155]">{candName}</strong></span>
                       {(t.job || t.application?.job) && (
                         <>
                           <span>•</span>
-                          <span>Role: <strong className="text-slate-700">{t.job?.title || t.application?.job?.title}</strong></span>
+                          <span>Role: <strong className="text-[#334155]">{t.job?.title || t.application?.job?.title}</strong></span>
                         </>
                       )}
                       {totalChecks > 0 && (
                         <>
                           <span>•</span>
-                          <span className="font-mono text-[11px] text-slate-600">
+                          <span className="font-mono text-[11px] text-[#64748B]">
                             ✓ {completedChecks}/{totalChecks} checklist items
                           </span>
                         </>

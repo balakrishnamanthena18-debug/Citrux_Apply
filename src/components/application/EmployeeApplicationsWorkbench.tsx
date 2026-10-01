@@ -98,7 +98,7 @@ interface Props {
 }
 
 const STATUS_BADGES: Record<string, string> = {
-  DISCOVERED: "bg-slate-100 text-slate-700 border-slate-200",
+  DISCOVERED: "bg-[#EDF1EF] text-[#334155] border-[#E5EAE7]",
   QUALIFIED: "bg-blue-50 text-blue-700 border-blue-200",
   PREPARING: "bg-indigo-50 text-indigo-700 border-indigo-200",
   REVIEW: "bg-purple-50 text-purple-700 border-purple-200",
@@ -110,7 +110,7 @@ const STATUS_BADGES: Record<string, string> = {
   CORRECTION_APPROVED: "bg-purple-100 text-purple-800 border-purple-200 font-semibold",
   RESUBMISSION: "bg-purple-100 text-purple-800 border-purple-200 font-semibold",
   REJECTED: "bg-red-100 text-red-800 border-red-200",
-  WITHDRAWN: "bg-slate-100 text-slate-800 border-slate-200",
+  WITHDRAWN: "bg-[#EDF1EF] text-[#0F1720] border-[#E5EAE7]",
   FAILED: "bg-rose-100 text-rose-900 border-rose-300",
 };
 
@@ -378,21 +378,21 @@ export function EmployeeApplicationsWorkbench({
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* Console Header */}
-      <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-2xs">
+      <div className="bg-white p-6 rounded-[16px] border border-[#E5EAE7] shadow-2xs">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-50" />
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl font-bold tracking-tight text-[#0F1720]">
                 Application Operations Console
               </h1>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-[#64748B] mt-1">
               Authoritative system of record for external candidate job search, preparation, QA verification, and manual employer submissions.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="font-semibold text-slate-800">{applications.length}</span> total managed records
+          <div className="flex items-center gap-2 text-xs text-[#64748B]">
+            <span className="font-semibold text-[#0F1720]">{applications.length}</span> total managed records
           </div>
         </div>
       </div>
@@ -405,13 +405,13 @@ export function EmployeeApplicationsWorkbench({
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "all"
               ? "bg-slate-900 text-white border-slate-900 shadow-md shadow-slate-900/10"
-              : "bg-white border-slate-200/90 hover:border-slate-300"
+              : "bg-white border-[#E5EAE7]/90 hover:border-[#DDE5E0]"
           }`}
         >
-          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "all" ? "text-slate-300" : "text-slate-400"}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "all" ? "text-slate-300" : "text-[#94A3B8]"}`}>
             Total Pipeline
           </div>
-          <div className={`text-2xl font-bold mt-1 ${queue === "all" ? "text-white" : "text-slate-900"}`}>
+          <div className={`text-2xl font-bold mt-1 ${queue === "all" ? "text-white" : "text-[#0F1720]"}`}>
             {queueCounts.total}
           </div>
         </button>
@@ -422,7 +422,7 @@ export function EmployeeApplicationsWorkbench({
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "ready"
               ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-md shadow-blue-500/20"
-              : "bg-white border-slate-200/90 hover:border-blue-300"
+              : "bg-white border-[#E5EAE7]/90 hover:border-blue-300"
           }`}
         >
           <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${queue === "ready" ? "text-blue-100" : "text-blue-600"}`}>
@@ -440,7 +440,7 @@ export function EmployeeApplicationsWorkbench({
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "in_progress"
               ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20"
-              : "bg-white border-slate-200/90 hover:border-indigo-300"
+              : "bg-white border-[#E5EAE7]/90 hover:border-indigo-300"
           }`}
         >
           <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "in_progress" ? "text-indigo-100" : "text-indigo-700"}`}>
@@ -457,7 +457,7 @@ export function EmployeeApplicationsWorkbench({
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "submitted"
               ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20"
-              : "bg-white border-slate-200/90 hover:border-emerald-300"
+              : "bg-white border-[#E5EAE7]/90 hover:border-emerald-300"
           }`}
         >
           <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "submitted" ? "text-emerald-100" : "text-emerald-700"}`}>
@@ -477,7 +477,7 @@ export function EmployeeApplicationsWorkbench({
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             statusFilter === "AWAITING_APPROVAL"
               ? "bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20"
-              : "bg-white border-slate-200/90 hover:border-amber-300"
+              : "bg-white border-[#E5EAE7]/90 hover:border-amber-300"
           }`}
         >
           <div className={`text-[10px] font-bold uppercase tracking-wider ${statusFilter === "AWAITING_APPROVAL" ? "text-amber-100" : "text-amber-700"}`}>
@@ -494,7 +494,7 @@ export function EmployeeApplicationsWorkbench({
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
             queue === "needs_attention" && statusFilter !== "AWAITING_APPROVAL"
               ? "bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-500/20"
-              : "bg-white border-slate-200/90 hover:border-rose-300"
+              : "bg-white border-[#E5EAE7]/90 hover:border-rose-300"
           }`}
         >
           <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "needs_attention" ? "text-rose-100" : "text-rose-700"}`}>
@@ -510,11 +510,11 @@ export function EmployeeApplicationsWorkbench({
       <InstantTabs tabs={tabs} activeTab={queue} onChange={handleQueueChange} />
 
       {/* Create Managed Application Panel */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+      <div className="bg-white p-6 rounded-2xl border border-[#E5EAE7]/90 shadow-xs space-y-3">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
               Create Managed Application Record
             </h2>
           </div>
@@ -530,11 +530,11 @@ export function EmployeeApplicationsWorkbench({
           className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1"
         >
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Select Candidate *</label>
+            <label className="block font-semibold text-[#334155] mb-1">Select Candidate *</label>
             <select
               name="candidateId"
               required
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-[20px] border border-[#DDE5E0] px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose Candidate...</option>
               {candidates.map((c) => (
@@ -546,11 +546,11 @@ export function EmployeeApplicationsWorkbench({
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Select Discovered Job *</label>
+            <label className="block font-semibold text-[#334155] mb-1">Select Discovered Job *</label>
             <select
               name="jobId"
               required
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-[20px] border border-[#DDE5E0] px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose Sourced Job...</option>
               {jobs.map((j) => (
@@ -565,7 +565,7 @@ export function EmployeeApplicationsWorkbench({
             <PendingButton
               type="submit"
               pendingText="Creating..."
-              className="w-full rounded-xl py-2 font-semibold"
+              className="w-full rounded-[20px] py-2 font-semibold"
             >
               + Create Managed Application
             </PendingButton>
@@ -574,7 +574,7 @@ export function EmployeeApplicationsWorkbench({
       </div>
 
       {/* Advanced Filter, Search & Sort Bar (0ms in-memory response) */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+      <div className="bg-white p-4 rounded-2xl border border-[#E5EAE7]/90 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           <InstantSearch
             value={searchTerm}
@@ -592,22 +592,22 @@ export function EmployeeApplicationsWorkbench({
           />
         </div>
 
-        <div className="text-[11px] text-slate-500 shrink-0">
-          Showing <span className="font-semibold text-slate-900">{filteredApplications.length}</span> records
+        <div className="text-[11px] text-[#64748B] shrink-0">
+          Showing <span className="font-semibold text-[#0F1720]">{filteredApplications.length}</span> records
         </div>
       </div>
 
       {/* Authoritative Applications Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#E5EAE7]/90 shadow-xs overflow-hidden">
         {filteredApplications.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-500">
-            <p className="font-semibold text-slate-700">No applications match the specified criteria.</p>
-            <p className="mt-1 text-slate-400">Adjust the filters above or create a new application record.</p>
+          <div className="p-12 text-center text-xs text-[#64748B]">
+            <p className="font-semibold text-[#334155]">No applications match the specified criteria.</p>
+            <p className="mt-1 text-[#94A3B8]">Adjust the filters above or create a new application record.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
-              <thead className="bg-slate-50 font-semibold uppercase tracking-wider text-slate-500 text-[10px]">
+            <table className="min-w-full divide-y divide-[#E5EAE7] text-left text-xs">
+              <thead className="bg-[#F7F9F8] font-semibold uppercase tracking-wider text-[#64748B] text-[10px]">
                 <tr>
                   <th className="px-4 py-3">Candidate</th>
                   <th className="px-4 py-3">Company & Role</th>
@@ -620,7 +620,7 @@ export function EmployeeApplicationsWorkbench({
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#EDF1EF]">
                 {paginatedApps.map((app) => {
                   const candidateName =
                     [app.candidate.user.firstName, app.candidate.user.lastName].filter(Boolean).join(" ") ||
@@ -631,11 +631,11 @@ export function EmployeeApplicationsWorkbench({
                   const salaryText = formatSalary(app.job.salaryMin, app.job.salaryMax, app.job.salaryCurrency);
 
                   return (
-                    <tr key={app.id} className="hover:bg-slate-50/75 transition">
+                    <tr key={app.id} className="hover:bg-[#F7F9F8]/75 transition">
                       {/* Candidate Column */}
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{candidateName}</div>
-                        <div className="text-[11px] text-slate-500 truncate max-w-[180px]">
+                        <div className="font-semibold text-[#0F1720]">{candidateName}</div>
+                        <div className="text-[11px] text-[#64748B] truncate max-w-[180px]">
                           {app.candidate.user.email}
                         </div>
                         <div className="mt-0.5">
@@ -643,7 +643,7 @@ export function EmployeeApplicationsWorkbench({
                             className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
                               app.candidate.applicationAuthorizationMode === "MANAGED"
                                 ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                                : "bg-[#EDF1EF] text-[#334155] border border-[#E5EAE7]"
                             }`}
                           >
                             {app.candidate.applicationAuthorizationMode === "MANAGED" ? "MANAGED" : "REVIEW REQ"}
@@ -653,8 +653,8 @@ export function EmployeeApplicationsWorkbench({
 
                       {/* Company & Role Column */}
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{app.job.title}</div>
-                        <div className="text-[11px] text-slate-600 font-medium">
+                        <div className="font-semibold text-[#0F1720]">{app.job.title}</div>
+                        <div className="text-[11px] text-[#64748B] font-medium">
                           {app.job.companyName}
                         </div>
                         {app.job.externalUrl && (
@@ -672,12 +672,12 @@ export function EmployeeApplicationsWorkbench({
 
                       {/* Location & Compensation Column */}
                       <td className="px-4 py-3">
-                        <div className="text-slate-800 font-medium">
+                        <div className="text-[#0F1720] font-medium">
                           {app.job.isRemote ? "🌐 Remote" : app.job.location || "On-site"}
                         </div>
                         <div
                           className={`text-[11px] mt-0.5 ${
-                            salaryText === "Salary not disclosed" ? "text-slate-400" : "text-emerald-700 font-semibold"
+                            salaryText === "Salary not disclosed" ? "text-[#94A3B8]" : "text-emerald-700 font-semibold"
                           }`}
                         >
                           {salaryText}
@@ -688,7 +688,7 @@ export function EmployeeApplicationsWorkbench({
                       <td className="px-4 py-3 whitespace-nowrap">
                         {app.job.source ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-[#EDF1EF] text-[#0F1720] border border-[#E5EAE7]">
                               {app.job.source}
                             </span>
                             {app.job.externalUrl && (
@@ -696,7 +696,7 @@ export function EmployeeApplicationsWorkbench({
                                 href={app.job.externalUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-slate-400 hover:text-slate-700 text-xs"
+                                className="text-[#94A3B8] hover:text-[#334155] text-xs"
                                 title="Open original job posting"
                               >
                                 ↗
@@ -704,7 +704,7 @@ export function EmployeeApplicationsWorkbench({
                             )}
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Direct</span>
+                          <span className="text-[#94A3B8] italic">Direct</span>
                         )}
                       </td>
 
@@ -712,7 +712,7 @@ export function EmployeeApplicationsWorkbench({
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] border ${
-                            STATUS_BADGES[app.status] || "bg-slate-100 text-slate-700 border-slate-200"
+                            STATUS_BADGES[app.status] || "bg-[#EDF1EF] text-[#334155] border-[#E5EAE7]"
                           }`}
                         >
                           {app.status.replace(/_/g, " ")}
@@ -720,25 +720,25 @@ export function EmployeeApplicationsWorkbench({
                       </td>
 
                       {/* Assignee Column */}
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
                         {app.assignedEmployee ? (
-                          <span className={app.assignedEmployeeId === currentUserId ? "font-bold text-slate-900" : ""}>
+                          <span className={app.assignedEmployeeId === currentUserId ? "font-bold text-[#0F1720]" : ""}>
                             {[app.assignedEmployee.firstName, app.assignedEmployee.lastName].filter(Boolean).join(" ") ||
                               app.assignedEmployee.email}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">Unassigned</span>
+                          <span className="text-[#94A3B8] italic">Unassigned</span>
                         )}
                       </td>
 
                       {/* Last Activity Column */}
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                      <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
                         {latestHistory ? (
                           <div>
-                            <span className="text-slate-800 font-medium">
+                            <span className="text-[#0F1720] font-medium">
                               {new Date(latestHistory.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                             </span>
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-[10px] text-[#94A3B8]">
                               {latestHistory.toStatus.replace(/_/g, " ")}
                             </div>
                           </div>
@@ -748,13 +748,13 @@ export function EmployeeApplicationsWorkbench({
                       </td>
 
                       {/* Submission Status Column */}
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
                         {app.status === "SUBMITTED" && latestSub ? (
                           <div>
                             <span className="font-semibold text-emerald-800">
                               Submitted · Attempt #{latestSub.attemptNumber}
                             </span>
-                            <div className="text-[10px] text-slate-500">
+                            <div className="text-[10px] text-[#64748B]">
                               {new Date(latestSub.submittedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
                             </div>
                           </div>
@@ -768,7 +768,7 @@ export function EmployeeApplicationsWorkbench({
                         ) : app.status === "RESUBMISSION" ? (
                           <span className="font-semibold text-purple-700">Resubmission staged</span>
                         ) : (
-                          <span className="text-slate-400">Not submitted</span>
+                          <span className="text-[#94A3B8]">Not submitted</span>
                         )}
                       </td>
 
@@ -779,7 +779,7 @@ export function EmployeeApplicationsWorkbench({
                           className={`inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold transition ${
                             app.status === "READY"
                               ? "bg-sky-600 text-white hover:bg-sky-700 shadow-xs"
-                              : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                              : "bg-white text-[#334155] border border-[#DDE5E0] hover:bg-[#F7F9F8]"
                           }`}
                         >
                           {app.status === "READY" ? "Open Application →" : "Open Workbench →"}

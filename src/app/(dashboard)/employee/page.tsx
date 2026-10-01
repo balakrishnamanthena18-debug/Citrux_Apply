@@ -3,6 +3,9 @@ import { withRlsContext } from "@/lib/db/rls";
 import { ApplicationStatus, TaskStatus, TaskPriority } from "@/generated/prisma";
 import Link from "next/link";
 import { TelemetryGauge } from "@/components/ui/TelemetryGauge";
+import { PageHero } from "@/components/ui/PageHero";
+import { MetricStrip } from "@/components/ui/MetricStrip";
+import { SectionPanel } from "@/components/ui/SectionPanel";
 
 interface WorkItem {
   id: string;
@@ -286,124 +289,85 @@ export default async function EmployeeWorkspacePage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16">
-      {/* 1. Operational Workspace Header */}
-      <div className="bg-white rounded-[20px] border border-[#E5EAE7] p-5 shadow-[0_4px_18px_rgba(15,23,32,0.04)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#12A150] animate-pulse" />
-            <h1 className="text-lg sm:text-xl font-bold text-[#0F1720] tracking-tight">Employee Command Center</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#12A150]/[0.08] text-[#0B3B2C] border border-[#12A150]/20">
-              OPERATIONAL WORK DESK
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-[#64748B] font-medium">
-            Daily triage queue for assignments, priority action items, and submission handoffs.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#F7F9F8] border border-[#E5EAE7] text-[#64748B] shadow-2xs">
-            {formattedCurrentDate}
-          </span>
-          <Link
-            href="/employee/application-log"
-            className="inline-flex items-center px-3.5 py-1.5 rounded-[11px] text-xs font-semibold bg-[#12A150] hover:bg-[#0E8541] text-white shadow-2xs transition"
-          >
-            + Fast Intake
-          </Link>
-        </div>
-      </div>
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+      <PageHero
+        eyebrow={`${formattedCurrentDate} · Operational desk`}
+        title={
+          workItems.length === 0
+            ? "Your desk is clear."
+            : `${workItems.length} item${workItems.length === 1 ? "" : "s"} in your queue.`
+        }
+        description={
+          workItems.length === 0
+            ? "No pending tasks or urgent application actions are assigned to you right now."
+            : "Triage SLA work first, then move ready packages to submission."
+        }
+        primaryAction={{
+          label: workItems[0] ? workItems[0].actionLabel : "Fast Intake",
+          href: workItems[0]?.actionUrl || "/employee/application-log",
+        }}
+        secondaryAction={{ label: "Open tasks", href: "/employee/tasks?scope=mine" }}
+        tiles={[
+          {
+            label: "Active tasks",
+            count: data.myTasksCount,
+            href: "/employee/tasks?scope=mine",
+            description: "Assigned operational work",
+            tone: data.myTasksCount > 0 ? "blue" : "neutral",
+          },
+          {
+            label: "Candidates",
+            count: data.myCandidatesCount,
+            href: "/employee/candidates?scope=mine",
+            description: "Your assigned people",
+            tone: "neutral",
+          },
+          {
+            label: "Applications",
+            count: data.activeApplicationsCount,
+            href: "/employee/applications?scope=mine",
+            description: "Live packages on your desk",
+            tone: data.activeApplicationsCount > 0 ? "amber" : "neutral",
+          },
+          {
+            label: "Due today",
+            count: data.dueTodayTasksCount,
+            href: "/employee/tasks?scope=mine&filter=due_today",
+            description: "SLA risk window",
+            tone: data.dueTodayTasksCount > 0 ? "amber" : "neutral",
+          },
+          {
+            label: "Ready to submit",
+            count: data.readyApplications?.length || 0,
+            href: "/employee/applications?queue=ready",
+            description: "Approved packages",
+            tone: (data.readyApplications?.length || 0) > 0 ? "blue" : "neutral",
+          },
+        ]}
+      />
 
-      {/* 2. Compact Operational Pulse Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link
-          href="/employee/tasks?scope=mine"
-          className="bg-white rounded-[16px] border border-[#E5EAE7] p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] hover:border-[#12A150]/40 transition group"
-        >
-          <div className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">My Active Tasks</div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-[#0F1720] group-hover:text-[#12A150] transition">
-              {data.myTasksCount}
-            </div>
-            <span className="text-[11px] font-semibold text-[#12A150]">
-              View Tasks →
-            </span>
-          </div>
-        </Link>
+      <MetricStrip
+        items={[
+          { label: "My active tasks", value: data.myTasksCount, href: "/employee/tasks?scope=mine" },
+          { label: "Assigned candidates", value: data.myCandidatesCount, href: "/employee/candidates?scope=mine" },
+          { label: "Active applications", value: data.activeApplicationsCount, href: "/employee/applications?scope=mine" },
+          {
+            label: "Due today / overdue",
+            value: data.dueTodayTasksCount,
+            href: "/employee/tasks?scope=mine&filter=due_today",
+            accent: data.dueTodayTasksCount > 0,
+          },
+        ]}
+      />
 
-        <Link
-          href="/employee/candidates?scope=mine"
-          className="bg-white rounded-[16px] border border-[#E5EAE7] p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] hover:border-[#12A150]/40 transition group"
-        >
-          <div className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Assigned Candidates</div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-[#0F1720] group-hover:text-[#12A150] transition">
-              {data.myCandidatesCount}
-            </div>
-            <span className="text-[11px] font-semibold text-[#12A150]">
-              Directory →
-            </span>
-          </div>
-        </Link>
-
-        <Link
-          href="/employee/applications?scope=mine"
-          className="bg-white rounded-[16px] border border-[#E5EAE7] p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] hover:border-[#12A150]/40 transition group"
-        >
-          <div className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Active Applications</div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-[#0F1720] group-hover:text-[#12A150] transition">
-              {data.activeApplicationsCount}
-            </div>
-            <span className="text-[11px] font-semibold text-[#12A150]">
-              Queue →
-            </span>
-          </div>
-        </Link>
-
-        <Link
-          href="/employee/tasks?scope=mine&filter=due_today"
-          className={`rounded-[16px] border p-4 shadow-[0_4px_18px_rgba(15,23,32,0.04)] transition group ${
-            data.dueTodayTasksCount > 0
-              ? "bg-amber-50/60 border-amber-200"
-              : "bg-white border-[#E5EAE7] hover:border-[#12A150]/40"
-          }`}
-        >
-          <div className="text-[10px] font-bold uppercase tracking-wider text-amber-900">
-            Due Today / Overdue
-          </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <div className={`text-2xl font-bold ${data.dueTodayTasksCount > 0 ? "text-amber-950" : "text-[#0F1720]"}`}>
-              {data.dueTodayTasksCount}
-            </div>
-            <span className="text-[11px] font-semibold text-amber-800">
-              Triage SLA →
-            </span>
-          </div>
-        </Link>
-      </div>
-
-      {/* 3. Primary Operational Workspace: MY WORK QUEUE */}
-      <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden transition-all">
-        <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">My Work Queue</span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#0B3B2C] text-white font-mono font-bold">
-              {workItems.length}
-            </span>
-            <span className="text-[11px] text-[#64748B] hidden sm:inline">
-              — Prioritized by SLA deadlines and operational dependencies
-            </span>
-          </div>
-          <Link
-            href="/employee/tasks?scope=mine"
-            className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] transition inline-flex items-center gap-1"
-          >
-            <span>Open Task Board</span>
-            <span>→</span>
-          </Link>
-        </div>
-
+      {/* Primary Operational Workspace: MY WORK QUEUE */}
+      <SectionPanel
+        title="My work queue"
+        description="Prioritized by SLA deadlines and operational dependencies"
+        actionHref="/employee/tasks?scope=mine"
+        actionLabel="Task board →"
+        flush
+      >
         {workItems.length === 0 ? (
           <div className="p-12 text-center text-[#64748B]">
             <div className="text-2xl mb-1 text-[#12A150]">✓</div>
@@ -513,17 +477,17 @@ export default async function EmployeeWorkspacePage() {
             })}
           </div>
         )}
-      </div>
+      </SectionPanel>
 
       {/* 4. Two-Column Operational Surface: Ready for Submission & Dependencies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Section: READY FOR EXTERNAL SUBMISSION */}
-        <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col">
-          <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex justify-between items-center">
+        <div className="bg-white rounded-[24px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)] overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#FCFDFC] flex justify-between items-center">
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#12A150]" />
-                <h2 className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">Ready for External Submission</h2>
+                <h2 className="text-sm font-semibold tracking-[-0.02em] text-[#0F1720]">Ready for external submission</h2>
               </div>
               <p className="text-[11px] text-[#64748B] mt-0.5">
                 Approved packages ready for manual external submission on employer portals.

@@ -214,8 +214,8 @@ export function EmployeeCandidatesWorkbench({
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold">
+            <table className="min-w-full divide-y divide-[#E5EAE7] text-xs">
+              <thead className="bg-[#F7F9F8] text-[#64748B] uppercase tracking-wider font-semibold">
                 <tr>
                   <th scope="col" className="px-5 py-3 text-left">Candidate</th>
                   <th scope="col" className="px-5 py-3 text-left">Status</th>
@@ -225,23 +225,23 @@ export function EmployeeCandidatesWorkbench({
                   <th scope="col" className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-100">
+              <tbody className="bg-white divide-y divide-[#EDF1EF]">
                 {paginatedCandidates.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={c.id} className="hover:bg-[#F7F9F8]/80 transition-colors">
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-semibold flex items-center justify-center text-xs shrink-0">
+                        <div className="h-8 w-8 rounded-full bg-[#EDF1EF] border border-[#E5EAE7] text-[#334155] font-semibold flex items-center justify-center text-xs shrink-0">
                           {c.user.firstName?.[0] || (c.user.email?.[0] ? c.user.email[0].toUpperCase() : "?")}
                         </div>
                         <div>
                           <TransitionLink
                             href={`/employee/candidates/${c.id}`}
-                            className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors"
+                            className="font-semibold text-[#0F1720] hover:text-indigo-600 transition-colors"
                           >
                             {[c.user.firstName, c.user.lastName].filter(Boolean).join(" ") || c.user.email}
                           </TransitionLink>
-                          <div className="text-[11px] text-slate-400 font-mono">{c.user.email}</div>
-                          {c.headline && <div className="text-slate-500 text-[11px] mt-0.5 max-w-xs truncate">{c.headline}</div>}
+                          <div className="text-[11px] text-[#94A3B8] font-mono">{c.user.email}</div>
+                          {c.headline && <div className="text-[#64748B] text-[11px] mt-0.5 max-w-xs truncate">{c.headline}</div>}
                         </div>
                       </div>
                     </td>
@@ -255,7 +255,7 @@ export function EmployeeCandidatesWorkbench({
                             ? "bg-blue-50 text-blue-700 border border-blue-200"
                             : c.status === "PLACED"
                             ? "bg-purple-50 text-purple-700 border border-purple-200"
-                            : "bg-slate-100 text-slate-600"
+                            : "bg-[#EDF1EF] text-[#64748B]"
                         }`}
                       >
                         {c.status}
@@ -277,20 +277,20 @@ export function EmployeeCandidatesWorkbench({
                     </td>
 
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <span className="font-semibold text-slate-900">
+                      <span className="font-semibold text-[#0F1720]">
                         {c.applications?.length || 0}
                       </span>{" "}
-                      <span className="text-slate-400 text-[11px]">staged</span>
+                      <span className="text-[#94A3B8] text-[11px]">staged</span>
                     </td>
 
-                    <td className="px-5 py-3.5 whitespace-nowrap text-slate-600">
+                    <td className="px-5 py-3.5 whitespace-nowrap text-[#64748B]">
                       {c.assignedEmployee ? (
-                        <span className={c.assignedEmployeeId === currentUserId ? "font-semibold text-slate-900" : ""}>
+                        <span className={c.assignedEmployeeId === currentUserId ? "font-semibold text-[#0F1720]" : ""}>
                           {[c.assignedEmployee.firstName, c.assignedEmployee.lastName].filter(Boolean).join(" ") ||
                             c.assignedEmployee.email}
                         </span>
                       ) : (
-                        <span className="text-slate-400 italic">Unassigned</span>
+                        <span className="text-[#94A3B8] italic">Unassigned</span>
                       )}
                     </td>
 

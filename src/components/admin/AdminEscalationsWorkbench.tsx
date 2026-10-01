@@ -154,11 +154,11 @@ export function AdminEscalationsWorkbench({
             }}
           />
         ) : (
-          <div className="divide-y divide-slate-100 p-4 space-y-4">
+          <div className="divide-y divide-[#EDF1EF] p-4 space-y-4">
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-white rounded-lg border border-amber-200/80 p-5 shadow-xs flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5"
+                className="bg-white rounded-[16px] border border-amber-200/80 p-5 shadow-xs flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5"
               >
                 {/* Task Details & Context */}
                 <div className="flex-1">
@@ -166,13 +166,13 @@ export function AdminEscalationsWorkbench({
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider">
                       ESCALATED
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 uppercase tracking-wider">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#EDF1EF] text-[#334155] uppercase tracking-wider">
                       {task.priority}
                     </span>
-                    <span className="text-xs font-mono text-slate-500">{task.type}</span>
+                    <span className="text-xs font-mono text-[#64748B]">{task.type}</span>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-[#0F1720]">
                     <TransitionLink href={`/employee/tasks/${task.id}`} className="hover:underline">
                       {task.title}
                     </TransitionLink>
@@ -186,19 +186,19 @@ export function AdminEscalationsWorkbench({
                   )}
 
                   {/* Context Tags */}
-                  <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-slate-600">
+                  <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-[#64748B]">
                     {task.assignedEmployee && (
-                      <span className="inline-flex items-center bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center bg-[#EDF1EF] px-2 py-0.5 rounded text-[11px]">
                         Assignee: {task.assignedEmployee.firstName || task.assignedEmployee.email}
                       </span>
                     )}
                     {task.candidate && (
-                      <span className="inline-flex items-center bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center bg-[#EDF1EF] px-2 py-0.5 rounded text-[11px]">
                         Candidate: {task.candidate.user?.firstName || task.candidate.user?.email}
                       </span>
                     )}
                     {task.job && (
-                      <span className="inline-flex items-center bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center bg-[#EDF1EF] px-2 py-0.5 rounded text-[11px]">
                         Job: {task.job.companyName} ({task.job.title})
                       </span>
                     )}
@@ -211,8 +211,8 @@ export function AdminEscalationsWorkbench({
                 </div>
 
                 {/* Admin Triage Form Box */}
-                <div className="bg-slate-50/70 rounded-lg p-4 border border-slate-200 w-full lg:w-96 flex-shrink-0">
-                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+                <div className="bg-[#F7F9F8]/70 rounded-[16px] p-4 border border-[#E5EAE7] w-full lg:w-96 flex-shrink-0">
+                  <div className="text-[11px] font-bold text-[#334155] uppercase tracking-wider mb-2.5">
                     Admin Triage Actions
                   </div>
                   <form
@@ -228,11 +228,11 @@ export function AdminEscalationsWorkbench({
                     <input type="hidden" name="taskId" value={task.id} />
 
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Triage Resolution *</label>
+                      <label className="block text-xs font-medium text-[#334155] mb-1">Triage Resolution *</label>
                       <select
                         name="triageAction"
                         required
-                        className="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white font-medium"
+                        className="w-full text-xs border border-[#DDE5E0] rounded-md px-2.5 py-1.5 bg-white font-medium"
                       >
                         <option value="RESUME">Resume Work (Clear Blocker → IN_PROGRESS)</option>
                         <option value="REASSIGN">Reassign Staff (Set Assignee → ASSIGNED)</option>
@@ -241,10 +241,10 @@ export function AdminEscalationsWorkbench({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Target Assignee (If Reassigning)</label>
+                      <label className="block text-xs font-medium text-[#334155] mb-1">Target Assignee (If Reassigning)</label>
                       <select
                         name="targetEmployeeId"
-                        className="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white"
+                        className="w-full text-xs border border-[#DDE5E0] rounded-md px-2.5 py-1.5 bg-white"
                       >
                         <option value="">Keep current / Unassigned</option>
                         {staffMembers.map((s) => (
@@ -256,12 +256,12 @@ export function AdminEscalationsWorkbench({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Triage Notes</label>
+                      <label className="block text-xs font-medium text-[#334155] mb-1">Triage Notes</label>
                       <input
                         type="text"
                         name="triageNotes"
                         placeholder="Operational decision rationale..."
-                        className="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white"
+                        className="w-full text-xs border border-[#DDE5E0] rounded-md px-2.5 py-1.5 bg-white"
                       />
                     </div>
 

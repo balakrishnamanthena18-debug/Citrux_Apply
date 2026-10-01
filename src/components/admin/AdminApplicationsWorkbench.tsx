@@ -191,8 +191,8 @@ export function AdminApplicationsWorkbench({
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
-              <thead className="bg-slate-50 font-semibold uppercase tracking-wider text-[11px] text-slate-500">
+            <table className="min-w-full divide-y divide-[#E5EAE7] text-left text-xs">
+              <thead className="bg-[#F7F9F8] font-semibold uppercase tracking-wider text-[11px] text-[#64748B]">
                 <tr>
                   <th scope="col" className="px-5 py-3">Candidate</th>
                   <th scope="col" className="px-5 py-3">Job & Company</th>
@@ -202,22 +202,22 @@ export function AdminApplicationsWorkbench({
                   <th scope="col" className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-[#EDF1EF] bg-white">
                 {paginated.map((app) => (
-                  <tr key={app.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={app.id} className="hover:bg-[#F7F9F8]/80 transition-colors">
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="font-semibold text-slate-900">
+                      <div className="font-semibold text-[#0F1720]">
                         {[app.candidate?.user?.firstName, app.candidate?.user?.lastName].filter(Boolean).join(" ") ||
                           app.candidate?.user?.email ||
                           "Unnamed Candidate"}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                      <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5">
                         {app.candidate?.user?.email}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="font-semibold text-slate-900">{app.job?.title || "Untitled Position"}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">{app.job?.companyName || "Unknown Company"}</div>
+                      <div className="font-semibold text-[#0F1720]">{app.job?.title || "Untitled Position"}</div>
+                      <div className="text-[11px] text-[#64748B] mt-0.5">{app.job?.companyName || "Unknown Company"}</div>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <span
@@ -230,23 +230,23 @@ export function AdminApplicationsWorkbench({
                             ? "bg-rose-50 text-rose-700 border border-rose-200"
                             : app.status === "SUBMITTED"
                             ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : "bg-slate-100 text-slate-700"
+                            : "bg-[#EDF1EF] text-[#334155]"
                         }`}
                       >
                         {app.status.replace(/_/g, " ")}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap text-slate-600">
+                    <td className="px-5 py-3.5 whitespace-nowrap text-[#64748B]">
                       {app.assignedEmployee ? (
-                        <div className="font-medium text-slate-900">
+                        <div className="font-medium text-[#0F1720]">
                           {[app.assignedEmployee.firstName, app.assignedEmployee.lastName].filter(Boolean).join(" ") ||
                             app.assignedEmployee.email}
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">Unassigned</span>
+                        <span className="text-[#94A3B8] italic">Unassigned</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                    <td className="px-5 py-3.5 whitespace-nowrap text-[#64748B] font-mono text-[11px]">
                       {new Date(app.createdAt).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",

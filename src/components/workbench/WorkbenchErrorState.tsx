@@ -37,7 +37,7 @@ export function WorkbenchErrorState({
         </svg>
       </div>
       <div className="space-y-1 max-w-sm">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-[#0F1720]">{title}</h3>
         <p className="text-xs text-rose-600 font-medium">{message}</p>
       </div>
       {onRetry && (

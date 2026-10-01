@@ -37,27 +37,27 @@ export default async function EmployeeMessagesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+      <div className="flex items-center justify-between border-b border-[#E5EAE7] pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">
             Candidate Communications
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-[#64748B] mt-1">
             Realtime messaging with candidates across all applications
           </p>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-[#E5EAE7] rounded-[20px] overflow-hidden shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
         {conversations.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-sm font-medium text-slate-600">No active conversations found</p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-sm font-medium text-[#64748B]">No active conversations found</p>
+            <p className="text-xs text-[#94A3B8] mt-1">
               Conversations initiated by candidates or staff will appear here.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-[#EDF1EF]">
             {conversations.map((conv) => {
               const lastMsg = conv.messages[0];
               const candidateUser = conv.candidate?.user;
@@ -72,13 +72,13 @@ export default async function EmployeeMessagesPage() {
                   key={conv.id}
                   href={`/employee/messages/${conv.id}`}
                   prefetch={false}
-                  className="p-5 flex items-center justify-between hover:bg-slate-50 transition block"
+                  className="p-5 flex items-center justify-between hover:bg-[#F7F9F8] transition block"
                 >
                   <div className="space-y-1 max-w-xl">
                     <div className="flex items-center gap-3">
-                      <span className="font-semibold text-slate-900">{candidateName}</span>
+                      <span className="font-semibold text-[#0F1720]">{candidateName}</span>
                       {candidateUser?.email && (
-                        <span className="text-xs text-slate-500 font-mono">
+                        <span className="text-xs text-[#64748B] font-mono">
                           ({candidateUser.email})
                         </span>
                       )}
@@ -88,10 +88,10 @@ export default async function EmployeeMessagesPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-medium text-slate-800">{conv.subject}</p>
+                    <p className="text-sm font-medium text-[#0F1720]">{conv.subject}</p>
                     {lastMsg && (
-                      <p className="text-xs text-slate-500 line-clamp-1">
-                        <span className="font-medium text-slate-700">
+                      <p className="text-xs text-[#64748B] line-clamp-1">
+                        <span className="font-medium text-[#334155]">
                           {lastMsg.senderRole === "CANDIDATE" ? "Candidate: " : "Staff: "}
                         </span>
                         {lastMsg.body}
@@ -99,7 +99,7 @@ export default async function EmployeeMessagesPage() {
                     )}
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-slate-400 block">
+                    <span className="text-xs text-[#94A3B8] block">
                       {new Date(conv.updatedAt).toLocaleDateString([], {
                         month: "short",
                         day: "numeric",
