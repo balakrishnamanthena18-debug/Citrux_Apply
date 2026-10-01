@@ -47,8 +47,11 @@ export default async function EmployeeMessageThreadPage({
   }
 
   const candidateFullName =
-    [conversation.candidate.user.firstName, conversation.candidate.user.lastName].filter(Boolean).join(" ") ||
-    conversation.candidate.user.email;
+    [conversation.candidate?.user?.firstName, conversation.candidate?.user?.lastName]
+      .filter(Boolean)
+      .join(" ") ||
+    conversation.candidate?.user?.email ||
+    "Unknown candidate";
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -64,10 +67,12 @@ export default async function EmployeeMessageThreadPage({
           <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
             <span>
               Candidate:{" "}
-              <strong className="text-slate-800">{candidateFullName}</strong> (
-              {conversation.candidate.user.email})
+              <strong className="text-slate-800">{candidateFullName}</strong>
+              {conversation.candidate?.user?.email
+                ? ` (${conversation.candidate.user.email})`
+                : ""}
             </span>
-            {conversation.application && (
+            {conversation.application?.job && (
               <>
                 <span>•</span>
                 <span>Job: {conversation.application.job.title}</span>
@@ -94,7 +99,9 @@ export default async function EmployeeMessageThreadPage({
                 >
                   <div className="flex items-center gap-2 mb-1 px-1">
                     <span className="text-xs font-semibold text-slate-700">
-                      {isStaff ? "Staff (" + msg.sender.email + ")" : candidateFullName}
+                      {isStaff
+                        ? "Staff (" + (msg.sender?.email || "unknown") + ")"
+                        : candidateFullName}
                     </span>
                     <span className="text-[10px] text-slate-400">
                       {new Date(msg.createdAt).toLocaleTimeString([], {

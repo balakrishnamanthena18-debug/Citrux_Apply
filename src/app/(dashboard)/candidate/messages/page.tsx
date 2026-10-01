@@ -105,6 +105,7 @@ export default async function CandidateMessagesPage() {
                 <Link
                   key={conv.id}
                   href={`/candidate/messages/${conv.id}`}
+                  prefetch={false}
                   className={`block p-4 rounded-lg border transition hover:shadow-sm ${
                     isUnread ? "bg-blue-50/40 border-blue-200" : "bg-white border-slate-200 hover:border-slate-300"
                   }`}

@@ -14,7 +14,8 @@ interface TransitionLinkProps extends LinkProps {
 
 /**
  * Navigation link with immediate pending visual feedback.
- * Preserves next/link prefetch while acknowledging the click before RSC completes.
+ * Prefetch is opt-in for dense lists — session-mode RLS poolers cannot absorb
+ * viewport-wide prefetch storms (EMAXCONNSESSION → React #441).
  */
 export function TransitionLink({
   href,
@@ -23,7 +24,7 @@ export function TransitionLink({
   activeClassName = "",
   isActive = false,
   onNavigate,
-  prefetch = true,
+  prefetch = false,
   ...props
 }: TransitionLinkProps) {
   const router = useRouter();
@@ -32,6 +33,7 @@ export function TransitionLink({
   const target = href.toString();
 
   const warm = () => {
+    if (prefetch === false) return;
     try {
       router.prefetch(target);
     } catch {
@@ -54,6 +56,12 @@ export function TransitionLink({
 
     e.preventDefault();
     onNavigate?.();
+    // Warm the destination only on intentional navigation intent
+    try {
+      router.prefetch(target);
+    } catch {
+      // best-effort
+    }
     startTransition(() => {
       router.push(target);
     });
@@ -66,7 +74,6 @@ export function TransitionLink({
       onClick={handleClick}
       onMouseEnter={warm}
       onFocus={warm}
-      onTouchStart={warm}
       aria-current={isActive ? "page" : undefined}
       aria-busy={isPending || undefined}
       data-pending={isPending ? "true" : undefined}

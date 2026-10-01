@@ -27,7 +27,9 @@ export default function DashboardError({
       </h2>
 
       <p className="text-xs text-slate-600 leading-relaxed">
-        {error.message || "An unexpected error occurred while processing your request."}
+        {error.message?.includes("EMAXCONNSESSION") || error.message?.includes("max clients")
+          ? "The workspace is temporarily busy. Please try again in a moment."
+          : error.message || "An unexpected error occurred while processing your request."}
       </p>
 
       {isAccessDenied && (

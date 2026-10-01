@@ -58,25 +58,33 @@ export default async function EmployeeMessagesPage() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {conversations.map((conv: any) => {
+            {conversations.map((conv) => {
               const lastMsg = conv.messages[0];
+              const candidateUser = conv.candidate?.user;
+              const candidateName =
+                [candidateUser?.firstName, candidateUser?.lastName].filter(Boolean).join(" ") ||
+                candidateUser?.email ||
+                "Unknown candidate";
+              const jobTitle = conv.application?.job?.title;
+
               return (
                 <Link
                   key={conv.id}
                   href={`/employee/messages/${conv.id}`}
+                  prefetch={false}
                   className="p-5 flex items-center justify-between hover:bg-slate-50 transition block"
                 >
                   <div className="space-y-1 max-w-xl">
                     <div className="flex items-center gap-3">
-                      <span className="font-semibold text-slate-900">
-                        {[conv.candidate.user.firstName, conv.candidate.user.lastName].filter(Boolean).join(" ") || conv.candidate.user.email}
-                      </span>
-                      <span className="text-xs text-slate-500 font-mono">
-                        ({conv.candidate.user.email})
-                      </span>
-                      {conv.application && (
+                      <span className="font-semibold text-slate-900">{candidateName}</span>
+                      {candidateUser?.email && (
+                        <span className="text-xs text-slate-500 font-mono">
+                          ({candidateUser.email})
+                        </span>
+                      )}
+                      {jobTitle && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          {conv.application.job.title}
+                          {jobTitle}
                         </span>
                       )}
                     </div>
