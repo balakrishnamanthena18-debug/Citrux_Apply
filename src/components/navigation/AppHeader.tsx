@@ -112,11 +112,11 @@ export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeader
 
         <div className="h-4 w-[1px] bg-[#E5EAE7]" />
 
-        {/* Role Badge */}
+        {/* Role Badge — hidden on large screens; sidebar already shows role identity */}
         <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+          className={`lg:hidden inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
             role === "ADMIN"
-              ? "bg-purple-50 text-purple-700 border border-purple-200/60"
+              ? "bg-[#0B3B2C]/8 text-[#0B3B2C] border border-[#0B3B2C]/15"
               : role === "EMPLOYEE"
               ? "bg-blue-50 text-blue-700 border border-blue-200/60"
               : "bg-emerald-50 text-[#12A150] border border-emerald-200/60"

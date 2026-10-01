@@ -33,7 +33,6 @@ export default async function AdminDashboardPage() {
       tx.organization.findUnique({
         where: { id: ctx.organizationId },
       }),
-      // Primary Metrics
       tx.candidate.count({
         where: { organizationId: ctx.organizationId, status: "ACTIVE" },
       }),
@@ -63,7 +62,6 @@ export default async function AdminDashboardPage() {
           status: MembershipStatus.ACTIVE,
         },
       }),
-      // Needs Attention
       tx.application.count({
         where: {
           organizationId: ctx.organizationId,
@@ -101,7 +99,6 @@ export default async function AdminDashboardPage() {
           status: TaskStatus.BLOCKED,
         },
       }),
-      // Application Operations Breakdown
       tx.application.count({
         where: { organizationId: ctx.organizationId },
       }),
@@ -124,7 +121,6 @@ export default async function AdminDashboardPage() {
           },
         },
       }),
-      // Funnel
       tx.candidate.count({
         where: { organizationId: ctx.organizationId },
       }),
@@ -139,7 +135,6 @@ export default async function AdminDashboardPage() {
           },
         },
       }),
-      // Staff for Workload
       tx.membership.findMany({
         where: {
           organizationId: ctx.organizationId,
@@ -153,7 +148,6 @@ export default async function AdminDashboardPage() {
         orderBy: { createdAt: "asc" },
         take: 200,
       }),
-      // Phase 10: Lean bounded workload inputs (was unbounded findMany of all assigned tasks/apps)
       tx.task.findMany({
         where: {
           organizationId: ctx.organizationId,
@@ -185,7 +179,6 @@ export default async function AdminDashboardPage() {
         take: 2000,
         orderBy: { updatedAt: "desc" },
       }),
-      // Recent Audit Activity
       tx.auditEvent.findMany({
         where: { organizationId: ctx.organizationId },
         include: { actor: true },
@@ -194,7 +187,6 @@ export default async function AdminDashboardPage() {
       }),
     ]);
 
-    // Calculate per-employee workload
     const staffWorkload = activeStaffMembers.map((staff) => {
       const activeTasks = allTasks.filter(
         (t) =>
@@ -215,14 +207,17 @@ export default async function AdminDashboardPage() {
 
       const totalActiveWork = activeTasks + activeApps;
 
-      const name = `${staff.user.firstName ?? ""} ${staff.user.lastName ?? ""}`.trim() || staff.user.email;
-      const initials = name
-        .split(" ")
-        .map((s) => s[0])
-        .filter(Boolean)
-        .slice(0, 2)
-        .join("")
-        .toUpperCase() || "E";
+      const name =
+        `${staff.user.firstName ?? ""} ${staff.user.lastName ?? ""}`.trim() ||
+        staff.user.email;
+      const initials =
+        name
+          .split(" ")
+          .map((s) => s[0])
+          .filter(Boolean)
+          .slice(0, 2)
+          .join("")
+          .toUpperCase() || "E";
 
       return {
         id: staff.id,
@@ -239,6 +234,44 @@ export default async function AdminDashboardPage() {
       };
     });
 
+    const attentionItems = [
+      {
+        label: "Awaiting Candidate",
+        count: awaitingCandidateCount,
+        href: "/admin/applications",
+        tone: awaitingCandidateCount > 0 ? ("amber" as const) : ("neutral" as const),
+        description: "Pending candidate approval or review",
+      },
+      {
+        label: "Escalations",
+        count: escalatedTasksCount,
+        href: "/admin/tasks/escalations",
+        tone: escalatedTasksCount > 0 ? ("rose" as const) : ("neutral" as const),
+        description: "Blocked work needing admin triage",
+      },
+      {
+        label: "Review / QA",
+        count: qaReviewTasksCount,
+        href: "/employee/tasks",
+        tone: qaReviewTasksCount > 0 ? ("blue" as const) : ("neutral" as const),
+        description: "Tasks awaiting verification sign-off",
+      },
+      {
+        label: "Submission Issues",
+        count: submissionIssuesCount,
+        href: "/admin/applications",
+        tone: submissionIssuesCount > 0 ? ("rose" as const) : ("neutral" as const),
+        description: "Portal or submission errors",
+      },
+      {
+        label: "Blocked Tasks",
+        count: blockedTasksCount,
+        href: "/employee/tasks",
+        tone: blockedTasksCount > 0 ? ("amber" as const) : ("neutral" as const),
+        description: "Work stalled on dependencies",
+      },
+    ].sort((a, b) => b.count - a.count);
+
     return {
       organizationName: org?.name || "CitrUX Operations",
       primaryMetrics: {
@@ -247,43 +280,7 @@ export default async function AdminDashboardPage() {
         submittedApplications: submittedApplicationsCount,
         activeEmployees: activeEmployeesCount,
       },
-      attentionItems: [
-        {
-          label: "Awaiting Candidate",
-          count: awaitingCandidateCount,
-          href: "/admin/applications",
-          badgeType: awaitingCandidateCount > 0 ? "amber" : "neutral",
-          description: "Applications pending candidate approval or review",
-        },
-        {
-          label: "Escalations",
-          count: escalatedTasksCount,
-          href: "/admin/tasks/escalations",
-          badgeType: escalatedTasksCount > 0 ? "red" : "neutral",
-          description: "Tasks blocked and escalated for administrative triage",
-        },
-        {
-          label: "Review / QA Required",
-          count: qaReviewTasksCount,
-          href: "/employee/tasks",
-          badgeType: qaReviewTasksCount > 0 ? "blue" : "neutral",
-          description: "Tasks awaiting double-verification QA sign-off",
-        },
-        {
-          label: "Submission Issues",
-          count: submissionIssuesCount,
-          href: "/admin/applications",
-          badgeType: submissionIssuesCount > 0 ? "red" : "neutral",
-          description: "Applications flagged with portal/submission errors",
-        },
-        {
-          label: "Blocked Tasks",
-          count: blockedTasksCount,
-          href: "/employee/tasks",
-          badgeType: blockedTasksCount > 0 ? "amber" : "neutral",
-          description: "Operational tasks currently blocked by dependencies",
-        },
-      ],
+      attentionItems,
       appSummary: {
         total: totalApplicationsCount,
         ready: readyApplicationsCount,
@@ -299,22 +296,21 @@ export default async function AdminDashboardPage() {
         prepared: preparedApplicationsCount,
         submitted: submittedApplicationsCount,
       },
-      staffWorkload,
+      staffWorkload: [...staffWorkload].sort((a, b) => b.totalActiveWork - a.totalActiveWork),
       recentActivity: recentAuditEvents.map((evt) => {
         let actionLabel = evt.action.replace(/_/g, " ").toLowerCase();
         actionLabel = actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1);
 
         const actorName = evt.actor
-          ? `${evt.actor.firstName ?? ""} ${evt.actor.lastName ?? ""}`.trim() || evt.actor.email
+          ? `${evt.actor.firstName ?? ""} ${evt.actor.lastName ?? ""}`.trim() ||
+            evt.actor.email
           : evt.actorType;
 
         return {
           id: evt.id,
-          action: evt.action,
           actionLabel,
           actor: actorName,
           entityType: evt.entityType,
-          entityId: evt.entityId,
           createdAt: evt.createdAt,
         };
       }),
@@ -323,398 +319,385 @@ export default async function AdminDashboardPage() {
 
   const currentDate = new Date().toLocaleDateString(undefined, {
     weekday: "long",
-    year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-  const totalAttentionItems = dashboardData.attentionItems.reduce(
-    (acc, curr) => acc + curr.count,
-    0
+  const totalAttention = dashboardData.attentionItems.reduce((acc, item) => acc + item.count, 0);
+  const primaryAttention = dashboardData.attentionItems.find((item) => item.count > 0);
+  const funnelMax = Math.max(
+    dashboardData.funnel.candidates,
+    dashboardData.funnel.jobs,
+    dashboardData.funnel.applications,
+    dashboardData.funnel.prepared,
+    dashboardData.funnel.submitted,
+    1
   );
 
+  const toneClasses = {
+    amber: "bg-amber-50 text-amber-900 border-amber-200/80",
+    rose: "bg-rose-50 text-rose-800 border-rose-200/80",
+    blue: "bg-sky-50 text-sky-800 border-sky-200/80",
+    neutral: "bg-[#F7F9F8] text-[#64748B] border-[#E5EAE7]",
+  } as const;
+
   return (
-    <div className="space-y-6">
-      {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5EAE7] pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#12A150] animate-pulse" />
-            <h1 className="text-xl font-bold text-[#0F1720] tracking-tight">
-              Admin Command Center
-            </h1>
-          </div>
-          <p className="mt-0.5 text-xs text-[#64748B] font-medium">
-            Executive operations, organizational throughput signals, team workload distribution, and audit telemetry.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-[#64748B] border border-[#E5EAE7] shadow-2xs">
-            {currentDate}
-          </span>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#0B3B2C] text-white shadow-2xs">
-            {dashboardData.organizationName}
-          </span>
-        </div>
-      </div>
-
-      {/* 2. Primary Metrics Strip */}
-      <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#E5EAE7]">
-          <div className="p-5">
-            <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-              Active Candidates
-            </div>
-            <div className="mt-2 text-2xl font-bold text-[#0F1720] tracking-tight">
-              {dashboardData.primaryMetrics.activeCandidates.toLocaleString()}
-            </div>
-          </div>
-          <div className="p-5">
-            <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-              Active Applications
-            </div>
-            <div className="mt-2 text-2xl font-bold text-[#0F1720] tracking-tight">
-              {dashboardData.primaryMetrics.activeApplications.toLocaleString()}
-            </div>
-          </div>
-          <div className="p-5">
-            <div className="text-[11px] font-semibold text-[#12A150] uppercase tracking-wider">
-              Submitted Applications
-            </div>
-            <div className="mt-2 text-2xl font-bold text-[#12A150] tracking-tight">
-              {dashboardData.primaryMetrics.submittedApplications.toLocaleString()}
-            </div>
-          </div>
-          <div className="p-5">
-            <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-              Active Employees
-            </div>
-            <div className="mt-2 text-2xl font-bold text-[#0F1720] tracking-tight">
-              {dashboardData.primaryMetrics.activeEmployees.toLocaleString()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Middle Row: Needs Attention + Application Operations */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Needs Attention Panel (5 Cols) */}
-        <div className="lg:col-span-5 bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
-                  Needs Attention
-                </span>
-                {totalAttentionItems > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                    {totalAttentionItems}
-                  </span>
-                )}
+    <div className="space-y-10 pb-8">
+      {/* Hero: one job — clear the queue */}
+      <section className="relative overflow-hidden rounded-[28px] border border-[#DDE5E0] bg-[linear-gradient(145deg,#0B3B2C_0%,#0F4A37_48%,#126B45_100%)] text-white shadow-[0_24px_60px_rgba(11,59,44,0.18)]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 12% 18%, rgba(198,244,50,0.45), transparent 42%), radial-gradient(circle at 88% 12%, rgba(255,255,255,0.18), transparent 36%)",
+          }}
+        />
+        <div className="relative px-6 py-7 sm:px-8 sm:py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                <span>{dashboardData.organizationName}</span>
+                <span className="text-white/25">·</span>
+                <span>{currentDate}</span>
               </div>
-              <span className="text-[11px] text-[#94A3B8] font-medium">Operational Action</span>
+              <h1 className="text-[2rem] sm:text-[2.35rem] font-semibold tracking-[-0.04em] leading-[1.05] text-balance">
+                {totalAttention === 0
+                  ? "Operations are clear."
+                  : `${totalAttention} item${totalAttention === 1 ? "" : "s"} need your attention.`}
+              </h1>
+              <p className="text-sm sm:text-[15px] leading-relaxed text-white/70 max-w-xl">
+                {totalAttention === 0
+                  ? "No escalations, blocked work, or candidate waits. Keep momentum on applications and staffing."
+                  : "Triage the queue first. Pipeline health and staffing stay below once the desk is clear."}
+              </p>
             </div>
 
-            <div className="divide-y divide-[#EDF1EF]">
-              {dashboardData.attentionItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="px-5 py-3.5 flex items-center justify-between hover:bg-[#12A150]/[0.035] transition-colors"
+            <div className="flex flex-wrap items-center gap-2.5">
+              {primaryAttention ? (
+                <Link
+                  href={primaryAttention.href}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#C6F432] px-5 py-2.5 text-sm font-semibold text-[#0B3B2C] shadow-[0_10px_30px_rgba(198,244,50,0.28)] transition hover:bg-[#d4f75a] active:scale-[0.98]"
                 >
-                  <div className="min-w-0 pr-2">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-5 px-2 py-0.5 rounded-full text-xs font-bold ${
-                          item.count > 0 && item.badgeType === "red"
-                            ? "bg-rose-50 text-rose-700 border border-rose-200"
-                            : item.count > 0 && item.badgeType === "amber"
-                            ? "bg-amber-50 text-amber-800 border border-amber-200"
-                            : item.count > 0 && item.badgeType === "blue"
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : "bg-[#F7F9F8] text-[#64748B] border border-[#E5EAE7]"
-                        }`}
-                      >
-                        {item.count}
-                      </span>
-                      <span className="text-xs font-semibold text-[#0F1720] truncate">
-                        {item.label}
-                      </span>
+                  Resolve {primaryAttention.label}
+                  <span aria-hidden>→</span>
+                </Link>
+              ) : (
+                <Link
+                  href="/admin/applications"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#C6F432] px-5 py-2.5 text-sm font-semibold text-[#0B3B2C] shadow-[0_10px_30px_rgba(198,244,50,0.28)] transition hover:bg-[#d4f75a] active:scale-[0.98]"
+                >
+                  Open applications
+                  <span aria-hidden>→</span>
+                </Link>
+              )}
+              <Link
+                href="/admin/tasks/escalations"
+                className="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/90 backdrop-blur-sm transition hover:bg-white/10"
+              >
+                Escalations
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {dashboardData.attentionItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`group rounded-[18px] border px-4 py-3.5 transition ${
+                  item.count > 0
+                    ? "border-white/15 bg-white/[0.08] hover:bg-white/[0.14]"
+                    : "border-white/8 bg-black/10 hover:bg-black/15"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/45">
+                      {item.label}
                     </div>
-                    <div className="text-[11px] text-[#64748B] truncate mt-0.5 pl-7">
-                      {item.description}
+                    <div className="mt-2 text-[1.65rem] font-semibold tracking-[-0.04em] tabular-nums leading-none">
+                      {item.count}
                     </div>
                   </div>
-
-                  <Link
-                    href={item.href}
-                    className="inline-flex items-center text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline flex-shrink-0"
+                  <span
+                    className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-1.5 text-[10px] font-bold tabular-nums ${
+                      item.count > 0 ? toneClasses[item.tone] : "border-white/10 bg-white/5 text-white/50"
+                    }`}
                   >
-                    View →
-                  </Link>
+                    {item.count > 0 ? "!" : "·"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-snug text-white/45 group-hover:text-white/65">
+                  {item.description}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Slim KPI strip — one composition, no card soup */}
+      <section className="grid grid-cols-2 gap-px overflow-hidden rounded-[22px] border border-[#E5EAE7] bg-[#E5EAE7] sm:grid-cols-4 shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
+        {[
+          {
+            label: "Active candidates",
+            value: dashboardData.primaryMetrics.activeCandidates,
+            href: "/employee/candidates",
+          },
+          {
+            label: "Active applications",
+            value: dashboardData.primaryMetrics.activeApplications,
+            href: "/admin/applications",
+          },
+          {
+            label: "Submitted",
+            value: dashboardData.primaryMetrics.submittedApplications,
+            href: "/admin/applications",
+            accent: true,
+          },
+          {
+            label: "Active staff",
+            value: dashboardData.primaryMetrics.activeEmployees,
+            href: "/admin/members",
+          },
+        ].map((metric) => (
+          <Link
+            key={metric.label}
+            href={metric.href}
+            className="bg-white px-5 py-5 transition hover:bg-[#F7F9F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#12A150]"
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">
+              {metric.label}
+            </div>
+            <div
+              className={`mt-3 text-[1.85rem] font-semibold tracking-[-0.04em] tabular-nums ${
+                metric.accent ? "text-[#12A150]" : "text-[#0F1720]"
+              }`}
+            >
+              {metric.value.toLocaleString()}
+            </div>
+          </Link>
+        ))}
+      </section>
+
+      {/* Secondary: pipeline + funnel */}
+      <section className="space-y-4">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#0F1720]">
+              Application pipeline
+            </h2>
+            <p className="mt-1 text-sm text-[#64748B]">
+              State distribution and throughput after triage.
+            </p>
+          </div>
+          <Link
+            href="/admin/applications"
+            className="hidden sm:inline-flex text-sm font-semibold text-[#12A150] hover:text-[#0B3B2C]"
+          >
+            View all →
+          </Link>
+        </div>
+
+        <div className="rounded-[24px] border border-[#E5EAE7] bg-white p-5 sm:p-6 shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            {[
+              { label: "Total", value: dashboardData.appSummary.total },
+              { label: "In progress", value: dashboardData.appSummary.inProgress },
+              { label: "Ready", value: dashboardData.appSummary.ready, accent: "emerald" },
+              { label: "Submitted", value: dashboardData.appSummary.submitted, accent: "sky" },
+              { label: "Awaiting", value: dashboardData.appSummary.awaitingCandidate, accent: "amber" },
+              { label: "Issues", value: dashboardData.appSummary.submissionIssues, accent: "rose" },
+            ].map((cell) => (
+              <div
+                key={cell.label}
+                className="rounded-[16px] border border-[#EDF1EF] bg-[#FCFDFC] px-3.5 py-3.5"
+              >
+                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#94A3B8]">
+                  {cell.label}
+                </div>
+                <div
+                  className={`mt-2 text-xl font-semibold tabular-nums tracking-[-0.03em] ${
+                    cell.accent === "emerald"
+                      ? "text-[#12A150]"
+                      : cell.accent === "sky"
+                      ? "text-sky-700"
+                      : cell.accent === "amber"
+                      ? "text-amber-700"
+                      : cell.accent === "rose"
+                      ? "text-rose-700"
+                      : "text-[#0F1720]"
+                  }`}
+                >
+                  {cell.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 border-t border-[#EDF1EF] pt-5">
+            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">
+              Throughput
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: "Candidates", value: dashboardData.funnel.candidates },
+                { label: "Open jobs", value: dashboardData.funnel.jobs },
+                { label: "Applications", value: dashboardData.funnel.applications },
+                { label: "Prepared", value: dashboardData.funnel.prepared },
+                { label: "Submitted", value: dashboardData.funnel.submitted, strong: true },
+              ].map((step) => (
+                <div key={step.label} className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3">
+                  <div className="text-xs font-medium text-[#64748B]">{step.label}</div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#EDF1EF]">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        step.strong ? "bg-[#12A150]" : "bg-[#0B3B2C]/70"
+                      }`}
+                      style={{ width: `${Math.max(6, (step.value / funnelMax) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="text-right text-xs font-semibold tabular-nums text-[#0F1720]">
+                    {step.value}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="p-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8] text-center">
-            <span className="text-[11px] text-[#64748B] font-medium">
-              {totalAttentionItems === 0
-                ? "No operational attention items. All systems progressing normally."
-                : `${totalAttentionItems} action items requiring administrative or desk review.`}
-            </span>
-          </div>
         </div>
+      </section>
 
-        {/* Application Operations Summary (7 Cols) */}
-        <div className="lg:col-span-7 bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between">
-              <span className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
-                Application Operations
-              </span>
-              <span className="text-[11px] text-[#94A3B8] font-medium">Authoritative State Machine</span>
+      {/* Tertiary: people + audit */}
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <div className="xl:col-span-7 rounded-[24px] border border-[#E5EAE7] bg-white shadow-[0_10px_40px_rgba(15,23,32,0.03)] overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-[#EDF1EF] px-5 py-4">
+            <div>
+              <h2 className="text-sm font-semibold tracking-[-0.02em] text-[#0F1720]">
+                Team workload
+              </h2>
+              <p className="mt-0.5 text-xs text-[#94A3B8]">
+                {dashboardData.staffWorkload.length} active staff · sorted by open work
+              </p>
             </div>
-
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-[14px] bg-[#F7F9F8] border border-[#E5EAE7]">
-                  <div className="text-[11px] font-semibold text-[#64748B]">Total Pipeline</div>
-                  <div className="text-xl font-bold text-[#0F1720] mt-1">
-                    {dashboardData.appSummary.total}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-[14px] bg-[#F7F9F8] border border-[#E5EAE7]">
-                  <div className="text-[11px] font-semibold text-[#64748B]">In Progress</div>
-                  <div className="text-xl font-bold text-[#0F1720] mt-1">
-                    {dashboardData.appSummary.inProgress}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-[14px] bg-[#12A150]/[0.05] border border-[#12A150]/20">
-                  <div className="text-[11px] font-semibold text-[#12A150]">Ready to Apply</div>
-                  <div className="text-xl font-bold text-[#12A150] mt-1">
-                    {dashboardData.appSummary.ready}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-[14px] bg-blue-50/50 border border-blue-200/60">
-                  <div className="text-[11px] font-semibold text-blue-700">Submitted</div>
-                  <div className="text-xl font-bold text-blue-700 mt-1">
-                    {dashboardData.appSummary.submitted}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-[14px] bg-amber-50/50 border border-amber-200/60">
-                  <div className="text-[11px] font-semibold text-amber-700">Awaiting Candidate</div>
-                  <div className="text-xl font-bold text-amber-700 mt-1">
-                    {dashboardData.appSummary.awaitingCandidate}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-[14px] bg-rose-50/50 border border-rose-200/60">
-                  <div className="text-[11px] font-semibold text-rose-700">Submission Issues</div>
-                  <div className="text-xl font-bold text-rose-700 mt-1">
-                    {dashboardData.appSummary.submissionIssues}
-                  </div>
-                </div>
-              </div>
-
-              {/* Restrained Funnel */}
-              <div className="pt-2">
-                <div className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-2">
-                  Operational Throughput Funnel
-                </div>
-                <div className="grid grid-cols-5 gap-2 text-center text-xs">
-                  <div className="p-2.5 rounded-[12px] bg-[#F7F9F8] border border-[#E5EAE7]">
-                    <div className="text-[10px] text-[#64748B] font-medium truncate">Candidates</div>
-                    <div className="font-bold text-[#0F1720] mt-0.5">{dashboardData.funnel.candidates}</div>
-                  </div>
-                  <div className="p-2.5 rounded-[12px] bg-[#F7F9F8] border border-[#E5EAE7]">
-                    <div className="text-[10px] text-[#64748B] font-medium truncate">Open Jobs</div>
-                    <div className="font-bold text-[#0F1720] mt-0.5">{dashboardData.funnel.jobs}</div>
-                  </div>
-                  <div className="p-2.5 rounded-[12px] bg-[#F7F9F8] border border-[#E5EAE7]">
-                    <div className="text-[10px] text-[#64748B] font-medium truncate">Applications</div>
-                    <div className="font-bold text-[#0F1720] mt-0.5">{dashboardData.funnel.applications}</div>
-                  </div>
-                  <div className="p-2.5 rounded-[12px] bg-[#F7F9F8] border border-[#E5EAE7]">
-                    <div className="text-[10px] text-[#64748B] font-medium truncate">Prepared</div>
-                    <div className="font-bold text-[#0F1720] mt-0.5">{dashboardData.funnel.prepared}</div>
-                  </div>
-                  <div className="p-2.5 rounded-[12px] bg-[#12A150]/[0.08] border border-[#12A150]/30">
-                    <div className="text-[10px] text-[#12A150] font-semibold truncate">Submitted</div>
-                    <div className="font-bold text-[#0B3B2C] mt-0.5">{dashboardData.funnel.submitted}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8] flex justify-end">
-            <Link
-              href="/admin/applications"
-              className="inline-flex items-center px-3.5 py-1.5 rounded-[10px] text-xs font-semibold text-[#0F1720] bg-white border border-[#E5EAE7] hover:bg-[#F7F9F8] hover:border-[#12A150]/30 shadow-2xs transition-colors"
-            >
-              View Application Operations →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Bottom Row: Team Workload + Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Team Workload Table (7 Cols) */}
-        <div className="lg:col-span-7 bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between">
-              <span className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
-                Team Workload ({dashboardData.staffWorkload.length})
-              </span>
-              <span className="text-[11px] text-[#94A3B8] font-medium">Active Assignments</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[#EDF1EF] text-xs">
-                <thead className="bg-[#F7F9F8] text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-                  <tr>
-                    <th scope="col" className="px-5 py-3 text-left">Employee</th>
-                    <th scope="col" className="px-5 py-3 text-left">Role & Title</th>
-                    <th scope="col" className="px-5 py-3 text-center">Active Work</th>
-                    <th scope="col" className="px-5 py-3 text-right">Completed Tasks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#EDF1EF]">
-                  {dashboardData.staffWorkload.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-8 text-center text-[#94A3B8] italic">
-                        Workload data will appear as operational assignments are recorded.
-                      </td>
-                    </tr>
-                  ) : (
-                    dashboardData.staffWorkload.map((member) => (
-                      <tr key={member.id} className="hover:bg-[#12A150]/[0.035] transition-colors">
-                        <td className="px-5 py-3.5 whitespace-nowrap">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-7 h-7 rounded-full bg-[#0B3B2C] text-white font-bold text-[10px] flex items-center justify-center flex-shrink-0 shadow-2xs">
-                              {member.initials}
-                            </div>
-                            <div className="min-w-0">
-                              <Link
-                                href={`/admin/members/${member.id}`}
-                                className="font-semibold text-[#0F1720] hover:text-[#12A150] transition-colors truncate block"
-                              >
-                                {member.name}
-                              </Link>
-                              <div className="text-[10px] text-[#64748B] font-mono truncate">
-                                {member.email}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-3.5 whitespace-nowrap">
-                          <div className="text-[#0F1720] font-medium">{member.designation}</div>
-                          <span
-                            className={`inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                              member.role === "ADMIN"
-                                ? "bg-purple-50 text-purple-700 border border-purple-200/60"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                            }`}
-                          >
-                            {member.role}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-3.5 whitespace-nowrap text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              member.totalActiveWork > 0
-                                ? "bg-[#12A150]/[0.08] text-[#0B3B2C] border border-[#12A150]/20"
-                                : "bg-[#F7F9F8] text-[#64748B] border border-[#E5EAE7]"
-                            }`}
-                          >
-                            {member.totalActiveWork} items
-                          </span>
-                          <div className="text-[10px] text-[#94A3B8] mt-0.5">
-                            {member.activeTasks} tasks • {member.activeApps} apps
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono font-semibold text-[#0F1720]">
-                          {member.completedTasks}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="px-5 py-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8] flex justify-end">
             <Link
               href="/admin/members"
-              className="inline-flex items-center px-3.5 py-1.5 rounded-[10px] text-xs font-semibold text-[#0F1720] bg-white border border-[#E5EAE7] hover:bg-[#F7F9F8] hover:border-[#12A150]/30 shadow-2xs transition-colors"
+              className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C]"
             >
-              Manage Staff Roster →
+              Roster →
             </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead className="bg-[#FCFDFC] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8]">
+                <tr>
+                  <th className="px-5 py-3 text-left font-semibold">People</th>
+                  <th className="px-5 py-3 text-left font-semibold">Role</th>
+                  <th className="px-5 py-3 text-center font-semibold">Open</th>
+                  <th className="px-5 py-3 text-right font-semibold">Done</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F1F5F3]">
+                {dashboardData.staffWorkload.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-10 text-center text-[#94A3B8]">
+                      Assignments will appear once staff take work.
+                    </td>
+                  </tr>
+                ) : (
+                  dashboardData.staffWorkload.map((member) => (
+                    <tr key={member.id} className="hover:bg-[#F7F9F8]/80 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0B3B2C] text-[10px] font-bold text-white">
+                            {member.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <Link
+                              href={`/admin/members/${member.id}`}
+                              className="block truncate font-semibold text-[#0F1720] hover:text-[#12A150]"
+                            >
+                              {member.name}
+                            </Link>
+                            <div className="truncate font-mono text-[10px] text-[#94A3B8]">
+                              {member.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="font-medium text-[#0F1720]">{member.designation}</div>
+                        <div className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-[#94A3B8]">
+                          {member.role}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <div className="font-semibold tabular-nums text-[#0F1720]">
+                          {member.totalActiveWork}
+                        </div>
+                        <div className="text-[10px] text-[#94A3B8]">
+                          {member.activeTasks}t · {member.activeApps}a
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-mono font-semibold tabular-nums text-[#0F1720]">
+                        {member.completedTasks}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Recent Operational Activity Feed (5 Cols) */}
-        <div className="lg:col-span-5 bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between">
-              <span className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
-                Recent Activity
-              </span>
-              <span className="text-[11px] text-[#94A3B8] font-medium">Immutable Telemetry</span>
+        <div className="xl:col-span-5 rounded-[24px] border border-[#E5EAE7] bg-white shadow-[0_10px_40px_rgba(15,23,32,0.03)] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between gap-3 border-b border-[#EDF1EF] px-5 py-4">
+            <div>
+              <h2 className="text-sm font-semibold tracking-[-0.02em] text-[#0F1720]">
+                Recent activity
+              </h2>
+              <p className="mt-0.5 text-xs text-[#94A3B8]">Latest audit events</p>
             </div>
-
-            <div className="divide-y divide-[#EDF1EF]">
-              {dashboardData.recentActivity.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[#94A3B8] italic">
-                  No recent operational activity.
-                </div>
-              ) : (
-                dashboardData.recentActivity.map((evt) => (
-                  <div key={evt.id} className="p-3.5 text-xs hover:bg-[#12A150]/[0.035] transition-colors">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[#0F1720] truncate">
-                        {evt.actionLabel}
-                      </span>
-                      <span className="text-[10px] text-[#94A3B8] font-mono flex-shrink-0 ml-2">
-                        {new Date(evt.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-1 text-[11px] text-[#64748B]">
-                      <span className="truncate">Actor: {evt.actor}</span>
-                      {evt.entityType && (
-                        <span className="font-mono text-[10px] bg-[#F7F9F8] px-2 py-0.5 rounded-full border border-[#E5EAE7] text-[#64748B] flex-shrink-0 ml-2">
-                          {evt.entityType}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="px-5 py-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8] flex justify-end">
             <Link
               href="/admin/audit"
-              className="inline-flex items-center px-3.5 py-1.5 rounded-[10px] text-xs font-semibold text-[#0F1720] bg-white border border-[#E5EAE7] hover:bg-[#F7F9F8] hover:border-[#12A150]/30 shadow-2xs transition-colors"
+              className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C]"
             >
-              View Complete Audit Trail →
+              Audit →
             </Link>
           </div>
+
+          <div className="flex-1 divide-y divide-[#F1F5F3]">
+            {dashboardData.recentActivity.length === 0 ? (
+              <div className="px-5 py-10 text-center text-xs text-[#94A3B8]">
+                No recent operational activity.
+              </div>
+            ) : (
+              dashboardData.recentActivity.map((evt) => (
+                <div key={evt.id} className="px-5 py-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-[#0F1720]">
+                        {evt.actionLabel}
+                      </div>
+                      <div className="mt-1 truncate text-[11px] text-[#64748B]">
+                        {evt.actor}
+                        {evt.entityType ? ` · ${evt.entityType}` : ""}
+                      </div>
+                    </div>
+                    <time className="shrink-0 font-mono text-[10px] tabular-nums text-[#94A3B8]">
+                      {new Date(evt.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
