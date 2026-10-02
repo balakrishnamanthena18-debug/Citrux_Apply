@@ -89,7 +89,7 @@ function resolveSection(pathname: string): { breadcrumb: string; section: string
   return { breadcrumb, section, mobileTitle };
 }
 
-export function AppHeader({ email, fullName, onOpenMobileMenu }: AppHeaderProps) {
+export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeaderProps) {
   const pathname = usePathname();
   const { breadcrumb, section, mobileTitle } = resolveSection(pathname);
 
@@ -144,7 +144,7 @@ export function AppHeader({ email, fullName, onOpenMobileMenu }: AppHeaderProps)
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-        <NotificationsBell />
+        <NotificationsBell role={role} />
 
         <div className="hidden h-4 w-px bg-[#E5EAE7] sm:block" />
 

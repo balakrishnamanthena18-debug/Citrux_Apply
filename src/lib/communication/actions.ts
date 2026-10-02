@@ -31,6 +31,7 @@ import {
   AuthorizationError,
 } from "@/lib/errors";
 import { emailNotificationService } from "@/lib/email";
+import { buildMessageNotificationContent } from "@/lib/notifications/presentation";
 import {
   buildNewConversationEmailHtml,
   buildNewConversationEmailSubject,
@@ -156,14 +157,21 @@ export async function createConversationAction(
         : candidate.userId;
 
       let notificationId: string | null = null;
+      let notificationContent: { title: string; body: string } | null = null;
       if (recipientId) {
+        notificationContent = buildMessageNotificationContent({
+          subject: parsed.data.subject,
+          body: parsed.data.initialMessage,
+          recipientIsCandidate: !isCandidateSender,
+          isNewConversation: true,
+        });
         const notif = await tx.notification.create({
           data: {
             organizationId: ctx.organizationId,
             recipientId,
             type: NotificationType.NEW_MESSAGE,
-            title: `New conversation: ${parsed.data.subject}`,
-            body: parsed.data.initialMessage.slice(0, 150),
+            title: notificationContent.title,
+            body: notificationContent.body,
             relatedEntityType: "Conversation",
             relatedEntityId: conv.id,
           },
@@ -171,7 +179,7 @@ export async function createConversationAction(
         notificationId = notif.id;
       }
 
-      return { conv, candidate, recipientId, notificationId };
+      return { conv, candidate, recipientId, notificationId, notificationContent };
     });
 
     // 5. Audit Logging
@@ -202,8 +210,8 @@ export async function createConversationAction(
           eventType: "NOTIFICATION_CREATED",
           data: {
             id: conversation.notificationId,
-            title: `New conversation: ${parsed.data.subject}`,
-            body: parsed.data.initialMessage.slice(0, 150),
+            title: conversation.notificationContent?.title ?? "New message from your team",
+            body: conversation.notificationContent?.body ?? "",
             readAt: null,
           },
         }
@@ -308,14 +316,21 @@ export async function sendMessageAction(
         : conv.candidate.userId;
 
       let notificationId: string | null = null;
+      let notificationContent: { title: string; body: string } | null = null;
       if (recipientId) {
+        notificationContent = buildMessageNotificationContent({
+          subject: conv.subject,
+          body: parsed.data.body,
+          recipientIsCandidate: !isCandidateSender,
+          isNewConversation: false,
+        });
         const notif = await tx.notification.create({
           data: {
             organizationId: ctx.organizationId,
             recipientId,
             type: NotificationType.NEW_MESSAGE,
-            title: `New reply in "${conv.subject}"`,
-            body: parsed.data.body.slice(0, 150),
+            title: notificationContent.title,
+            body: notificationContent.body,
             relatedEntityType: "Conversation",
             relatedEntityId: conv.id,
           },
@@ -323,7 +338,7 @@ export async function sendMessageAction(
         notificationId = notif.id;
       }
 
-      return { message, conv, recipientId, notificationId };
+      return { message, conv, recipientId, notificationId, notificationContent };
     });
 
     // 4. Audit Logging
@@ -354,8 +369,8 @@ export async function sendMessageAction(
           eventType: "NOTIFICATION_CREATED",
           data: {
             id: result.notificationId,
-            title: `New reply in "${result.conv.subject}"`,
-            body: parsed.data.body.slice(0, 150),
+            title: result.notificationContent?.title ?? "New message from your team",
+            body: result.notificationContent?.body ?? "",
             readAt: null,
           },
         }
