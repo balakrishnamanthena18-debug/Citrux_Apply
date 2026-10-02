@@ -32,7 +32,7 @@ function fallbackUrl(): string {
 }
 
 export const SUPABASE_AUTH_EMAIL_SUBJECTS = {
-  recovery: "Reset your OOS password",
+  recovery: "Your OOS password reset code",
   confirmation: "Confirm your OOS email address",
   magic_link: "Your OOS verification code",
   invite: "You're invited to OOS",
@@ -49,15 +49,16 @@ export const SUPABASE_AUTH_EMAIL_SUBJECTS = {
 
 export function buildRecoveryEmailHtml(): string {
   return buildSupabaseAuthEmailHtml({
-    title: "Reset your OOS password",
+    title: "Your OOS password reset code",
     eyebrow: "Security",
     headline: "Reset your password",
     bodyHtml: [
       p("We received a request to reset the password for your Operations OS account."),
-      authPrimaryButton("Reset your password →", CONFIRMATION_URL),
-      fallbackUrl(),
+      p("Enter this verification code on the OOS password reset page to continue."),
+      authOtpBlock(TOKEN),
+      p("This code is temporary and can only be used once."),
       authSecurityNotice(
-        "This secure link expires shortly and can be used only once. If you did not request a password reset, you can safely ignore this email."
+        "If you did not request this, you can safely ignore this email. Do not share this code with anyone."
       ),
     ].join(""),
   });
@@ -303,7 +304,7 @@ export function buildSupabaseAuthMailerConfigPayload(): Record<string, string | 
 }
 
 export const REQUIRED_TEMPLATE_VARIABLES = {
-  recovery: ["{{ .ConfirmationURL }}"],
+  recovery: ["{{ .Token }}"],
   confirmation: ["{{ .ConfirmationURL }}"],
   magic_link: ["{{ .ConfirmationURL }}", "{{ .Token }}"],
   invite: ["{{ .ConfirmationURL }}"],

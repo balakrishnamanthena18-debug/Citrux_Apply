@@ -35,6 +35,10 @@ function isDryRun(): boolean {
   return process.argv.includes("--dry-run");
 }
 
+function isTemplatesOnly(): boolean {
+  return process.argv.includes("--templates-only");
+}
+
 function buildSmtpPayload() {
   const host = requireEnv("SMTP_HOST");
   const portRaw = process.env.SMTP_PORT?.trim() || "587";
@@ -65,41 +69,9 @@ function buildSmtpPayload() {
   };
 }
 
-function printPlan(opts: {
-  projectRef: string;
-  dryRun: boolean;
-  smtpHost: string;
-  smtpPort: string;
-  smtpUser: string;
-  smtpAdminEmail: string;
-  smtpSenderName: string;
-  smtpPassPresent: boolean;
-  templateFieldCount: number;
-}) {
-  console.log("TARGET PROJECT:");
-  console.log(`Mumbai / ${opts.projectRef}`);
-  console.log("");
-  console.log("SOURCE/OLD PROJECT:");
-  console.log(`Seoul / ${SEOUL_PROJECT_REF} (refused — not modified)`);
-  console.log("");
-  console.log("ACTION:");
-  console.log("Configure Supabase Auth Custom SMTP");
-  console.log("");
-  console.log("NO MUTATION PERFORMED:");
-  console.log(opts.dryRun ? "true" : "false");
-  console.log("");
-  console.log("PLAN DETAILS:");
-  console.log(`  smtp_host: ${opts.smtpHost}`);
-  console.log(`  smtp_port: ${opts.smtpPort}`);
-  console.log(`  smtp_user: ${opts.smtpUser}`);
-  console.log(`  smtp_admin_email: ${opts.smtpAdminEmail}`);
-  console.log(`  smtp_sender_name: ${opts.smtpSenderName}`);
-  console.log(`  smtp_pass: ${opts.smtpPassPresent ? "[REDACTED]" : "[MISSING]"}`);
-  console.log(`  mailer_template_fields: ${opts.templateFieldCount}`);
-}
-
 async function main() {
   const dryRun = isDryRun();
+  const templatesOnly = isTemplatesOnly();
   const token = process.env.SUPABASE_ACCESS_TOKEN?.trim();
   const projectRef = (process.env.SUPABASE_PROJECT_REF || MUMBAI_PROJECT_REF).trim();
 
@@ -112,21 +84,43 @@ async function main() {
     );
   }
 
-  const smtp = buildSmtpPayload();
   const mailer = buildSupabaseAuthMailerConfigPayload();
-  const payload = { ...smtp, ...mailer };
+  const smtp = templatesOnly ? null : buildSmtpPayload();
+  const payload = templatesOnly ? { ...mailer } : { ...smtp!, ...mailer };
 
-  printPlan({
-    projectRef,
-    dryRun,
-    smtpHost: smtp.smtp_host,
-    smtpPort: smtp.smtp_port,
-    smtpUser: smtp.smtp_user,
-    smtpAdminEmail: smtp.smtp_admin_email,
-    smtpSenderName: smtp.smtp_sender_name,
-    smtpPassPresent: Boolean(smtp.smtp_pass),
-    templateFieldCount: Object.keys(mailer).length,
-  });
+  console.log("TARGET PROJECT:");
+  console.log(`Mumbai / ${projectRef}`);
+  console.log("");
+  console.log("SOURCE/OLD PROJECT:");
+  console.log(`Seoul / ${SEOUL_PROJECT_REF} (refused — not modified)`);
+  console.log("");
+  console.log("ACTION:");
+  console.log(
+    templatesOnly
+      ? "Update Supabase Auth email templates only (OTP recovery)"
+      : "Configure Supabase Auth Custom SMTP + templates"
+  );
+  console.log("");
+  console.log("NO MUTATION PERFORMED:");
+  console.log(dryRun ? "true" : "false");
+  console.log("");
+  if (smtp) {
+    console.log("PLAN DETAILS:");
+    console.log(`  smtp_host: ${smtp.smtp_host}`);
+    console.log(`  smtp_port: ${smtp.smtp_port}`);
+    console.log(`  smtp_user: ${smtp.smtp_user}`);
+    console.log(`  smtp_admin_email: ${smtp.smtp_admin_email}`);
+    console.log(`  smtp_sender_name: ${smtp.smtp_sender_name}`);
+    console.log(`  smtp_pass: ${smtp.smtp_pass ? "[REDACTED]" : "[MISSING]"}`);
+  }
+  console.log(`  mailer_template_fields: ${Object.keys(mailer).length}`);
+  console.log(`  recovery_subject: ${mailer.mailer_subjects_recovery}`);
+  console.log(
+    `  recovery_has_token: ${String(mailer.mailer_templates_recovery_content).includes("{{ .Token }}")}`
+  );
+  console.log(
+    `  recovery_has_confirmation_url: ${String(mailer.mailer_templates_recovery_content).includes("{{ .ConfirmationURL }}")}`
+  );
 
   if (dryRun) {
     console.log("");
@@ -152,7 +146,6 @@ async function main() {
 
   if (!response.ok) {
     const body = await response.text();
-    // Never echo token; body may still contain config — trim length.
     const safeBody = body.slice(0, 800).replace(/"smtp_pass"\s*:\s*"[^"]*"/g, '"smtp_pass":"[REDACTED]"');
     throw new Error(`Management API PATCH failed (${response.status}): ${safeBody}`);
   }
@@ -160,11 +153,13 @@ async function main() {
   const result = (await response.json()) as Record<string, unknown>;
   console.log("");
   console.log("APPLY RESULT: SUCCESS");
-  console.log(`  smtp_host: ${result.smtp_host ?? smtp.smtp_host}`);
-  console.log(`  smtp_port: ${result.smtp_port ?? smtp.smtp_port}`);
-  console.log(`  smtp_admin_email: ${result.smtp_admin_email ?? smtp.smtp_admin_email}`);
-  console.log(`  smtp_sender_name: ${result.smtp_sender_name ?? smtp.smtp_sender_name}`);
-  console.log(`  external_email_enabled: ${result.external_email_enabled ?? true}`);
+  if (!templatesOnly) {
+    console.log(`  smtp_host: ${result.smtp_host ?? smtp?.smtp_host}`);
+    console.log(`  smtp_port: ${result.smtp_port ?? smtp?.smtp_port}`);
+    console.log(`  smtp_admin_email: ${result.smtp_admin_email ?? smtp?.smtp_admin_email}`);
+    console.log(`  smtp_sender_name: ${result.smtp_sender_name ?? smtp?.smtp_sender_name}`);
+  }
+  console.log(`  recovery_subject: ${result.mailer_subjects_recovery ?? mailer.mailer_subjects_recovery}`);
 }
 
 main().catch((err: Error) => {

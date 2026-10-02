@@ -20,6 +20,7 @@ import { prisma } from "@/lib/db/prisma";
 export type RateLimitAction =
   | "LOGIN"
   | "PASSWORD_RESET"
+  | "RECOVERY_OTP"
   | "REGISTER"
   | "ACTIVATION"
   | "API_REQUEST"
@@ -57,6 +58,11 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     maxAttempts: 3,
     windowMs: 15 * 60 * 1000, // 15 minutes
     blockDurationMs: 15 * 60 * 1000, // 15 minutes cooldown
+  },
+  RECOVERY_OTP: {
+    maxAttempts: 5,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    blockDurationMs: 15 * 60 * 1000, // 15 minutes lockout
   },
   REGISTER: {
     maxAttempts: 10,
@@ -117,6 +123,11 @@ export function deriveRateLimitKeyHash(
     case "PASSWORD_RESET": {
       const normalizedEmail = (params.email ?? "").toLowerCase().trim();
       domainMaterial = `password-reset:${normalizedEmail}:${safeIpHash}`;
+      break;
+    }
+    case "RECOVERY_OTP": {
+      const normalizedEmail = (params.email ?? "").toLowerCase().trim();
+      domainMaterial = `recovery-otp:${normalizedEmail}:${safeIpHash}`;
       break;
     }
     case "REGISTER": {

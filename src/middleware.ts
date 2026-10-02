@@ -62,8 +62,16 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/register") ||
     path.startsWith("/forgot-password") ||
+    path.startsWith("/verify-reset-otp") ||
     path.startsWith("/reset-password") ||
+    path.startsWith("/activate") ||
+    path.startsWith("/auth/activate") ||
     path.startsWith("/api/auth");
+
+  // Recovery OTP → password update requires an authenticated recovery session on these routes.
+  // Do not bounce those users to /candidate while completing password reset.
+  const isPasswordRecoveryPath =
+    path.startsWith("/verify-reset-otp") || path.startsWith("/reset-password");
 
   // Protected application paths
   const isProtectedPath =
@@ -79,7 +87,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (hasSession && isAuthPath && !path.startsWith("/api/auth")) {
+  if (hasSession && isAuthPath && !path.startsWith("/api/auth") && !isPasswordRecoveryPath) {
     return NextResponse.redirect(new URL("/candidate", request.url));
   }
 

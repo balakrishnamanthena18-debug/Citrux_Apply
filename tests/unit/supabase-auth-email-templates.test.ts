@@ -12,14 +12,14 @@ import {
 } from "@/lib/email/supabase-auth/templates";
 
 describe("Supabase Auth OOS email templates", () => {
-  it("uses OOS-branded recovery subject and preserves ConfirmationURL", () => {
-    expect(SUPABASE_AUTH_EMAIL_SUBJECTS.recovery).toBe("Reset your OOS password");
+  it("uses OOS-branded recovery subject and preserves recovery Token", () => {
+    expect(SUPABASE_AUTH_EMAIL_SUBJECTS.recovery).toBe("Your OOS password reset code");
     const html = buildRecoveryEmailHtml();
     expect(html).toContain("Operations OS");
-    expect(html).toContain("{{ .ConfirmationURL }}");
-    expect(html).toContain('href="{{ .ConfirmationURL }}"');
-    expect(html).toContain("Reset your password");
+    expect(html).toContain("{{ .Token }}");
+    expect(html).toContain("verification code");
     expect(html).toContain("safely ignore");
+    expect(html).not.toContain("{{ .ConfirmationURL }}");
     expect(html).not.toContain("noreply@mail.app.supabase.io");
   });
 
@@ -52,8 +52,9 @@ describe("Supabase Auth OOS email templates", () => {
 
   it("Management API payload includes SMTP-independent mailer fields only for templates", () => {
     const payload = buildSupabaseAuthMailerConfigPayload();
-    expect(payload.mailer_subjects_recovery).toBe("Reset your OOS password");
-    expect(String(payload.mailer_templates_recovery_content)).toContain("{{ .ConfirmationURL }}");
+    expect(payload.mailer_subjects_recovery).toBe("Your OOS password reset code");
+    expect(String(payload.mailer_templates_recovery_content)).toContain("{{ .Token }}");
+    expect(String(payload.mailer_templates_recovery_content)).not.toContain("{{ .ConfirmationURL }}");
     expect(payload.mailer_notifications_password_changed_enabled).toBe(true);
     expect(JSON.stringify(payload)).not.toMatch(/SMTP_PASS|smtp_pass|service_role/i);
   });

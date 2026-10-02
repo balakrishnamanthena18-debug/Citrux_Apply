@@ -17,7 +17,6 @@ import {
   UpdateMemberRoleSchema,
   DeactivateMemberSchema,
   ForgotPasswordSchema,
-  ResetPasswordSchema,
   ActivateStaffAccountSchema,
 } from "@/lib/validation/auth.schemas";
 import {
@@ -556,8 +555,9 @@ export async function deactivateMemberAction(input: unknown): Promise<ActionResu
 }
 
 /**
- * Sends a password reset email via Supabase Auth.
+ * Sends a password reset recovery email via Supabase Auth.
  * Protected against account enumeration and email flooding rate limits.
+ * Recovery email is OTP-first ({{ .Token }}); link prefetch is not required.
  */
 export async function requestPasswordResetAction(formData: FormData): Promise<ActionResult> {
   const rawEmail = formData.get("email");
@@ -580,59 +580,24 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
       entityType: "User",
       details: { reason: "Password reset rate limit exceeded", email: normalizedEmail, ip: clientIp },
     });
-    return { success: false, error: "Too many password reset requests. Please try again later." };
+    return { success: false, error: "Too many attempts. Please wait before requesting another code." };
   }
 
   await recordFailedAttempt("PASSWORD_RESET", rateLimitParams);
 
   try {
+    console.info("[AUTH_ACTION] requestPasswordResetAction");
     const supabase = await createServerClient();
-    await supabase.auth.resetPasswordForEmail(normalizedEmail);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    // redirectTo is retained for Auth URL allow-list compliance; OTP flow does not require clicking it.
+    await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${appUrl}/reset-password`,
+    });
   } catch {
     // Non-leaking catch
   }
 
   // Always return success to prevent account enumeration
-  return { success: true };
-}
-
-/**
- * Resets user password for an authenticated session.
- */
-export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
-  const rawData = {
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
-  };
-
-  const parsed = ResetPasswordSchema.safeParse(rawData);
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
-  }
-
-  const supabase = await createServerClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { success: false, error: "Authentication required to reset password. Please use the reset link from your email." };
-  }
-
-  const { error } = await supabase.auth.updateUser({
-    password: parsed.data.password,
-  });
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  await logUserAuditEvent({
-    userId: user.id,
-    action: AuditAction.USER_LOGIN,
-    entityType: "User",
-    entityId: user.id,
-    details: { event: "PASSWORD_UPDATED" },
-  });
-
   return { success: true };
 }
 
