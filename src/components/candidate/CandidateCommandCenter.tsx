@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { CandidateActionCenter, CandidateActionItem } from "./CandidateActionCenter";
-import { CandidatePipeline, PipelineStageKey } from "./CandidatePipeline";
+import { CandidatePipeline, PipelineStageKey, getPipelineListSubtitle, getPipelineListTitle } from "./CandidatePipeline";
 import { CandidateApplicationList } from "./CandidateApplicationList";
 import { CandidateApplicationData } from "./CandidateApplicationCard";
 import { CandidateProfileHealth } from "./CandidateProfileHealth";
@@ -152,26 +152,23 @@ export function CandidateCommandCenter({
       <CandidateActionCenter actions={actions} userName={candidateName} />
 
       {/* Operational Application Pipeline Track */}
-      <CandidatePipeline
-        activeStage={activeStage}
-        onSelectStage={setActiveStage}
-        counts={pipelineCounts}
-      />
+      <div className="space-y-3">
+        <CandidatePipeline
+          activeStage={activeStage}
+          onSelectStage={setActiveStage}
+          counts={pipelineCounts}
+        />
 
-      {/* Filtered Continuous Application List */}
-      <CandidateApplicationList
-        applications={applications}
-        selectedStage={activeStage}
-        onSelectStage={setActiveStage}
-        title={
-          activeStage === "ALL"
-            ? "Active & Recent Applications"
-            : `Pipeline: ${activeStage.replace(/_/g, " ")}`
-        }
-        subtitle="Continuous operational list with transparent stage statuses and direct candidate actions"
-        showViewAllLink={true}
-      />
-
+        {/* Filtered Continuous Application List — visually continuous with pipeline */}
+        <CandidateApplicationList
+          applications={applications}
+          selectedStage={activeStage}
+          onSelectStage={setActiveStage}
+          title={getPipelineListTitle(activeStage)}
+          subtitle={getPipelineListSubtitle(activeStage)}
+          showViewAllLink={true}
+        />
+      </div>
       {/* Operational Context Grid (2 columns on desktop) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: Specialist & Document Vault */}

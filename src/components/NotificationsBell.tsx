@@ -358,6 +358,15 @@ function IncomingToast({
   onOpen: (id: string, href: string) => void;
   onDismiss: () => void;
 }) {
+  const label = [
+    item.presentation.headline,
+    item.presentation.context,
+    item.presentation.preview,
+    item.presentation.actionLabel,
+  ]
+    .filter(Boolean)
+    .join(". ");
+
   return (
     <div
       className="pointer-events-auto mx-auto w-full max-w-[430px] motion-safe:transition motion-safe:duration-200 motion-safe:ease-out"
@@ -366,44 +375,52 @@ function IncomingToast({
     >
       <div className="relative overflow-hidden rounded-2xl border border-[#DDE5E1] bg-white shadow-[0_10px_28px_rgba(15,32,26,0.14)]">
         <div className="absolute left-0 top-0 h-full w-1 bg-[#12A150]" aria-hidden />
-        <div className="flex items-start gap-3 p-3.5 pl-4">
-          <div
+        {/* Entire card is the hit target: tap anywhere → open + dismiss */}
+        <button
+          type="button"
+          className="flex w-full items-start gap-3 p-3.5 pl-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#12A150]"
+          onClick={() => onOpen(item.id, item.presentation.href)}
+          aria-label={label}
+        >
+          <span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B3B2C] text-[#C6F432]"
             aria-hidden
           >
             <NotificationTypeIcon kind={item.presentation.icon} />
-          </div>
-          <button
-            type="button"
-            className="min-w-0 flex-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150] rounded-lg"
-            onClick={() => onOpen(item.id, item.presentation.href)}
-          >
-            <p className="text-[13px] font-semibold text-[#10201A]">{item.presentation.headline}</p>
+          </span>
+          <span className="min-w-0 flex-1 pr-8">
+            <span className="block text-[13px] font-semibold text-[#10201A]">
+              {item.presentation.headline}
+            </span>
             {item.presentation.context && (
-              <p className="mt-0.5 truncate text-xs font-medium text-[#0B3B2C]">
+              <span className="mt-0.5 block truncate text-xs font-medium text-[#0B3B2C]">
                 {item.presentation.context}
-              </p>
+              </span>
             )}
             {item.presentation.preview && (
-              <p className="mt-1 line-clamp-2 text-xs text-[#66756E]">
+              <span className="mt-1 block line-clamp-2 text-xs text-[#66756E]">
                 “{item.presentation.preview.replace(/^["“]|["”]$/g, "")}”
-              </p>
+              </span>
             )}
-            <p className="mt-2 text-[11px] font-semibold text-[#12A150]">
+            <span className="mt-2 block text-[11px] font-semibold text-[#12A150]">
               {item.presentation.actionLabel} →
-            </p>
-          </button>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#66756E] hover:bg-[#F7F9F8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150]"
-            aria-label="Dismiss notification"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+            </span>
+          </span>
+        </button>
+        {/* Explicit dismiss — tap × removes toast without navigating */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDismiss();
+          }}
+          className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#66756E] hover:bg-[#F7F9F8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150]"
+          aria-label="Dismiss notification"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -661,9 +678,17 @@ export function NotificationsBell({ role }: { role: Role }) {
     }
   };
 
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToast(null);
+  }, []);
+
   const handleOpen = async (id: string, href: string) => {
     setIsOpen(false);
-    setToast(null);
+    dismissToast();
     void handleMarkRead(id);
     router.push(href);
   };
@@ -685,7 +710,7 @@ export function NotificationsBell({ role }: { role: Role }) {
         type="button"
         onClick={() => {
           setIsOpen(!isOpen);
-          setToast(null);
+          dismissToast();
           if (!isOpen) void loadNotifications();
         }}
         className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-[#66756E] transition hover:bg-[#F7F9F8] hover:text-[#10201A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150] sm:h-9 sm:w-9 sm:rounded-full"
@@ -719,7 +744,7 @@ export function NotificationsBell({ role }: { role: Role }) {
           <IncomingToast
             item={toast}
             onOpen={handleOpen}
-            onDismiss={() => setToast(null)}
+            onDismiss={dismissToast}
           />
         </div>
       )}

@@ -71,26 +71,27 @@ export function CandidateApplicationList({
   }, [applications, selectedStage, searchTerm]);
 
   const totalPages = Math.ceil(filteredApps.length / pageSize) || 1;
+  const currentPage = Math.min(page, totalPages);
   const paginatedApps = useMemo(() => {
-    const start = (page - 1) * pageSize;
+    const start = (currentPage - 1) * pageSize;
     return filteredApps.slice(start, start + pageSize);
-  }, [filteredApps, page, pageSize]);
+  }, [filteredApps, currentPage, pageSize]);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+    <div className="overflow-hidden rounded-[18px] border border-[#DDE5E1] bg-white shadow-[0_2px_12px_rgba(15,32,26,0.04)]">
       {/* Header & Search Bar */}
-      <div className="p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 border-b border-[#EDF1EF] bg-[#F7F9F8] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700">
+            <h2 className="text-sm font-semibold text-[#10201A]">{title}</h2>
+            <span className="text-xs font-bold tabular-nums text-[#0B3B2C]">
               {filteredApps.length}
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-[#66756E]">{subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex w-full items-center gap-3 sm:w-auto">
           <div className="w-full sm:w-64">
             <InstantSearch
               value={searchTerm}
@@ -104,7 +105,7 @@ export function CandidateApplicationList({
           {showViewAllLink && (
             <Link
               href="/candidate/applications"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 shrink-0 hidden md:inline-block"
+              className="hidden shrink-0 text-xs font-semibold text-[#12A150] hover:text-[#0E8541] md:inline-block"
             >
               View All Applications →
             </Link>
@@ -114,12 +115,11 @@ export function CandidateApplicationList({
 
       {/* Applications List */}
       {filteredApps.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 space-y-2">
-          <div className="text-3xl">📂</div>
-          <h3 className="text-sm font-semibold text-slate-900">
+        <div className="space-y-2 p-12 text-center text-[#66756E]">
+          <h3 className="text-sm font-semibold text-[#10201A]">
             No applications in this view
           </h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+          <p className="mx-auto max-w-sm text-xs text-[#66756E]">
             {searchTerm
               ? `No application matches "${searchTerm}". Try resetting your search.`
               : "Applications matched to your profile will appear here in real-time as your team stages them."}
@@ -128,14 +128,14 @@ export function CandidateApplicationList({
             <button
               type="button"
               onClick={() => onSelectStage("ALL")}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 pt-2 cursor-pointer inline-block"
+              className="inline-block cursor-pointer pt-2 text-xs font-semibold text-[#12A150] hover:text-[#0E8541]"
             >
               View all pipeline stages
             </button>
           )}
         </div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-[#EDF1EF]">
           {paginatedApps.map((app) => (
             <CandidateApplicationCard key={app.id} application={app} />
           ))}
@@ -145,7 +145,7 @@ export function CandidateApplicationList({
       {/* Pagination */}
       {filteredApps.length > pageSize && (
         <TablePagination
-          currentPage={page}
+          currentPage={currentPage}
           totalPages={totalPages}
           totalItems={filteredApps.length}
           pageSize={pageSize}
