@@ -155,7 +155,7 @@ describe("Employee Onboarding & Identity Integration Tests (tests/integration/em
       expect.objectContaining({
         recipientEmail: "new.staff@citrux.com",
         templateId: "STAFF_WELCOME_ACTIVATION",
-        subject: expect.stringContaining("Welcome to CitrUX"),
+        subject: expect.stringContaining("Welcome to Operations OS"),
       })
     );
 

@@ -14,6 +14,11 @@ import {
 } from "@/generated/prisma";
 import { emailNotificationService } from "@/lib/email";
 import {
+  buildApplicationSubmittedEmailHtml,
+  buildApplicationSubmittedEmailSubject,
+  buildApplicationSubmittedEmailText,
+} from "@/lib/email/templates/applicationSubmitted";
+import {
   GenerateSubmissionEvidenceUploadUrlSchema,
   RecordApplicationSubmissionSchema,
   RecordSubmissionIssueSchema,
@@ -263,6 +268,8 @@ export async function recordApplicationSubmissionAction(
       candidateUser: candidateUser ? { email: candidateUser.email, firstName: candidateUser.firstName } : null,
       jobTitle: application.job?.title || "Job Application",
       companyName: application.job?.companyName || "Company",
+      jobLocation: application.job?.location || null,
+      jobIsRemote: application.job?.isRemote ?? false,
     };
   });
 
@@ -271,13 +278,27 @@ export async function recordApplicationSubmissionAction(
 
   if (result.candidateUser?.email) {
     try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const applicationUrl = `${appUrl}/candidate/applications/${result.application.id}`;
+      const emailParams = {
+        firstName: result.candidateUser.firstName,
+        jobTitle: result.jobTitle,
+        companyName: result.companyName,
+        location: result.jobLocation,
+        isRemote: result.jobIsRemote,
+        confirmationReference: result.submission.externalReference,
+        applicationUrl,
+        submittedAt: result.submission.submittedAt,
+      };
+
       await emailNotificationService
         .sendTransactionalNotification({
           organizationId: ctx.organizationId,
           recipientEmail: result.candidateUser.email,
           templateId: "APPLICATION_SUBMITTED",
-          subject: `Application Submitted: ${result.jobTitle} at ${result.companyName}`,
-          textBody: `Hello ${result.candidateUser.firstName || "Candidate"},\n\nAn operational team member has submitted your application for ${result.jobTitle} at ${result.companyName} on your behalf.\n\nConfirmation Reference: ${result.submission.externalReference || "Recorded"}\n\nYou can view the submission details and confirmation evidence in your OOS portal.\n\nBest regards,\nOperations Team`,
+          subject: buildApplicationSubmittedEmailSubject(result.jobTitle, result.companyName),
+          textBody: buildApplicationSubmittedEmailText(emailParams),
+          htmlBody: buildApplicationSubmittedEmailHtml(emailParams),
         })
         .catch((err) => {
           logger.warn(`[EmailNotification] Post-commit submission email notification failed`, {

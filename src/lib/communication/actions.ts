@@ -31,6 +31,14 @@ import {
   AuthorizationError,
 } from "@/lib/errors";
 import { emailNotificationService } from "@/lib/email";
+import {
+  buildNewConversationEmailHtml,
+  buildNewConversationEmailSubject,
+  buildNewConversationEmailText,
+  buildNewMessageEmailHtml,
+  buildNewMessageEmailSubject,
+  buildNewMessageEmailText,
+} from "@/lib/email/templates/messaging";
 import { publishRealtimeEvent } from "@/lib/realtime/publish";
 import type { SubscriptionScope } from "@/lib/realtime/types";
 
@@ -201,22 +209,40 @@ export async function createConversationAction(
         }
       );
     }
-    // 6. Safe transactional email dispatch
-    const isCandidateSender = ctx.role === Role.CANDIDATE;
-    const recipientEmail = isCandidateSender
-      ? conversation.candidate.assignedEmployee?.email
-      : conversation.candidate.user.email;
+    // 6. Safe transactional email dispatch (presentation templates only; never fail the action)
+    try {
+      const isCandidateSender = ctx.role === Role.CANDIDATE;
+      const recipientEmail = isCandidateSender
+        ? conversation.candidate.assignedEmployee?.email
+        : conversation.candidate.user.email;
 
-    if (recipientEmail) {
-      emailNotificationService
-        .sendTransactionalNotification({
-          organizationId: ctx.organizationId,
-          recipientEmail,
-          templateId: "new_conversation",
-          subject: `[OOS Message] ${parsed.data.subject}`,
-          textBody: `You have received a new message regarding "${parsed.data.subject}":\n\n${parsed.data.initialMessage}`,
-        })
-        .catch(() => {});
+      if (recipientEmail) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const conversationUrl = isCandidateSender
+          ? `${appUrl}/employee/messages/${conversation.conv.id}`
+          : `${appUrl}/candidate/messages/${conversation.conv.id}`;
+        const recipientIsCandidate = !isCandidateSender;
+        const messageParams = {
+          subject: parsed.data.subject,
+          messageBody: parsed.data.initialMessage,
+          senderName: ctx.fullName,
+          conversationUrl,
+          recipientIsCandidate,
+        };
+
+        emailNotificationService
+          .sendTransactionalNotification({
+            organizationId: ctx.organizationId,
+            recipientEmail,
+            templateId: "new_conversation",
+            subject: buildNewConversationEmailSubject(parsed.data.subject),
+            textBody: buildNewConversationEmailText(messageParams),
+            htmlBody: buildNewConversationEmailHtml(messageParams),
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // Email presentation/dispatch must never fail conversation creation
     }
 
     revalidateCommunicationViews(conversation.conv.id);
@@ -336,22 +362,40 @@ export async function sendMessageAction(
       );
     }
 
-    // 5. Safe transactional email dispatch
-    const isCandidateSender = ctx.role === Role.CANDIDATE;
-    const recipientEmail = isCandidateSender
-      ? result.conv.candidate.assignedEmployee?.email
-      : result.conv.candidate.user.email;
+    // 5. Safe transactional email dispatch (presentation templates only; never fail the action)
+    try {
+      const isCandidateSender = ctx.role === Role.CANDIDATE;
+      const recipientEmail = isCandidateSender
+        ? result.conv.candidate.assignedEmployee?.email
+        : result.conv.candidate.user.email;
 
-    if (recipientEmail) {
-      emailNotificationService
-        .sendTransactionalNotification({
-          organizationId: ctx.organizationId,
-          recipientEmail,
-          templateId: "new_message",
-          subject: `[OOS Reply] ${result.conv.subject}`,
-          textBody: `You have received a new reply in "${result.conv.subject}":\n\n${parsed.data.body}`,
-        })
-        .catch(() => {});
+      if (recipientEmail) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const conversationUrl = isCandidateSender
+          ? `${appUrl}/employee/messages/${result.conv.id}`
+          : `${appUrl}/candidate/messages/${result.conv.id}`;
+        const recipientIsCandidate = !isCandidateSender;
+        const messageParams = {
+          subject: result.conv.subject || "Conversation",
+          messageBody: parsed.data.body,
+          senderName: ctx.fullName,
+          conversationUrl,
+          recipientIsCandidate,
+        };
+
+        emailNotificationService
+          .sendTransactionalNotification({
+            organizationId: ctx.organizationId,
+            recipientEmail,
+            templateId: "new_message",
+            subject: buildNewMessageEmailSubject(result.conv.subject || "Conversation"),
+            textBody: buildNewMessageEmailText(messageParams),
+            htmlBody: buildNewMessageEmailHtml(messageParams),
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // Email presentation/dispatch must never fail message send
     }
 
     revalidateCommunicationViews(result.conv.id);

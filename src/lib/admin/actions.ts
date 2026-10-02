@@ -6,6 +6,12 @@ import { getAuthenticatedContext, requireAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
 import { emailNotificationService } from "@/lib/email";
+import {
+  buildStaffActivationEmailHtml,
+  buildStaffActivationEmailText,
+  buildStaffWelcomeEmailSubject,
+  buildStaffResentEmailSubject,
+} from "@/lib/email/templates/staffWelcomeActivation";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   AuditAction,
@@ -545,34 +551,28 @@ export async function createEmployeeAction(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const activationUrl = `${appUrl}/auth/activate?token=${rawToken}`;
 
-    // Resolve designation name & manager name for email
     try {
       await emailNotificationService.sendTransactionalNotification({
         organizationId: ctx.organizationId,
         recipientEmail: parsed.data.email,
         templateId: "STAFF_WELCOME_ACTIVATION",
-        subject: `Welcome to CitrUX Operations — Activate Your Employee Account`,
-        textBody: `Hello ${parsed.data.firstName},\n\nWelcome to CitrUX Operations. Your employee account has been created.\n\nEmployee ID: ${createdEmployeeId}\nRole: ${parsed.data.role}\nDepartment: ${parsed.data.department || "Operations"}\n\nPlease activate your account and establish your password:\n${activationUrl}\n\nThis single-use link expires in 48 hours.\n\nCitrUX Operations System`,
-        htmlBody: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 8px;">
-            <h2 style="color: #0f172a; margin-top: 0;">Welcome to CitrUX Operations</h2>
-            <p>Hello <strong>${parsed.data.firstName}</strong>,</p>
-            <p>Your employee account has been created in the Operations Operating System.</p>
-            <div style="background-color: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0;">
-              <p style="margin: 4px 0;"><strong>Employee ID:</strong> ${createdEmployeeId}</p>
-              <p style="margin: 4px 0;"><strong>Role:</strong> ${parsed.data.role}</p>
-              <p style="margin: 4px 0;"><strong>Department:</strong> ${parsed.data.department || "Operations"}</p>
-            </div>
-            <p style="margin: 24px 0;">
-              <a href="${activationUrl}" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                Activate Your Employee Account
-              </a>
-            </p>
-            <p style="color: #64748b; font-size: 12px; margin-top: 24px;">
-              This activation link is single-use and expires in 48 hours. If you did not expect this invitation, please contact your administrator.
-            </p>
-          </div>
-        `,
+        subject: buildStaffWelcomeEmailSubject(),
+        textBody: buildStaffActivationEmailText({
+          firstName: parsed.data.firstName,
+          employeeId: createdEmployeeId,
+          role: parsed.data.role,
+          department: parsed.data.department || "Operations",
+          activationUrl,
+          variant: "welcome",
+        }),
+        htmlBody: buildStaffActivationEmailHtml({
+          firstName: parsed.data.firstName,
+          employeeId: createdEmployeeId,
+          role: parsed.data.role,
+          department: parsed.data.department || "Operations",
+          activationUrl,
+          variant: "welcome",
+        }),
       });
     } catch {
       // Email failure is non-fatal; logged in email_delivery_logs
@@ -669,23 +669,23 @@ export async function resendStaffActivationAction(
         organizationId: ctx.organizationId,
         recipientEmail: target.user.email,
         templateId: "STAFF_WELCOME_ACTIVATION",
-        subject: `Activate Your CitrUX Employee Account (Resent)`,
-        textBody: `Hello ${target.user.firstName},\n\nYour activation invitation has been resent.\n\nActivate your account:\n${activationUrl}\n\nThis single-use link expires in 48 hours.`,
-        htmlBody: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 8px;">
-            <h2 style="color: #0f172a; margin-top: 0;">Activate Your Employee Account</h2>
-            <p>Hello <strong>${target.user.firstName}</strong>,</p>
-            <p>Your activation invitation has been resent by your administrator.</p>
-            <p style="margin: 24px 0;">
-              <a href="${activationUrl}" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                Activate Account
-              </a>
-            </p>
-            <p style="color: #64748b; font-size: 12px; margin-top: 24px;">
-              This link is single-use and expires in 48 hours.
-            </p>
-          </div>
-        `,
+        subject: buildStaffResentEmailSubject(),
+        textBody: buildStaffActivationEmailText({
+          firstName: target.user.firstName || "there",
+          employeeId: target.employeeId,
+          role: target.role,
+          department: target.department || "Operations",
+          activationUrl,
+          variant: "resent",
+        }),
+        htmlBody: buildStaffActivationEmailHtml({
+          firstName: target.user.firstName || "there",
+          employeeId: target.employeeId,
+          role: target.role,
+          department: target.department || "Operations",
+          activationUrl,
+          variant: "resent",
+        }),
       });
     } catch {
       // Non-fatal
