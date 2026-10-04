@@ -64,7 +64,7 @@ function revalidateApplicationViews(applicationId?: string) {
     revalidatePath("/employee");
     revalidatePath("/candidate/applications");
     revalidatePath("/candidate");
-    revalidatePath("/admin/applications");
+    revalidatePath("/employee/applications");
     revalidatePath("/admin");
     if (applicationId) {
       revalidatePath(`/employee/applications/${applicationId}`);
@@ -1198,58 +1198,22 @@ export async function startApplicationFromDeskAction(
         throw new ValidationError("Cannot create applications for an archived candidate");
       }
 
-      // 2. Resolve or create canonical Job
-      let job: { id: string; status: JobStatus } | null = null;
-      let isExistingJob = false;
-
-      // Check by externalUrl if provided
-      if (parsed.data.externalUrl) {
-        job = await tx.job.findFirst({
-          where: {
-            organizationId: ctx.organizationId,
-            externalUrl: parsed.data.externalUrl,
-            status: JobStatus.OPEN,
-          },
-          select: { id: true, status: true },
-        });
-        if (job) isExistingJob = true;
-      }
-
-      // Fallback: check by exact companyName and title match in organization
+      // 2. Verify Job exists in org catalog and is OPEN (authoritative Job reference)
+      const job = await tx.job.findUnique({
+        where: { id: parsed.data.jobId, organizationId: ctx.organizationId },
+        select: {
+          id: true,
+          status: true,
+          title: true,
+          companyName: true,
+          source: true,
+        },
+      });
       if (!job) {
-        job = await tx.job.findFirst({
-          where: {
-            organizationId: ctx.organizationId,
-            companyName: { equals: parsed.data.companyName, mode: "insensitive" },
-            title: { equals: parsed.data.title, mode: "insensitive" },
-            status: JobStatus.OPEN,
-          },
-          select: { id: true, status: true },
-        });
-        if (job) isExistingJob = true;
+        throw new NotFoundError("Job not found or unauthorized");
       }
-
-      // If still not found, create new Job
-      if (!job) {
-        job = await tx.job.create({
-          data: {
-            organizationId: ctx.organizationId,
-            createdById: ctx.userId,
-            title: parsed.data.title,
-            companyName: parsed.data.companyName,
-            location: parsed.data.location || "Remote",
-            isRemote: parsed.data.isRemote ?? false,
-            employmentType: parsed.data.employmentType || "FULL_TIME",
-            source: parsed.data.source || "MANUAL",
-            externalUrl: parsed.data.externalUrl || null,
-            jobDescription: parsed.data.jobDescription || "Not provided",
-            salaryMin: parsed.data.salaryMin ?? null,
-            salaryMax: parsed.data.salaryMax ?? null,
-            salaryCurrency: parsed.data.salaryCurrency || "USD",
-            status: JobStatus.OPEN,
-          },
-          select: { id: true, status: true },
-        });
+      if (job.status !== JobStatus.OPEN) {
+        throw new ValidationError(`Cannot create applications for ${job.status} jobs`);
       }
 
       // 3. Prevent duplicate active applications for same candidate + job
@@ -1306,7 +1270,10 @@ export async function startApplicationFromDeskAction(
       return {
         applicationId: application.id,
         jobId: job.id,
-        isExistingJob,
+        isExistingJob: true,
+        jobTitle: job.title,
+        companyName: job.companyName,
+        source: job.source,
       };
     });
 
@@ -1318,20 +1285,24 @@ export async function startApplicationFromDeskAction(
       entityType: "Application",
       entityId: result.applicationId,
       details: {
+        viaApplicationDesk: true,
         candidateId: parsed.data.candidateId,
         jobId: result.jobId,
-        isExistingJob: result.isExistingJob,
-        viaApplicationDesk: true,
+        isExistingJob: true,
       },
     });
 
     revalidateApplicationViews(result.applicationId);
     return {
       success: true,
-      data: result,
+      data: {
+        applicationId: result.applicationId,
+        jobId: result.jobId,
+        isExistingJob: true,
+      },
     };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to initialize application from desk" };
+    return { success: false, error: err.message || "Failed to initialize application" };
   }
 }
 
@@ -1370,58 +1341,84 @@ export async function getCandidateLogSummaryAction(
     const data = await withRlsContext(ctx.userId, async (tx) => {
       const candidate = await tx.candidate.findUnique({
         where: { id: candidateId, organizationId: ctx.organizationId },
-        include: { user: true },
+        select: {
+          id: true,
+          status: true,
+          applicationAuthorizationMode: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+        },
       });
       if (!candidate) throw new NotFoundError("Candidate not found");
 
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const dayOfWeek = now.getDay();
-      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      const startOfWeek = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+      );
 
-      const todayCount = await tx.application.count({
-        where: {
-          candidateId: candidate.id,
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-          createdAt: { gte: startOfToday },
-        },
-      });
-      const weekCount = await tx.application.count({
-        where: {
-          candidateId: candidate.id,
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-          createdAt: { gte: startOfWeek },
-        },
-      });
-      const totalSubmittedCount = await tx.application.count({
-        where: {
-          candidateId: candidate.id,
-          organizationId: ctx.organizationId,
-          status: ApplicationStatus.SUBMITTED,
-        },
-      });
-      const recentApps = await tx.application.findMany({
-        where: {
-          candidateId: candidate.id,
-          organizationId: ctx.organizationId,
-        },
-        include: {
-          job: true,
-          submissions: {
-            orderBy: { attemptNumber: "desc" },
-            take: 1,
+      const candidateScope = {
+        candidateId: candidate.id,
+        organizationId: ctx.organizationId,
+      } as const;
+
+      const [todayCount, weekCount, totalSubmittedCount, recentApps] = await Promise.all([
+        tx.application.count({
+          where: {
+            ...candidateScope,
+            status: ApplicationStatus.SUBMITTED,
+            createdAt: { gte: startOfToday },
           },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-      });
+        }),
+        tx.application.count({
+          where: {
+            ...candidateScope,
+            status: ApplicationStatus.SUBMITTED,
+            createdAt: { gte: startOfWeek },
+          },
+        }),
+        tx.application.count({
+          where: {
+            ...candidateScope,
+            status: ApplicationStatus.SUBMITTED,
+          },
+        }),
+        tx.application.findMany({
+          where: candidateScope,
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            job: {
+              select: {
+                title: true,
+                companyName: true,
+                source: true,
+                location: true,
+                isRemote: true,
+                salaryMin: true,
+                salaryMax: true,
+              },
+            },
+            submissions: {
+              orderBy: { attemptNumber: "desc" },
+              take: 1,
+              select: { submittedAt: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+      ]);
 
       return {
         candidate: {
           id: candidate.id,
-          fullName: `${candidate.user.firstName || ""} ${candidate.user.lastName || ""}`.trim() || candidate.user.email,
+          fullName:
+            `${candidate.user.firstName || ""} ${candidate.user.lastName || ""}`.trim() ||
+            candidate.user.email,
           email: candidate.user.email,
           status: candidate.status,
           applicationAuthorizationMode: candidate.applicationAuthorizationMode,
@@ -1441,7 +1438,8 @@ export async function getCandidateLogSummaryAction(
           salaryMin: app.job.salaryMin,
           salaryMax: app.job.salaryMax,
           status: app.status,
-          appliedAt: app.submissions[0]?.submittedAt?.toISOString() || app.createdAt.toISOString(),
+          appliedAt:
+            app.submissions[0]?.submittedAt?.toISOString() || app.createdAt.toISOString(),
         })),
       };
     });
@@ -1449,6 +1447,203 @@ export async function getCandidateLogSummaryAction(
     return { success: true, data };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to fetch candidate summary" };
+  }
+}
+
+const DESK_SEARCH_LIMIT = 40;
+
+/** Server-side candidate search for Application Desk selectors (bounded). */
+export async function searchDeskCandidatesAction(
+  query: string
+): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      fullName: string;
+      email: string;
+      status: string;
+      applicationAuthorizationMode: string;
+    }>
+  >
+> {
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireEmployeeOrAdmin(ctx);
+    const q = query.trim();
+
+    const rows = await withRlsContext(ctx.userId, async (tx) => {
+      return tx.candidate.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: { not: "ARCHIVED" },
+          ...(q
+            ? {
+                OR: [
+                  { user: { email: { contains: q, mode: "insensitive" } } },
+                  { user: { firstName: { contains: q, mode: "insensitive" } } },
+                  { user: { lastName: { contains: q, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          status: true,
+          applicationAuthorizationMode: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+        },
+        orderBy: [{ user: { firstName: "asc" } }, { user: { lastName: "asc" } }],
+        take: DESK_SEARCH_LIMIT,
+      });
+    });
+
+    return {
+      success: true,
+      data: rows.map((c) => ({
+        id: c.id,
+        fullName:
+          `${c.user.firstName || ""} ${c.user.lastName || ""}`.trim() || c.user.email,
+        email: c.user.email,
+        status: c.status,
+        applicationAuthorizationMode: c.applicationAuthorizationMode,
+      })),
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to search candidates" };
+  }
+}
+
+/** Server-side OPEN job search for Application Desk (no jobDescription in list). */
+export async function searchDeskJobsAction(
+  query: string
+): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      title: string;
+      companyName: string;
+      location: string | null;
+      isRemote: boolean;
+      employmentType: string;
+      salaryMin: number | null;
+      salaryMax: number | null;
+      salaryCurrency: string;
+      source: string | null;
+      externalUrl: string | null;
+      jobDescription: string | null;
+    }>
+  >
+> {
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireEmployeeOrAdmin(ctx);
+    const q = query.trim();
+
+    const rows = await withRlsContext(ctx.userId, async (tx) => {
+      return tx.job.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: JobStatus.OPEN,
+          ...(q
+            ? {
+                OR: [
+                  { title: { contains: q, mode: "insensitive" } },
+                  { companyName: { contains: q, mode: "insensitive" } },
+                  { location: { contains: q, mode: "insensitive" } },
+                  { source: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          companyName: true,
+          location: true,
+          isRemote: true,
+          employmentType: true,
+          salaryMin: true,
+          salaryMax: true,
+          salaryCurrency: true,
+          source: true,
+          externalUrl: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: DESK_SEARCH_LIMIT,
+      });
+    });
+
+    return {
+      success: true,
+      data: rows.map((j) => ({
+        ...j,
+        salaryCurrency: j.salaryCurrency || "USD",
+        jobDescription: null,
+      })),
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to search jobs" };
+  }
+}
+
+/** Fetch job description only when Inspect/select needs the detail panel. */
+export async function getDeskJobDetailAction(
+  jobId: string
+): Promise<
+  ActionResult<{
+    id: string;
+    title: string;
+    companyName: string;
+    location: string | null;
+    isRemote: boolean;
+    employmentType: string;
+    salaryMin: number | null;
+    salaryMax: number | null;
+    salaryCurrency: string;
+    source: string | null;
+    externalUrl: string | null;
+    jobDescription: string | null;
+  }>
+> {
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireEmployeeOrAdmin(ctx);
+
+    const job = await withRlsContext(ctx.userId, async (tx) => {
+      return tx.job.findFirst({
+        where: {
+          id: jobId,
+          organizationId: ctx.organizationId,
+          status: JobStatus.OPEN,
+        },
+        select: {
+          id: true,
+          title: true,
+          companyName: true,
+          location: true,
+          isRemote: true,
+          employmentType: true,
+          salaryMin: true,
+          salaryMax: true,
+          salaryCurrency: true,
+          source: true,
+          externalUrl: true,
+          jobDescription: true,
+        },
+      });
+    });
+
+    if (!job) throw new NotFoundError("Job not found");
+
+    return {
+      success: true,
+      data: {
+        ...job,
+        salaryCurrency: job.salaryCurrency || "USD",
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to load job detail" };
   }
 }
 

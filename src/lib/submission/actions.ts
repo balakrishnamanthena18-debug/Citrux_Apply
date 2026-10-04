@@ -54,7 +54,6 @@ function revalidateSubmissionViews(applicationId?: string) {
     revalidatePath("/candidate/applications");
     revalidatePath("/employee");
     revalidatePath("/candidate");
-    revalidatePath("/admin/applications");
     revalidatePath("/admin");
     if (applicationId) {
       revalidatePath(`/employee/applications/${applicationId}`);

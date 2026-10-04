@@ -2,7 +2,7 @@ import { cache } from "react";
 import { createServerClient } from "@/lib/supabase/server";
 import { withRlsContext } from "@/lib/db/rls";
 import { AuthenticationError, AuthorizationError } from "@/lib/errors";
-import { Role, UserStatus, MembershipStatus } from "@/generated/prisma";
+import { Role, UserStatus, MembershipStatus, type Prisma } from "@/generated/prisma";
 import { Permission, hasPermission } from "@/lib/auth/permissions";
 
 export interface AuthenticatedContext {
@@ -18,14 +18,11 @@ export interface AuthenticatedContext {
 
 export type AuthContext = AuthenticatedContext;
 
-/**
- * Resolves the authenticated user session from Supabase SSR cookies and fetches
- * active organization membership strictly within a transaction-local RLS context.
- * 
- * Wrapped in React cache() to deduplicate calls across Server Components, Layout, and Pages.
- */
-export const getAuthenticatedContext = cache(async (): Promise<AuthenticatedContext> => {
-  // 1. Verify Supabase Session from secure HTTP-only cookies
+/** Per-request store so membership resolved inside a data txn can seed later readers. */
+const authContextStore = cache((): { current?: AuthenticatedContext } => ({}));
+
+/** Cached Supabase Auth getUser() — never skipped; always verifies the session. */
+export const getAuthenticatedUser = cache(async () => {
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -36,20 +33,33 @@ export const getAuthenticatedContext = cache(async (): Promise<AuthenticatedCont
     throw new AuthenticationError("User is not authenticated");
   }
 
-  // 2. Query membership strictly through withRlsContext() to enforce database-level RLS
-  const membership = await withRlsContext(user.id, async (tx) => {
-    return tx.membership.findFirst({
-      where: {
-        userId: user.id,
-        status: "ACTIVE",
-        user: { status: "ACTIVE" },
-        organization: { status: "ACTIVE" },
+  return user;
+});
+
+export async function loadMembershipContext(
+  tx: Prisma.TransactionClient,
+  user: { id: string; email?: string | null }
+): Promise<AuthenticatedContext> {
+  const membership = await tx.membership.findFirst({
+    where: {
+      userId: user.id,
+      status: "ACTIVE",
+      user: { status: "ACTIVE" },
+      organization: { status: "ACTIVE" },
+    },
+    select: {
+      id: true,
+      organizationId: true,
+      role: true,
+      status: true,
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          status: true,
+        },
       },
-      include: {
-        user: true,
-        organization: true,
-      },
-    });
+    },
   });
 
   if (!membership) {
@@ -61,14 +71,49 @@ export const getAuthenticatedContext = cache(async (): Promise<AuthenticatedCont
   return {
     userId: user.id,
     email: user.email!,
-    fullName: [membership.user.firstName, membership.user.lastName].filter(Boolean).join(" ") || null,
+    fullName:
+      [membership.user.firstName, membership.user.lastName].filter(Boolean).join(" ") || null,
     organizationId: membership.organizationId,
     membershipId: membership.id,
     role: membership.role,
     status: membership.user.status,
     membershipStatus: membership.status,
   };
+}
+
+/**
+ * Resolves the authenticated user session from Supabase SSR cookies and fetches
+ * active organization membership strictly within a transaction-local RLS context.
+ *
+ * Wrapped in React cache() to deduplicate calls across Server Components, Layout, and Pages.
+ * When membership was already resolved inside withAuthenticatedData's data transaction,
+ * this returns the seeded context without opening a second RLS transaction.
+ */
+export const getAuthenticatedContext = cache(async (): Promise<AuthenticatedContext> => {
+  const store = authContextStore();
+  if (store.current) {
+    return store.current;
+  }
+
+  const user = await getAuthenticatedUser();
+
+  const ctx = await withRlsContext(user.id, async (tx) => {
+    return loadMembershipContext(tx, user);
+  });
+
+  store.current = ctx;
+  return ctx;
 });
+
+/** Seed request-scoped auth after membership was loaded inside another RLS txn. */
+export function seedAuthenticatedContext(ctx: AuthenticatedContext): void {
+  authContextStore().current = ctx;
+}
+
+/** Read seeded auth without opening a database transaction. */
+export function peekAuthenticatedContext(): AuthenticatedContext | null {
+  return authContextStore().current ?? null;
+}
 
 export function requireRole(ctx: AuthenticatedContext, allowedRoles: Role[]): void {
   if (!allowedRoles.includes(ctx.role)) {

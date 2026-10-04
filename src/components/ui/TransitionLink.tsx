@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useTransition } from "react";
+import React from "react";
 import Link, { LinkProps } from "next/link";
 import { useRouter } from "next/navigation";
+import { shouldPrefetchHref } from "@/lib/navigation/prefetch-policy";
+import { useNavigationPending } from "@/components/navigation/NavigationPendingContext";
 
 interface TransitionLinkProps extends LinkProps {
   children: React.ReactNode;
@@ -15,9 +17,8 @@ interface TransitionLinkProps extends LinkProps {
 /**
  * Soft-nav link with immediate pending visual feedback.
  *
- * Prefetch defaults OFF. Authenticated RSC routes open session-mode RLS
- * transactions; viewport/sidebar prefetch storms exhaust Supabase Free
- * (pool_size: 15) and surface as React #441.
+ * Prefetch is allowlisted (priority operational routes only) to avoid
+ * session-mode RLS/pool storms while warming the next click.
  */
 export function TransitionLink({
   href,
@@ -26,16 +27,18 @@ export function TransitionLink({
   activeClassName = "",
   isActive = false,
   onNavigate,
-  prefetch = false,
+  prefetch,
   ...props
 }: TransitionLinkProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { beginNavigation, runTransition, pendingHref } = useNavigationPending();
 
   const target = href.toString();
+  const resolvedPrefetch =
+    typeof prefetch === "boolean" ? prefetch : shouldPrefetchHref(target);
+  const isPending = pendingHref === target.split("?")[0];
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Allow modified clicks (new tab, etc.) to use native behavior
     if (
       e.defaultPrevented ||
       e.metaKey ||
@@ -49,7 +52,8 @@ export function TransitionLink({
 
     e.preventDefault();
     onNavigate?.();
-    startTransition(() => {
+    beginNavigation(target.split("?")[0] || target);
+    runTransition(() => {
       router.push(target);
     });
   };
@@ -57,7 +61,7 @@ export function TransitionLink({
   return (
     <Link
       href={href}
-      prefetch={prefetch}
+      prefetch={resolvedPrefetch}
       onClick={handleClick}
       aria-current={isActive ? "page" : undefined}
       aria-busy={isPending || undefined}

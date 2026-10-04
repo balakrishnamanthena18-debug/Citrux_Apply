@@ -128,18 +128,8 @@ export const ApplicationAssignSchema = z.object({
 });
 
 export const StartApplicationDeskSchema = z.object({
-  candidateId: z.string().uuid("Invalid candidate ID"),
-  companyName: z.string().trim().min(1, "Company name is required").max(255),
-  title: z.string().trim().min(1, "Job title is required").max(255),
-  source: z.string().trim().min(1, "Source is required").max(100),
-  externalUrl: z.string().trim().url().max(1024).optional().nullable().or(z.literal("")),
-  location: z.string().trim().max(255).optional().nullable(),
-  employmentType: JobEmploymentTypeEnum.default("FULL_TIME"),
-  isRemote: z.boolean().default(false),
-  salaryMin: z.number().int().min(0).max(10000000).optional().nullable(),
-  salaryMax: z.number().int().min(0).max(10000000).optional().nullable(),
-  salaryCurrency: z.string().trim().min(3).max(10).default("USD"),
-  jobDescription: z.string().trim().optional().nullable(),
+  candidateId: z.string().uuid("Select a candidate."),
+  jobId: z.string().uuid("Select a job."),
   internalNotes: z.string().trim().max(5000).optional().nullable(),
 });
 

@@ -23,7 +23,7 @@ interface Props {
 export default async function CandidateApplicationDetailPage({ params }: Props) {
   const { id } = await params;
   const ctx = await getAuthenticatedContext();
-  if (ctx.role === "ADMIN") redirect("/admin/applications");
+  if (ctx.role === "ADMIN") redirect("/employee/applications");
   if (ctx.role === "EMPLOYEE") redirect(`/employee/applications/${id}`);
 
   const data = await withRlsContext(ctx.userId, async (tx) => {

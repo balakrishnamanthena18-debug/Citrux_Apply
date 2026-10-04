@@ -1,11 +1,23 @@
+import { redirect } from "next/navigation";
 import { getAuthenticatedContext, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { createJobAction } from "@/lib/application/actions";
 import { EmployeeJobsWorkbench } from "@/components/job/EmployeeJobsWorkbench";
 
-export default async function EmployeeJobsPage() {
+interface Props {
+  searchParams?: Promise<{
+    returnTo?: string;
+    candidateId?: string;
+  }>;
+}
+
+export default async function EmployeeJobsPage({ searchParams }: Props) {
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);
+
+  const resolved = searchParams ? await searchParams : {};
+  const returnToDesk = resolved.returnTo === "application-log" || resolved.returnTo === "/employee/application-log";
+  const returnCandidateId = resolved.candidateId || "";
 
   const jobs = await withRlsContext(ctx.userId, async (tx) => {
     return tx.job.findMany({
@@ -20,7 +32,12 @@ export default async function EmployeeJobsPage() {
 
   async function handleCreateJob(formData: FormData) {
     "use server";
-    await createJobAction({
+    const shouldReturnToDesk =
+      formData.get("returnTo") === "application-log" ||
+      formData.get("returnTo") === "/employee/application-log";
+    const deskCandidateId = String(formData.get("returnCandidateId") || "");
+
+    const result = await createJobAction({
       title: formData.get("title") as string,
       companyName: formData.get("companyName") as string,
       jobDescription: formData.get("jobDescription") as string,
@@ -33,6 +50,13 @@ export default async function EmployeeJobsPage() {
       source: (formData.get("source") as string) || "LinkedIn",
       externalUrl: (formData.get("externalUrl") as string) || null,
     });
+
+    if (shouldReturnToDesk && result.success && result.data?.jobId) {
+      const params = new URLSearchParams();
+      params.set("jobId", result.data.jobId);
+      if (deskCandidateId) params.set("candidateId", deskCandidateId);
+      redirect(`/employee/application-log?${params.toString()}`);
+    }
   }
 
   return (
@@ -54,7 +78,8 @@ export default async function EmployeeJobsPage() {
         _count: j._count,
       }))}
       onCreateJob={handleCreateJob}
+      returnToDesk={returnToDesk}
+      returnCandidateId={returnCandidateId}
     />
   );
 }
-

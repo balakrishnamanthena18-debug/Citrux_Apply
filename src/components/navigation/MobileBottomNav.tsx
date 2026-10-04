@@ -52,7 +52,6 @@ export function MobileBottomNav({
               key={tab.id}
               href={tab.href}
               isActive={active}
-              prefetch={false}
               className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 transition active:scale-[0.97]"
               aria-label={tab.label}
             >

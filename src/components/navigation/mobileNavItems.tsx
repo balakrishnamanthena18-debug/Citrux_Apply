@@ -182,8 +182,10 @@ export function getMobileTabItems(role: Role): MobileTabItem[] {
     {
       id: "apps",
       label: "Apps",
-      href: "/admin/applications",
-      match: (p) => startsWithPath(p, "/admin/applications"),
+      href: "/employee/applications",
+      match: (p) =>
+        startsWithPath(p, "/employee/applications") ||
+        startsWithPath(p, "/admin/applications"),
       icon: appsIcon,
     },
     {

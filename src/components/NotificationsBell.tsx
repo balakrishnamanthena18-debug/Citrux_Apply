@@ -591,10 +591,12 @@ export function NotificationsBell({ role }: { role: Role }) {
       }, ms);
     };
 
+    // Defer below primary soft-nav / RSC work so notifications never contend
+    // with click → useful on the session-mode pool.
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(() => startInitial(), { timeout: 1500 });
+      idleId = window.requestIdleCallback(() => startInitial(), { timeout: 4000 });
     } else {
-      deferTimeout = setTimeout(startInitial, 250);
+      deferTimeout = setTimeout(startInitial, 1200);
     }
 
     schedule(realtimeSubscriptionManager.getStatus());

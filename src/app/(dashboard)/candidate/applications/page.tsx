@@ -15,7 +15,7 @@ export default async function CandidateApplicationsPage({ searchParams }: Props)
   const currentTab = resolvedParams.tab || "ALL";
 
   const ctx = await getAuthenticatedContext();
-  if (ctx.role === "ADMIN") redirect("/admin/applications");
+  if (ctx.role === "ADMIN") redirect("/employee/applications");
   if (ctx.role === "EMPLOYEE") redirect("/employee/applications");
 
   const applications = await withRlsContext(ctx.userId, async (tx) => {

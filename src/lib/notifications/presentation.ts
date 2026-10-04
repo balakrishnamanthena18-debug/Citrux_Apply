@@ -116,7 +116,7 @@ export function resolveNotificationHref(
     entityId
   ) {
     if (base === "candidate") return `/candidate/applications/${entityId}`;
-    if (base === "admin") return `/admin/applications`;
+    // Admin and employee share the Application Operations Console detail route
     return `/employee/applications/${entityId}`;
   }
 

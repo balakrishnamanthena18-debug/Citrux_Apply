@@ -41,7 +41,7 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
     vi.clearAllMocks();
   });
 
-  it("1. Initializes canonical Application in DISCOVERED status and does NOT create SUBMITTED directly", async () => {
+  it("1. Initializes canonical Application in DISCOVERED status referencing existing jobId", async () => {
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockEmployeeId,
       email: "staff@citrux.com",
@@ -68,21 +68,14 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
         }),
       },
       job: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        create: vi.fn().mockResolvedValue({
+        findUnique: vi.fn().mockResolvedValue({
           id: mockJobId,
-          organizationId: mockOrgId,
-          createdById: mockEmployeeId,
+          status: JobStatus.OPEN,
           title: "Staff Frontend Engineer",
           companyName: "Airbnb",
-          location: "Remote",
-          isRemote: true,
-          employmentType: "FULL_TIME",
           source: "Company Career",
-          salaryMin: 195000,
-          salaryMax: 240000,
-          status: JobStatus.OPEN,
         }),
+        create: vi.fn(),
       },
       application: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -109,25 +102,16 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
 
     const result = await startApplicationFromDeskAction({
       candidateId: mockCandidateId,
-      companyName: "Airbnb",
-      title: "Staff Frontend Engineer",
-      source: "Company Career",
-      externalUrl: "https://careers.airbnb.com/job/123",
-      location: "Remote",
-      employmentType: "FULL_TIME",
-      isRemote: true,
-      salaryMin: 195000,
-      salaryMax: 240000,
-      jobDescription: "Lead frontend web engineering",
+      jobId: mockJobId,
       internalNotes: "Candidate fit confirmed",
     });
 
     expect(result.success).toBe(true);
     expect(result.data?.applicationId).toBe(mockAppId);
     expect(result.data?.jobId).toBe(mockJobId);
-    expect(result.data?.isExistingJob).toBe(false);
+    expect(result.data?.isExistingJob).toBe(true);
+    expect(mockTx.job.create).not.toHaveBeenCalled();
 
-    // Verify canonical Application created in DISCOVERED status (NOT SUBMITTED)
     expect(mockTx.application.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -138,7 +122,6 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       })
     );
 
-    // Verify state history starts in DISCOVERED
     expect(mockTx.applicationStateHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -148,18 +131,27 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       })
     );
 
-    // Verify audit log
     expect(logUserAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "APPLICATION_CREATED",
         entityType: "Application",
         entityId: mockAppId,
-        details: expect.objectContaining({ viaApplicationDesk: true }),
+        details: expect.objectContaining({ viaApplicationDesk: true, jobId: mockJobId }),
       })
     );
   });
 
-  it("2. Deduplicates Job when matching OPEN job already exists in catalog", async () => {
+  it("2. Rejects missing jobId at schema validation", async () => {
+    const result = await startApplicationFromDeskAction({
+      candidateId: mockCandidateId,
+      jobId: "" as any,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/job/i);
+  });
+
+  it("3. Rejects unauthorized / missing Job (IDOR protection)", async () => {
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockEmployeeId,
       email: "staff@citrux.com",
@@ -169,7 +161,6 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       membershipStatus: "ACTIVE" as any,
     });
 
-    const mockExistingJobId = "88888888-8888-4888-8888-888888888888";
     const mockTx = {
       candidate: {
         findUnique: vi.fn().mockResolvedValue({
@@ -180,24 +171,7 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
         }),
       },
       job: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: mockExistingJobId,
-          status: JobStatus.OPEN,
-        }),
-        create: vi.fn(),
-      },
-      application: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        create: vi.fn().mockResolvedValue({
-          id: mockAppId,
-          organizationId: mockOrgId,
-          candidateId: mockCandidateId,
-          jobId: mockExistingJobId,
-          status: ApplicationStatus.DISCOVERED,
-        }),
-      },
-      applicationStateHistory: {
-        create: vi.fn().mockResolvedValue({}),
+        findUnique: vi.fn().mockResolvedValue(null),
       },
     };
 
@@ -207,19 +181,14 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
 
     const result = await startApplicationFromDeskAction({
       candidateId: mockCandidateId,
-      companyName: "Google",
-      title: "Staff Engineer",
-      source: "LinkedIn",
-      externalUrl: "https://careers.google.com/jobs/results/123",
+      jobId: mockJobId,
     });
 
-    expect(result.success).toBe(true);
-    expect(result.data?.jobId).toBe(mockExistingJobId);
-    expect(result.data?.isExistingJob).toBe(true);
-    expect(mockTx.job.create).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Job not found|unauthorized/i);
   });
 
-  it("3. Rejects duplicate active applications for same candidate + job", async () => {
+  it("4. Rejects duplicate active applications for same candidate + job", async () => {
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockEmployeeId,
       email: "staff@citrux.com",
@@ -239,7 +208,13 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
         }),
       },
       job: {
-        findFirst: vi.fn().mockResolvedValue({ id: mockJobId, status: JobStatus.OPEN }),
+        findUnique: vi.fn().mockResolvedValue({
+          id: mockJobId,
+          status: JobStatus.OPEN,
+          title: "Staff Engineer",
+          companyName: "Google",
+          source: "LinkedIn",
+        }),
       },
       application: {
         findFirst: vi.fn().mockResolvedValue({
@@ -255,16 +230,14 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
 
     const result = await startApplicationFromDeskAction({
       candidateId: mockCandidateId,
-      companyName: "Google",
-      title: "Staff Engineer",
-      source: "LinkedIn",
+      jobId: mockJobId,
     });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("already has an active application");
   });
 
-  it("4. Rejects application initialization for archived candidate", async () => {
+  it("5. Rejects application initialization for archived candidate", async () => {
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockEmployeeId,
       email: "staff@citrux.com",
@@ -291,16 +264,14 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
 
     const result = await startApplicationFromDeskAction({
       candidateId: mockCandidateId,
-      companyName: "Google",
-      title: "Software Engineer",
-      source: "LinkedIn",
+      jobId: mockJobId,
     });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("archived candidate");
   });
 
-  it("5. Completing QA with all 9 criteria advances MANAGED candidate to READY, and authoritative submission transitions to SUBMITTED", async () => {
+  it("6. Rejects unauthorized candidate", async () => {
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockEmployeeId,
       email: "staff@citrux.com",
@@ -310,7 +281,35 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       membershipStatus: "ACTIVE" as any,
     });
 
-    // 1. Execute QA pass
+    const mockTx = {
+      candidate: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
+    };
+
+    vi.mocked(withRlsContext).mockImplementation(async (_userId, callback) => {
+      return callback(mockTx as any);
+    });
+
+    const result = await startApplicationFromDeskAction({
+      candidateId: mockCandidateId,
+      jobId: mockJobId,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Candidate not found|unauthorized/i);
+  });
+
+  it("7. Completing QA with all 9 criteria advances MANAGED candidate to READY, and authoritative submission transitions to SUBMITTED", async () => {
+    vi.mocked(getAuthenticatedContext).mockResolvedValue({
+      userId: mockEmployeeId,
+      email: "staff@citrux.com",
+      role: "EMPLOYEE" as any,
+      organizationId: mockOrgId,
+      status: "ACTIVE" as any,
+      membershipStatus: "ACTIVE" as any,
+    });
+
     const mockAppRecord = {
       id: mockAppId,
       organizationId: mockOrgId,
@@ -366,7 +365,6 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       })
     );
 
-    // 2. Execute Authoritative Submission from READY
     const mockTxSubmit = {
       application: {
         findUnique: vi.fn().mockResolvedValue({
@@ -409,7 +407,7 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
     );
   });
 
-  it("6. getCandidateLogSummaryAction returns candidate metrics and recent applications", async () => {
+  it("8. getCandidateLogSummaryAction returns candidate metrics and recent applications", async () => {
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockEmployeeId,
       email: "staff@citrux.com",
@@ -436,9 +434,9 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       application: {
         count: vi
           .fn()
-          .mockResolvedValueOnce(4) // today
-          .mockResolvedValueOnce(17) // week
-          .mockResolvedValueOnce(42), // total
+          .mockResolvedValueOnce(4)
+          .mockResolvedValueOnce(17)
+          .mockResolvedValueOnce(42),
         findMany: vi.fn().mockResolvedValue([
           {
             id: mockAppId,

@@ -51,21 +51,6 @@ export interface ApplicationItem {
     id: string;
     attemptNumber: number;
     submittedAt: string | Date;
-    submittedBy?: {
-      firstName?: string | null;
-      lastName?: string | null;
-      email: string;
-    } | null;
-  }>;
-  stateHistory: Array<{
-    id: string;
-    toStatus: string;
-    createdAt: string | Date;
-    changedBy?: {
-      firstName?: string | null;
-      lastName?: string | null;
-      email: string;
-    } | null;
   }>;
 }
 
@@ -83,12 +68,23 @@ export interface JobOption {
   source?: string | null;
 }
 
+export interface ServerQueueCounts {
+  total: number;
+  mine: number;
+  ready: number;
+  inProgress: number;
+  submitted: number;
+  needsAttention: number;
+}
+
 interface Props {
   currentUserId: string;
   applications: ApplicationItem[];
   candidates: CandidateOption[];
   jobs: JobOption[];
   sources: string[];
+  /** Authoritative org-wide queue badges (not derived from the bounded page rows). */
+  serverQueueCounts?: ServerQueueCounts;
   initialQueue?: string;
   initialStatus?: string;
   initialCandidateId?: string;
@@ -120,6 +116,7 @@ export function EmployeeApplicationsWorkbench({
   candidates,
   jobs,
   sources,
+  serverQueueCounts,
   initialQueue = "all",
   initialStatus = "",
   initialCandidateId = "",
@@ -136,8 +133,10 @@ export function EmployeeApplicationsWorkbench({
   const [page, setPage] = useState<number>(1);
   const pageSize = 25;
 
-  // Compute live queue counts over authoritative application records in memory (<1ms)
+  // Prefer org-wide server counts; fall back to in-memory when not provided.
   const queueCounts = useMemo(() => {
+    if (serverQueueCounts) return serverQueueCounts;
+
     const total = applications.length;
     let mine = 0;
     let ready = 0;
@@ -156,7 +155,7 @@ export function EmployeeApplicationsWorkbench({
     }
 
     return { total, mine, ready, inProgress, submitted, needsAttention };
-  }, [applications, currentUserId]);
+  }, [applications, currentUserId, serverQueueCounts]);
 
   const tabs: TabItem[] = useMemo(
     () => [
@@ -626,7 +625,6 @@ export function EmployeeApplicationsWorkbench({
                     [app.candidate.user.firstName, app.candidate.user.lastName].filter(Boolean).join(" ") ||
                     app.candidate.user.email;
 
-                  const latestHistory = app.stateHistory?.[0];
                   const latestSub = app.submissions?.[0];
                   const salaryText = formatSalary(app.job.salaryMin, app.job.salaryMax, app.job.salaryCurrency);
 
@@ -731,20 +729,16 @@ export function EmployeeApplicationsWorkbench({
                         )}
                       </td>
 
-                      {/* Last Activity Column */}
+                      {/* Last Activity Column — uses updatedAt (slim list; no stateHistory) */}
                       <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
-                        {latestHistory ? (
-                          <div>
-                            <span className="text-[#0F1720] font-medium">
-                              {new Date(latestHistory.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
-                            </span>
-                            <div className="text-[10px] text-[#94A3B8]">
-                              {latestHistory.toStatus.replace(/_/g, " ")}
-                            </div>
+                        <div>
+                          <span className="text-[#0F1720] font-medium">
+                            {new Date(app.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                          </span>
+                          <div className="text-[10px] text-[#94A3B8]">
+                            Created {new Date(app.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                           </div>
-                        ) : (
-                          <span>{new Date(app.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}</span>
-                        )}
+                        </div>
                       </td>
 
                       {/* Submission Status Column */}

@@ -62,7 +62,7 @@ function revalidateAdminViews() {
     revalidatePath("/admin");
     revalidatePath("/admin/members");
     revalidatePath("/admin/settings/designations");
-    revalidatePath("/admin/applications");
+    revalidatePath("/employee/applications");
     revalidatePath("/admin/candidates");
     revalidatePath("/admin/tasks/escalations");
     revalidatePath("/admin/audit");

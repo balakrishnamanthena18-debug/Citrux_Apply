@@ -178,7 +178,12 @@ describe("Phase 10 — Navigation Time-to-Usable invariants", () => {
         "utf8"
       );
       expect(page).toContain("Promise.all");
-      expect(page).toContain("submittedLean");
+      expect(page).toContain("withAuthenticatedData");
+      expect(page).toContain("DESK_SELECTOR_LIMIT");
+      expect(page).toContain("COUNT(DISTINCT");
+      expect(page).not.toContain("submittedLean");
+      expect(page).not.toMatch(/take:\s*2000/);
+      expect(page).not.toMatch(/take:\s*500/);
     });
 
     it("admin dashboard bounds workload task/application scans", () => {

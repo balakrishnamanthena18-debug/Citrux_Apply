@@ -37,9 +37,16 @@ const JOB_SOURCES = [
 interface Props {
   jobs: JobListItem[];
   onCreateJob: (formData: FormData) => Promise<void>;
+  returnToDesk?: boolean;
+  returnCandidateId?: string;
 }
 
-export function EmployeeJobsWorkbench({ jobs, onCreateJob }: Props) {
+export function EmployeeJobsWorkbench({
+  jobs,
+  onCreateJob,
+  returnToDesk = false,
+  returnCandidateId = "",
+}: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sourceFilter, setSourceFilter] = useState("ALL");
   const [remoteOnly, setRemoteOnly] = useState(false);
@@ -117,6 +124,17 @@ export function EmployeeJobsWorkbench({ jobs, onCreateJob }: Props) {
             }}
             className="space-y-3 text-xs"
           >
+            {returnToDesk && (
+              <>
+                <input type="hidden" name="returnTo" value="application-log" />
+                {returnCandidateId ? (
+                  <input type="hidden" name="returnCandidateId" value={returnCandidateId} />
+                ) : null}
+                <div className="rounded-md border border-[#DDE5E0] bg-[#F7F9F8] px-3 py-2 text-[11px] text-[#334155]">
+                  Recording for Application Desk — you will return with this job selected.
+                </div>
+              </>
+            )}
             <div>
               <label className="block font-semibold text-[#334155] mb-1">Company Name *</label>
               <input

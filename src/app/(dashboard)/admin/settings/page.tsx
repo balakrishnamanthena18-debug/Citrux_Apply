@@ -290,7 +290,7 @@ export default async function AdminSettingsPage() {
               </div>
               <div className="flex-shrink-0">
                 <Link
-                  href="/admin/applications"
+                  href="/employee/applications"
                   className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-[#334155] bg-white border border-[#DDE5E0] hover:bg-[#F7F9F8] hover:text-[#0F1720] shadow-xs transition-colors"
                 >
                   View Applications →

@@ -238,7 +238,7 @@ export default async function AdminDashboardPage() {
       {
         label: "Awaiting Candidate",
         count: awaitingCandidateCount,
-        href: "/admin/applications",
+        href: "/employee/applications",
         tone: awaitingCandidateCount > 0 ? ("amber" as const) : ("neutral" as const),
         description: "Pending candidate approval or review",
       },
@@ -259,7 +259,7 @@ export default async function AdminDashboardPage() {
       {
         label: "Submission Issues",
         count: submissionIssuesCount,
-        href: "/admin/applications",
+        href: "/employee/applications",
         tone: submissionIssuesCount > 0 ? ("rose" as const) : ("neutral" as const),
         description: "Portal or submission errors",
       },
@@ -384,7 +384,7 @@ export default async function AdminDashboardPage() {
                 </Link>
               ) : (
                 <Link
-                  href="/admin/applications"
+                  href="/employee/applications"
                   className="inline-flex items-center gap-2 rounded-full bg-[#C6F432] px-5 py-2.5 text-sm font-semibold text-[#0B3B2C] shadow-[0_10px_30px_rgba(198,244,50,0.28)] transition hover:bg-[#d4f75a] active:scale-[0.98]"
                 >
                   Open applications
@@ -448,12 +448,12 @@ export default async function AdminDashboardPage() {
           {
             label: "Active applications",
             value: dashboardData.primaryMetrics.activeApplications,
-            href: "/admin/applications",
+            href: "/employee/applications",
           },
           {
             label: "Submitted",
             value: dashboardData.primaryMetrics.submittedApplications,
-            href: "/admin/applications",
+            href: "/employee/applications",
             accent: true,
           },
           {
@@ -493,7 +493,7 @@ export default async function AdminDashboardPage() {
             </p>
           </div>
           <Link
-            href="/admin/applications"
+            href="/employee/applications"
             className="hidden sm:inline-flex text-sm font-semibold text-[#12A150] hover:text-[#0B3B2C]"
           >
             View all →
