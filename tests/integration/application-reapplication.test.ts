@@ -43,7 +43,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
           findUnique: vi.fn().mockResolvedValue({ id: mockCandidateId, organizationId: mockOrgId, status: "ACTIVE" }),
         },
         job: {
-          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN" }),
+          findFirst: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+        },
+        candidateJobOpportunity: {
+          findUnique: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
+          create: vi.fn(),
         },
         application: {
           findFirst: vi.fn().mockResolvedValue({
@@ -75,7 +80,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
           findUnique: vi.fn().mockResolvedValue({ id: mockCandidateId, organizationId: mockOrgId, status: "ACTIVE" }),
         },
         job: {
-          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN" }),
+          findFirst: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+        },
+        candidateJobOpportunity: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
         },
         application: {
           findFirst: vi.fn().mockResolvedValue(null), // No active (non-terminal) application exists
@@ -112,7 +122,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
           findUnique: vi.fn().mockResolvedValue({ id: mockCandidateId, organizationId: mockOrgId, status: "ACTIVE" }),
         },
         job: {
-          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN" }),
+          findFirst: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+        },
+        candidateJobOpportunity: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
         },
         application: {
           findFirst: vi.fn().mockResolvedValue(null),
@@ -149,7 +164,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
           findUnique: vi.fn().mockResolvedValue({ id: mockCandidateId, organizationId: mockOrgId, status: "ACTIVE" }),
         },
         job: {
-          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN" }),
+          findFirst: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+        },
+        candidateJobOpportunity: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
         },
         application: {
           findFirst: vi.fn().mockResolvedValue(null),

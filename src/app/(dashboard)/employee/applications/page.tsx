@@ -148,13 +148,21 @@ export default async function EmployeeApplicationsPage({ searchParams }: Props) 
           take: 100,
         }),
         tx.job.findMany({
-          where: { organizationId: auth.organizationId, status: "OPEN" },
+          where: {
+            organizationId: auth.organizationId,
+            status: "OPEN",
+            visibility: "GLOBAL",
+          },
           select: { id: true, title: true, companyName: true, source: true },
           orderBy: { createdAt: "desc" },
           take: 100,
         }),
         tx.job.findMany({
-          where: { organizationId: auth.organizationId, source: { not: null } },
+          where: {
+            organizationId: auth.organizationId,
+            visibility: "GLOBAL",
+            source: { not: null },
+          },
           select: { source: true },
           distinct: ["source"],
           take: 50,

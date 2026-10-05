@@ -331,7 +331,12 @@ function NotificationPanel({
         }`}
       >
         {presentations.length === 0 ? (
-          <div className="p-8 text-center text-xs text-[#66756E]">No notifications yet.</div>
+          <div className="space-y-1 p-8 text-center">
+            <p className="text-sm font-semibold text-[#10201A]">No notifications yet</p>
+            <p className="text-xs text-[#66756E]">
+              Updates about applications, approvals, and messages will appear here.
+            </p>
+          </div>
         ) : (
           <>
             {renderGroup("Today", grouped.today)}
@@ -426,6 +431,7 @@ function IncomingToast({
   );
 }
 
+/** Authoritative notification UX for all dashboard roles (incl. candidates). */
 export function NotificationsBell({ role }: { role: Role }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -770,7 +776,13 @@ export function NotificationsBell({ role }: { role: Role }) {
               aria-label="Dismiss notifications"
               onClick={() => setIsOpen(false)}
             />
-            <div className="absolute inset-x-0 bottom-0 z-[61] px-0 transition-transform duration-200 ease-out motion-reduce:transition-none">
+            <div
+              className="absolute inset-x-0 bottom-0 z-[61] px-0 transition-transform duration-200 ease-out motion-reduce:transition-none"
+              style={{
+                // Sit above the mobile tab bar (64px) + safe area; avoid clipped/overlapped sheets.
+                paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
+              }}
+            >
               <NotificationPanel {...panelProps} variant="mobile" />
             </div>
           </div>

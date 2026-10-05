@@ -8,6 +8,7 @@ import {
   getCandidateActionRequirement,
   formatSalary,
 } from "@/lib/utils/status-presenter";
+import { formatApplicationCardDate } from "@/lib/utils/format-application-date";
 
 export interface CandidateApplicationData {
   id: string;
@@ -47,11 +48,7 @@ export function CandidateApplicationCard({ application }: Props) {
   );
   const latestSub = application.submissions?.[0];
 
-  const updatedDateText = new Date(application.updatedAt).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const updatedDateText = formatApplicationCardDate(application.updatedAt);
 
   return (
     <div className="p-4 sm:p-5 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -125,11 +122,7 @@ export function CandidateApplicationCard({ application }: Props) {
             <span>✓</span>
             <span>
               Submitted on{" "}
-              {new Date(latestSub.submittedAt).toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}{" "}
+              {formatApplicationCardDate(latestSub.submittedAt)}{" "}
               (Confirmation recorded)
             </span>
           </div>

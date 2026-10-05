@@ -184,6 +184,16 @@ describe("Phase 9 Golden Path — Candidate Journey Integration (tests/integrati
             city: "San Francisco",
           }),
         },
+        application: { findMany: vi.fn().mockResolvedValue([]) },
+        applicationIntelligenceRun: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        applicationAlignmentResult: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        applicationReadinessResult: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
       };
       return callback(tx as any);
     });

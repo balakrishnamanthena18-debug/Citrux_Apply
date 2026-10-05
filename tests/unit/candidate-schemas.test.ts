@@ -99,6 +99,47 @@ describe("Candidate Core Validation Schemas (tests/unit/candidate-schemas.test.t
     });
   });
 
+  describe("CandidateProjectSchema", () => {
+    it("validates a complete project payload", () => {
+      const result = CandidateProjectSchema.safeParse({
+        title: "Inventory sync service",
+        role: "Lead engineer",
+        url: "https://example.com/project",
+        description: "Built warehouse sync with idempotent retries.",
+        highlights: ["Cut lag from hours to minutes"],
+        technologies: ["TypeScript", "PostgreSQL"],
+        startDate: "2024-01-01",
+        endDate: "2024-06-30",
+        orderIndex: 0,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("requires a project title", () => {
+      const result = CandidateProjectSchema.safeParse({
+        title: "   ",
+        technologies: [],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects invalid project URLs", () => {
+      const result = CandidateProjectSchema.safeParse({
+        title: "Portfolio site",
+        url: "not-a-url",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("accepts empty URL as optional", () => {
+      const result = CandidateProjectSchema.safeParse({
+        title: "Internal tooling",
+        url: "",
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe("CandidateAssignmentSchema", () => {
     it("validates valid candidate and employee IDs", () => {
       const result = CandidateAssignmentSchema.safeParse({

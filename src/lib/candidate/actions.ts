@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { getAuthenticatedContext, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { logUserAuditEvent } from "@/lib/audit";
@@ -39,6 +40,8 @@ import {
 } from "@/lib/storage";
 import { CandidateStatus, Role, ApplicationAuthorizationMode, AuditAction } from "@/generated/prisma";
 import { AuthorizationError, InvalidStateTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
+import { markCandidateApplicationIntelligenceStale } from "@/lib/application-intelligence/runs";
+import { freshnessAfterTrigger } from "@/lib/application-intelligence/stale";
 
 export interface ActionResult<T = unknown> {
   success: boolean;
@@ -162,6 +165,15 @@ export async function updateCandidateProfileSelfAction(
           salaryCurrency: parsed.data.salaryCurrency,
           ...(parsed.data.applicationAuthorizationMode ? { applicationAuthorizationMode: parsed.data.applicationAuthorizationMode } : {}),
         },
+      });
+
+      // Gate 12: candidate truth change → mark intelligence STALE (no lifecycle mutation).
+      await markCandidateApplicationIntelligenceStale(tx, {
+        organizationId: ctx.organizationId,
+        candidateId: updated.id,
+        actorUserId: ctx.userId,
+        freshness: freshnessAfterTrigger("CANDIDATE_PROFILE_CHANGED"),
+        reason: "CANDIDATE_PROFILE_CHANGED",
       });
 
       return updated;
@@ -461,6 +473,9 @@ export async function upsertCandidateProjectAction(
   }
 
   const ctx = await getAuthenticatedContext();
+  if (ctx.role !== Role.CANDIDATE) {
+    return { success: false, error: "Only candidates can manage projects" };
+  }
 
   try {
     const project = await withRlsContext(ctx.userId, async (tx) => {
@@ -470,8 +485,14 @@ export async function upsertCandidateProjectAction(
       if (!candidate) throw new NotFoundError("Candidate profile not found");
 
       if (parsed.data.id) {
-        return tx.candidateProject.update({
+        const existing = await tx.candidateProject.findFirst({
           where: { id: parsed.data.id, candidateId: candidate.id },
+          select: { id: true },
+        });
+        if (!existing) throw new NotFoundError("Project not found");
+
+        return tx.candidateProject.update({
+          where: { id: existing.id },
           data: {
             title: parsed.data.title,
             role: parsed.data.role,
@@ -512,8 +533,11 @@ export async function upsertCandidateProjectAction(
 
     revalidateCandidateViews();
     return { success: true, data: { projectId: project.id } };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to update project" };
+  } catch (err: unknown) {
+    if (err instanceof NotFoundError) {
+      return { success: false, error: "Project not found" };
+    }
+    return { success: false, error: "Failed to update project" };
   }
 }
 
@@ -523,7 +547,14 @@ export async function upsertCandidateProjectAction(
 export async function deleteCandidateProjectAction(
   projectId: string
 ): Promise<ActionResult> {
+  if (!z.string().uuid().safeParse(projectId).success) {
+    return { success: false, error: "Invalid project" };
+  }
+
   const ctx = await getAuthenticatedContext();
+  if (ctx.role !== Role.CANDIDATE) {
+    return { success: false, error: "Only candidates can manage projects" };
+  }
 
   try {
     await withRlsContext(ctx.userId, async (tx) => {
@@ -532,15 +563,33 @@ export async function deleteCandidateProjectAction(
       });
       if (!candidate) throw new NotFoundError("Candidate not found");
 
-      await tx.candidateProject.delete({
+      const existing = await tx.candidateProject.findFirst({
         where: { id: projectId, candidateId: candidate.id },
+        select: { id: true },
       });
+      if (!existing) throw new NotFoundError("Project not found");
+
+      await tx.candidateProject.delete({
+        where: { id: existing.id },
+      });
+    });
+
+    await logUserAuditEvent({
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
+      action: "CANDIDATE_PROFILE_UPDATED",
+      entityType: "CandidateProject",
+      entityId: projectId,
+      details: { deleted: true },
     });
 
     revalidateCandidateViews();
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to delete project" };
+  } catch (err: unknown) {
+    if (err instanceof NotFoundError) {
+      return { success: false, error: "Project not found" };
+    }
+    return { success: false, error: "Failed to delete project" };
   }
 }
 

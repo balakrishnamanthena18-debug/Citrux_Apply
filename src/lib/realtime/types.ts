@@ -56,5 +56,9 @@ export interface SubscriptionScope {
   organizationId: string;
   userId: string;
   teamId?: string | null;
+  /**
+   * For CANDIDATE role realtime, this is the Auth/User.id channel key
+   * (same as userId in production). It is NOT Prisma Candidate.id.
+   */
   candidateId?: string | null;
 }

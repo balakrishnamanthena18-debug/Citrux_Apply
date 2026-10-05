@@ -9,6 +9,7 @@ import {
   searchDeskCandidatesAction,
   searchDeskJobsAction,
   getDeskJobDetailAction,
+  createCandidateJobLeadAction,
 } from "@/lib/application/actions";
 import { formatSalary } from "@/lib/utils/status-presenter";
 
@@ -33,6 +34,7 @@ export interface JobOption {
   source: string | null;
   externalUrl: string | null;
   jobDescription: string | null;
+  visibility?: "GLOBAL" | "CANDIDATE_PRIVATE";
 }
 
 export interface OperationalMetrics {
@@ -97,13 +99,6 @@ function jobLocationLabel(job: JobOption): string {
   return job.location?.trim() || "On-site";
 }
 
-function jobReturnHref(candidateId: string): string {
-  const params = new URLSearchParams();
-  params.set("returnTo", "application-log");
-  if (candidateId) params.set("candidateId", candidateId);
-  return `/employee/jobs?${params.toString()}`;
-}
-
 export function ApplicationLogWorkbench({
   candidates: initialCandidates,
   jobs: initialJobs,
@@ -134,6 +129,21 @@ export function ApplicationLogWorkbench({
   const [jobSearchQuery, setJobSearchQuery] = useState("");
   const [debouncedJobQuery, setDebouncedJobQuery] = useState("");
   const jobComboboxRef = useRef<HTMLDivElement>(null);
+  /** Job Catalog = reusable GLOBAL; Candidate Job Lead = private create form. */
+  const [jobSource, setJobSource] = useState<"catalog" | "lead">("catalog");
+  const [leadForm, setLeadForm] = useState({
+    title: "",
+    companyName: "",
+    externalUrl: "",
+    location: "",
+    employmentType: "FULL_TIME",
+    salaryMin: "",
+    salaryMax: "",
+    jobDescription: "",
+    source: "LinkedIn",
+    isRemote: false,
+  });
+  const [isCreatingLead, setIsCreatingLead] = useState(false);
 
   const [internalNotes, setInternalNotes] = useState("");
   const [changeJobConfirmOpen, setChangeJobConfirmOpen] = useState(false);
@@ -189,29 +199,31 @@ export function ApplicationLogWorkbench({
     };
   }, [debouncedCandidateQuery]);
 
-  // Server-side job search (bounded). Empty query uses initial page rows.
+  // Server-side job search scoped to selected candidate (catalog + their private leads).
   useEffect(() => {
-    if (!debouncedJobQuery) return;
+    if (!selectedCandidateId) return;
     let cancelled = false;
     void (async () => {
-      const res = await searchDeskJobsAction(debouncedJobQuery);
+      const res = await searchDeskJobsAction(debouncedJobQuery, selectedCandidateId);
       if (cancelled || !res.success || !res.data) return;
       setSearchedJobs(res.data);
     })();
     return () => {
       cancelled = true;
     };
-  }, [debouncedJobQuery]);
+  }, [debouncedJobQuery, selectedCandidateId]);
 
   const filteredCandidates = useMemo(
     () => (debouncedCandidateQuery ? searchedCandidates ?? [] : initialCandidates),
     [debouncedCandidateQuery, searchedCandidates, initialCandidates]
   );
-  const filteredJobs = useMemo(
-    () => (debouncedJobQuery ? searchedJobs ?? [] : initialJobs),
-    [debouncedJobQuery, searchedJobs, initialJobs]
-  );
-  const jobs = initialJobs;
+  const filteredJobs = useMemo(() => {
+    if (!selectedCandidateId) return [];
+    if (searchedJobs) return searchedJobs;
+    // Initial GLOBAL catalog page until first scoped search resolves.
+    return initialJobs.filter((j) => (j.visibility ?? "GLOBAL") === "GLOBAL");
+  }, [selectedCandidateId, searchedJobs, initialJobs]);
+  const jobs = filteredJobs;
 
   const selectedCandidate = useMemo(
     () =>
@@ -237,6 +249,11 @@ export function ApplicationLogWorkbench({
     setIsCandidateOpen(false);
     setCandidateSearchQuery("");
     setError(null);
+    // Reset job if it was another candidate's private lead
+    setSelectedJobId("");
+    setJobDetailCache({});
+    setSearchedJobs(null);
+    setJobSource("catalog");
 
     if (!candidateId) {
       setCandidateSummary(null);
@@ -258,6 +275,66 @@ export function ApplicationLogWorkbench({
     }
   }
 
+  async function handleCreateJobLead() {
+    if (!selectedCandidateId) {
+      setError("Select a candidate first.");
+      return;
+    }
+    setError(null);
+    setIsCreatingLead(true);
+    try {
+      const res = await createCandidateJobLeadAction({
+        candidateId: selectedCandidateId,
+        title: leadForm.title,
+        companyName: leadForm.companyName,
+        jobDescription: leadForm.jobDescription,
+        location: leadForm.location || null,
+        isRemote: leadForm.isRemote,
+        employmentType: leadForm.employmentType as
+          | "FULL_TIME"
+          | "PART_TIME"
+          | "CONTRACT"
+          | "INTERNSHIP"
+          | "TEMPORARY",
+        salaryMin: leadForm.salaryMin ? Number(leadForm.salaryMin) : null,
+        salaryMax: leadForm.salaryMax ? Number(leadForm.salaryMax) : null,
+        salaryCurrency: "USD",
+        source: leadForm.source || null,
+        externalUrl: leadForm.externalUrl || null,
+      });
+      if (!res.success || !res.data) {
+        setError(res.error || "Failed to create job lead");
+        return;
+      }
+      const detail = await getDeskJobDetailAction(res.data.jobId, selectedCandidateId);
+      if (detail.success && detail.data) {
+        setJobDetailCache((prev) => ({ ...prev, [detail.data!.id]: detail.data! }));
+        setSelectedJobId(detail.data.id);
+        setSearchedJobs((prev) => {
+          const next = prev ? prev.filter((j) => j.id !== detail.data!.id) : [];
+          return [detail.data!, ...next];
+        });
+      } else {
+        setSelectedJobId(res.data.jobId);
+      }
+      setJobSource("catalog");
+      setLeadForm({
+        title: "",
+        companyName: "",
+        externalUrl: "",
+        location: "",
+        employmentType: "FULL_TIME",
+        salaryMin: "",
+        salaryMax: "",
+        jobDescription: "",
+        source: "LinkedIn",
+        isRemote: false,
+      });
+    } finally {
+      setIsCreatingLead(false);
+    }
+  }
+
   async function selectJob(jobId: string) {
     setSelectedJobId(jobId);
     setIsJobOpen(false);
@@ -274,9 +351,16 @@ export function ApplicationLogWorkbench({
       return;
     }
 
-    const res = await getDeskJobDetailAction(jobId);
+    if (!selectedCandidateId) {
+      setError("Select a candidate before loading job details");
+      return;
+    }
+    const res = await getDeskJobDetailAction(jobId, selectedCandidateId);
     if (res.success && res.data) {
       setJobDetailCache((prev) => ({ ...prev, [jobId]: res.data! }));
+    } else if (!res.success) {
+      setError(res.error || "Job not available for this candidate");
+      setSelectedJobId("");
     }
   }
 
@@ -348,10 +432,6 @@ export function ApplicationLogWorkbench({
       .slice(0, 2)
       .join("")
       .toUpperCase() || "C";
-
-  const recordJobHref = selectedCandidateId
-    ? jobReturnHref(selectedCandidateId)
-    : "/employee/jobs";
 
   return (
     <div className="max-w-[1240px] mx-auto space-y-6 pb-20">
@@ -574,8 +654,51 @@ export function ApplicationLogWorkbench({
             <label className="text-xs font-semibold text-[#334155] uppercase tracking-wider">
               Job <span className="text-rose-500">*</span>
             </label>
-            <span className="text-[11px] text-[#94A3B8]">From Job Catalog</span>
+            {selectedJob?.visibility === "CANDIDATE_PRIVATE" ? (
+              <span className="text-[11px] font-semibold text-[#0B3B2C]">Private to this candidate</span>
+            ) : (
+              <span className="text-[11px] text-[#94A3B8]">Catalog or candidate job lead</span>
+            )}
           </div>
+
+          {!selectedCandidateId && (
+            <p className="text-xs text-[#64748B] rounded-[12px] border border-[#E5EAE7] bg-[#F7F9F8] px-3 py-2">
+              Select a candidate first to choose a catalog job or add a candidate-specific job lead.
+            </p>
+          )}
+
+          {selectedCandidateId && !selectedJob && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setJobSource("catalog")}
+                className={`text-left rounded-[14px] border px-3.5 py-3 transition ${
+                  jobSource === "catalog"
+                    ? "border-[#12A150] bg-[#12A150]/[0.06] ring-1 ring-[#12A150]/20"
+                    : "border-[#E5EAE7] bg-white hover:bg-[#F7F9F8]"
+                }`}
+              >
+                <div className="text-xs font-bold text-[#0F1720]">Job Catalog</div>
+                <div className="text-[11px] text-[#64748B] mt-0.5">
+                  Use an existing organization job.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setJobSource("lead")}
+                className={`text-left rounded-[14px] border px-3.5 py-3 transition ${
+                  jobSource === "lead"
+                    ? "border-[#12A150] bg-[#12A150]/[0.06] ring-1 ring-[#12A150]/20"
+                    : "border-[#E5EAE7] bg-white hover:bg-[#F7F9F8]"
+                }`}
+              >
+                <div className="text-xs font-bold text-[#0F1720]">Candidate Job Lead</div>
+                <div className="text-[11px] text-[#64748B] mt-0.5">
+                  Add a job specifically for this candidate.
+                </div>
+              </button>
+            </div>
+          )}
 
           {selectedJob ? (
             <div className="rounded-[16px] border border-[#DDE5E0] bg-[#F7F9F8]/60 p-4 sm:p-5 space-y-3">
@@ -647,7 +770,122 @@ export function ApplicationLogWorkbench({
                 </div>
               )}
             </div>
-          ) : (
+          ) : selectedCandidateId && jobSource === "lead" ? (
+            <div className="rounded-[16px] border border-[#E5EAE7] bg-[#F7F9F8]/50 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-[#0F1720] uppercase tracking-wider">
+                    Candidate-specific job
+                  </div>
+                  <p className="text-[11px] text-[#64748B] mt-1">
+                    This job will be available only to{" "}
+                    <span className="font-semibold text-[#0F1720]">
+                      {selectedCandidate?.fullName || "the selected candidate"}
+                    </span>
+                    . It will not appear in the organization Job Catalog.
+                  </p>
+                </div>
+                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#0B3B2C]/10 text-[#0B3B2C] border border-[#0B3B2C]/20">
+                  Private
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-xs space-y-1">
+                  <span className="font-semibold text-[#334155]">Job Title *</span>
+                  <input
+                    value={leadForm.title}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, title: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="font-semibold text-[#334155]">Company *</span>
+                  <input
+                    value={leadForm.companyName}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, companyName: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="text-xs space-y-1 sm:col-span-2">
+                  <span className="font-semibold text-[#334155]">Job URL</span>
+                  <input
+                    value={leadForm.externalUrl}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, externalUrl: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                    placeholder="https://"
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="font-semibold text-[#334155]">Location</span>
+                  <input
+                    value={leadForm.location}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, location: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="font-semibold text-[#334155]">Source</span>
+                  <input
+                    value={leadForm.source}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, source: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="font-semibold text-[#334155]">Salary min</span>
+                  <input
+                    type="number"
+                    value={leadForm.salaryMin}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, salaryMin: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="font-semibold text-[#334155]">Salary max</span>
+                  <input
+                    type="number"
+                    value={leadForm.salaryMax}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, salaryMax: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="text-xs space-y-1 sm:col-span-2">
+                  <span className="font-semibold text-[#334155]">Description *</span>
+                  <textarea
+                    value={leadForm.jobDescription}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, jobDescription: e.target.value }))}
+                    rows={4}
+                    className="w-full px-3 py-2 rounded-[12px] border border-[#DDE5E0] bg-white text-sm"
+                  />
+                </label>
+                <label className="inline-flex items-center gap-2 text-xs text-[#334155] sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={leadForm.isRemote}
+                    onChange={(e) => setLeadForm((f) => ({ ...f, isRemote: e.target.checked }))}
+                  />
+                  Remote role
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isCreatingLead}
+                  onClick={() => void handleCreateJobLead()}
+                  className="inline-flex items-center px-3.5 py-2 rounded-[12px] text-xs font-semibold bg-[#0B3B2C] text-white disabled:opacity-60"
+                >
+                  {isCreatingLead ? "Creating…" : "Create Job Lead"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setJobSource("catalog")}
+                  className="inline-flex items-center px-3.5 py-2 rounded-[12px] text-xs font-semibold border border-[#E5EAE7] bg-white text-[#334155]"
+                >
+                  Back to catalog
+                </button>
+              </div>
+            </div>
+          ) : selectedCandidateId ? (
             <div className="relative" ref={jobComboboxRef}>
               <button
                 type="button"
@@ -657,7 +895,7 @@ export function ApplicationLogWorkbench({
                 }}
                 className="w-full text-left bg-white hover:bg-[#F7F9F8]/60 border border-[#DDE5E0] focus:border-[#12A150] focus:ring-1 focus:ring-[#12A150]/20 rounded-[16px] p-3.5 flex items-center justify-between transition"
               >
-                <span className="text-sm text-[#94A3B8]">Search and select job...</span>
+                <span className="text-sm text-[#94A3B8]">Search job catalog…</span>
                 <svg
                   className={`w-4 h-4 text-[#94A3B8] transition-transform shrink-0 ${isJobOpen ? "rotate-180" : ""}`}
                   fill="none"
@@ -681,25 +919,19 @@ export function ApplicationLogWorkbench({
                     />
                   </div>
                   <div className="max-h-72 overflow-y-auto">
-                    {jobs.length === 0 ? (
-                      <div className="px-4 py-8 text-center space-y-3">
-                        <p className="text-xs font-semibold text-[#334155]">No jobs in the catalog yet.</p>
-                        <Link
-                          href={recordJobHref}
-                          className="inline-flex items-center px-3 py-2 rounded-[12px] text-xs font-semibold bg-[#0B3B2C] text-white"
-                        >
-                          Record a job
-                        </Link>
-                      </div>
-                    ) : filteredJobs.length === 0 ? (
+                    {filteredJobs.length === 0 ? (
                       <div className="px-4 py-8 text-center space-y-3">
                         <p className="text-xs font-semibold text-[#334155]">No matching jobs found.</p>
-                        <Link
-                          href={recordJobHref}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsJobOpen(false);
+                            setJobSource("lead");
+                          }}
                           className="inline-flex items-center px-3 py-2 rounded-[12px] text-xs font-semibold border border-[#DDE5E0] bg-white text-[#0B3B2C]"
                         >
-                          Record a new job
-                        </Link>
+                          + Add candidate-specific job
+                        </button>
                       </div>
                     ) : (
                       filteredJobs.map((j) => (
@@ -709,7 +941,14 @@ export function ApplicationLogWorkbench({
                           onClick={() => selectJob(j.id)}
                           className="w-full text-left px-4 py-3.5 hover:bg-[#F7F9F8] transition border-b border-[#F1F5F3] last:border-0"
                         >
-                          <div className="text-sm font-semibold text-[#0F1720]">{j.title}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-semibold text-[#0F1720]">{j.title}</div>
+                            {j.visibility === "CANDIDATE_PRIVATE" ? (
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-[#0B3B2C]">
+                                Private
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="text-xs font-medium text-[#334155] mt-0.5">{j.companyName}</div>
                           <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-[11px] text-[#64748B]">
                             <span>
@@ -726,21 +965,26 @@ export function ApplicationLogWorkbench({
                       ))
                     )}
                   </div>
-                  {jobs.length > 0 && (
-                    <div className="p-3 border-t border-[#EDF1EF] bg-[#F7F9F8]/80 text-center">
-                      <p className="text-[11px] text-[#64748B] mb-2">Can&apos;t find the job?</p>
-                      <Link
-                        href={recordJobHref}
-                        className="inline-flex items-center text-xs font-semibold text-[#0B3B2C] hover:underline"
-                      >
-                        + Record a new job
-                      </Link>
-                    </div>
-                  )}
+                  <div className="p-3 border-t border-[#EDF1EF] bg-[#F7F9F8]/80 text-center space-y-1">
+                    <p className="text-[11px] text-[#64748B]">Can&apos;t find this job?</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsJobOpen(false);
+                        setJobSource("lead");
+                      }}
+                      className="inline-flex items-center text-xs font-semibold text-[#0B3B2C] hover:underline"
+                    >
+                      + Add candidate-specific job
+                    </button>
+                    <p className="text-[10px] text-[#94A3B8]">
+                      Created for this candidate only — not added to the Job Catalog.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* 3. JOB DETAILS (read-only from Job record) */}

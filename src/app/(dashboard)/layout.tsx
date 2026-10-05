@@ -5,6 +5,7 @@ import { RealtimeProvider } from "@/components/RealtimeProvider";
 import { AppShell } from "@/components/navigation/AppShell";
 import { NavigationPerfProbe } from "@/components/navigation/NavigationPerfProbe";
 import type { SubscriptionScope } from "@/lib/realtime";
+import { buildCandidateRealtimeScope } from "@/lib/realtime/candidate-identity";
 
 export default async function DashboardLayout({
   children,
@@ -18,13 +19,21 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const realtimeScope: SubscriptionScope = {
-    role: ctx.role === "CANDIDATE" ? "CANDIDATE" : ctx.role === "ADMIN" ? "ADMIN" : "EMPLOYEE",
-    organizationId: ctx.organizationId,
-    userId: ctx.userId,
-    // Candidate channels key off userId until candidateId is resolved client-side
-    candidateId: ctx.role === "CANDIDATE" ? ctx.userId : null,
-  };
+  // INTENTIONAL IDENTITY CONTRACT:
+  // Candidate realtime channels are keyed by Auth/User.id (ctx.userId), NOT Prisma Candidate.id.
+  // Publishers set event.candidateId to the candidate's User.id so subscribe/publish match.
+  const realtimeScope: SubscriptionScope =
+    ctx.role === "CANDIDATE"
+      ? buildCandidateRealtimeScope({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+        })
+      : {
+          role: ctx.role === "ADMIN" ? "ADMIN" : "EMPLOYEE",
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          candidateId: null,
+        };
 
   return (
     <>

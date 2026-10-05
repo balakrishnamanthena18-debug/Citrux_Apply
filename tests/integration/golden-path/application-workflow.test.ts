@@ -19,6 +19,10 @@ import {
   JobStatus,
   TaskStatus,
 } from "@/generated/prisma";
+import {
+  jobSnapshotSyncTxStubs,
+  withJobWriteFields,
+} from "../../helpers/job-snapshot-tx";
 
 vi.mock("@/lib/auth/context", () => ({
   getAuthenticatedContext: vi.fn(),
@@ -59,15 +63,26 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
     vi.mocked(withRlsContext).mockImplementation(async (_userId, callback) => {
       const tx = {
         job: {
-          create: vi.fn().mockResolvedValue({
-            id: mockJobAId,
-            organizationId: mockOrgId,
-            title: "Staff Distributed Systems Engineer",
-            companyName: "Stripe",
-            jobDescription: "Build distributed core payment engines.",
-            status: JobStatus.OPEN,
-          }),
+          create: vi.fn().mockResolvedValue(
+            withJobWriteFields(
+              {
+                id: mockJobAId,
+                organizationId: mockOrgId,
+                title: "Staff Distributed Systems Engineer",
+                companyName: "Stripe",
+                status: JobStatus.OPEN,
+              },
+              {
+                organizationId: mockOrgId,
+                jobDescription: "Build distributed core payment engines.",
+              }
+            )
+          ),
         },
+        ...jobSnapshotSyncTxStubs({
+          organizationId: mockOrgId,
+          jobId: mockJobAId,
+        }),
       };
       return callback(tx as any);
     });
@@ -95,11 +110,24 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
           }),
         },
         job: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: mockJobAId,
+            organizationId: mockOrgId,
+            status: JobStatus.OPEN,
+            visibility: "GLOBAL",
+            ownerCandidateId: null,
+          }),
           findUnique: vi.fn().mockResolvedValue({
             id: mockJobAId,
             organizationId: mockOrgId,
             status: JobStatus.OPEN,
+            visibility: "GLOBAL",
+            ownerCandidateId: null,
           }),
+        },
+        candidateJobOpportunity: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
         },
         application: {
           findFirst: vi.fn().mockResolvedValue(null),

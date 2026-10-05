@@ -10,6 +10,7 @@ import { ProfessionalSummaryEditor } from "./ProfessionalSummaryEditor";
 import { ExperienceEditor } from "./ExperienceEditor";
 import { EducationEditor } from "./EducationEditor";
 import { SkillsManager } from "./SkillsManager";
+import { ProjectEditor } from "./ProjectEditor";
 import { CertificationManager } from "./CertificationManager";
 import { WorkAuthorizationPanel } from "./WorkAuthorizationPanel";
 import { JobPreferencesEditor } from "./JobPreferencesEditor";
@@ -33,6 +34,8 @@ export function CandidateCareerWorkspace({
   initialSection = "overview",
 }: Props) {
   const router = useRouter();
+  // Parent page remounts this workspace via `key` after server refresh so local
+  // state stays aligned with canonical candidate data without sync effects.
   const [candidate, setCandidate] = useState(initialCandidate);
   const [activeSection, setActiveSection] = useState<CareerSectionKey>(initialSection);
 
@@ -44,6 +47,7 @@ export function CandidateCareerWorkspace({
     experiences: candidate.experiences?.length || 0,
     educations: candidate.educations?.length || 0,
     skills: candidate.skills?.length || 0,
+    projects: candidate.projects?.length || 0,
     certifications: candidate.certifications?.length || 0,
     documents: candidate.documents?.length || 0,
     needsAttentionCount:
@@ -98,6 +102,7 @@ export function CandidateCareerWorkspace({
             { key: "experience", label: `Experience (${counts.experiences})` },
             { key: "education", label: `Education (${counts.educations})` },
             { key: "skills", label: `Skills (${counts.skills})` },
+            { key: "projects", label: `Projects (${counts.projects})` },
             { key: "certifications", label: `Certs (${counts.certifications})` },
             { key: "work_auth", label: "Work Auth" },
             { key: "preferences", label: "Preferences" },
@@ -181,6 +186,13 @@ export function CandidateCareerWorkspace({
             <SkillsManager
               skills={candidate.skills || []}
               onSkillsChanged={handleRefresh}
+            />
+          )}
+
+          {activeSection === "projects" && (
+            <ProjectEditor
+              projects={candidate.projects || []}
+              onProjectsChanged={handleRefresh}
             />
           )}
 

@@ -36,6 +36,13 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z
     .string()
     .optional(),
+  /**
+   * Phase 2 Application Intelligence — experimental NVIDIA NIM credentials.
+   * Server-only. Never NEXT_PUBLIC_*. Never persist to DB/logs/audit.
+   * Adapter registration is gated; absence means NullAIProvider / AI unavailable.
+   */
+  NVIDIA_API_KEY: z.string().min(1).optional(),
+  NVIDIA_API_BASE_URL: z.string().url().optional(),
 });
 
 const publicEnvSchema = z.object({

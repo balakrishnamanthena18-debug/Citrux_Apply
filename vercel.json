@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/rate-limit-cleanup",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/intelligence-worker",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

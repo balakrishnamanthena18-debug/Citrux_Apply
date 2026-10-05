@@ -58,4 +58,13 @@ describe("Environment Validation (src/lib/env.ts)", () => {
     };
     expect(() => parseEnv(invalidOrgEnv)).toThrow(/OPERATING_ORGANIZATION_ID must be a valid UUID/);
   });
+
+  it("accepts optional NVIDIA server-only credentials without requiring them", () => {
+    expect(parseEnv(validMockEnv).NVIDIA_API_KEY).toBeUndefined();
+    const withNvidia = parseEnv({
+      ...validMockEnv,
+      NVIDIA_API_KEY: "nvapi-test-placeholder",
+    });
+    expect(withNvidia.NVIDIA_API_KEY).toBe("nvapi-test-placeholder");
+  });
 });

@@ -52,7 +52,12 @@ describe("Application Lifecycle & Universal Approval Integration (tests/integrat
           findUnique: vi.fn().mockResolvedValue({ id: mockCandidateId, organizationId: mockOrgId, status: "ACTIVE" }),
         },
         job: {
-          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN" }),
+          findFirst: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+          findUnique: vi.fn().mockResolvedValue({ id: mockJobId, organizationId: mockOrgId, status: "OPEN", visibility: "GLOBAL", ownerCandidateId: null }),
+        },
+        candidateJobOpportunity: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
         },
         application: {
           findFirst: vi.fn().mockResolvedValue(null),

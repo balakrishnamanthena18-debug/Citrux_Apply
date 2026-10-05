@@ -65,6 +65,16 @@ export function ProfileOverviewSection({
           : "No skills cataloged yet",
     },
     {
+      id: "projects",
+      label: "Projects",
+      section: "projects" as CareerSectionKey,
+      isComplete: candidate.projects && candidate.projects.length > 0,
+      detail:
+        candidate.projects && candidate.projects.length > 0
+          ? `${candidate.projects.length} project(s) recorded`
+          : "No projects added yet",
+    },
+    {
       id: "work_auth",
       label: "Work Authorization",
       section: "work_auth" as CareerSectionKey,

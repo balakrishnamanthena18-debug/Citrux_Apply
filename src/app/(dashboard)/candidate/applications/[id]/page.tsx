@@ -15,6 +15,9 @@ import {
   getCandidateStatusPresentation,
   getCandidateActionRequirement,
 } from "@/lib/utils/status-presenter";
+import { loadCandidateApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
+import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
+import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -53,14 +56,42 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
       orderBy: { updatedAt: "desc" },
     });
 
-    return { application: app, candidate, existingConv };
+    let intelligence: ApplicationIntelligenceViewModel | null = null;
+    let intelligenceLoadFailed = false;
+    if (app) {
+      try {
+        const intel = await loadCandidateApplicationIntelligence({
+          db: tx,
+          applicationId: app.id,
+          candidateId: candidate.id,
+        });
+        intelligence = intel.ok ? intel.view : null;
+        if (!intel.ok) intelligenceLoadFailed = false; // same safe empty denial as detail
+      } catch {
+        intelligenceLoadFailed = true;
+      }
+    }
+
+    return {
+      application: app,
+      candidate,
+      existingConv,
+      intelligence,
+      intelligenceLoadFailed,
+    };
   });
 
   if (!data || !data.application) {
     notFound();
   }
 
-  const { application, candidate, existingConv } = data;
+  const {
+    application,
+    candidate,
+    existingConv,
+    intelligence,
+    intelligenceLoadFailed,
+  } = data;
   const currentMaterial = application.materials[0];
   const presentation = getCandidateStatusPresentation(application.status);
   const actionReq = getCandidateActionRequirement(application.status);
@@ -327,8 +358,14 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
             )}
         </div>
 
-        {/* Right Column: Tailored Materials & Submission Receipts */}
+        {/* Right Column: Intelligence, Tailored Materials & Submission Receipts */}
         <div className="lg:col-span-2 space-y-6">
+          <ApplicationIntelligencePanel
+            view={intelligence}
+            audience="candidate"
+            loadFailed={intelligenceLoadFailed}
+          />
+
           {/* Tailored Application Materials */}
           <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

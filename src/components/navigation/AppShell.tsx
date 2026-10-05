@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -42,12 +42,14 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
       <div className="min-h-screen bg-[#F7F9F8] antialiased text-[#0F1720] selection:bg-emerald-500/20 selection:text-[#0B3B2C]">
         {/* Desktop Fixed Persistent Sidebar (>= 1024px / lg:) */}
         <div className="hidden lg:block">
-          <AppSidebar
-            role={role}
-            email={email}
-            fullName={fullName}
-            isMobile={false}
-          />
+          <Suspense fallback={null}>
+            <AppSidebar
+              role={role}
+              email={email}
+              fullName={fullName}
+              isMobile={false}
+            />
+          </Suspense>
         </div>
 
         {/* Mobile & Tablet Slide-over Drawer (< 1024px) */}
@@ -69,13 +71,15 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
               className="relative z-50 flex h-full w-[min(320px,86vw)] max-w-[320px] flex-col border-r border-[#E5EAE7] bg-white shadow-xl transition-transform duration-200 ease-out"
               style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
             >
-              <AppSidebar
-                role={role}
-                email={email}
-                fullName={fullName}
-                isMobile={true}
-                onClose={() => setMobileMenuOpen(false)}
-              />
+              <Suspense fallback={null}>
+                <AppSidebar
+                  role={role}
+                  email={email}
+                  fullName={fullName}
+                  isMobile={true}
+                  onClose={() => setMobileMenuOpen(false)}
+                />
+              </Suspense>
             </div>
           </div>
         )}
@@ -94,7 +98,11 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
           </main>
         </div>
 
-        <MobileBottomNav role={role} onOpenMore={() => setMobileMenuOpen(true)} />
+        {/* Hide tab bar while the More drawer is open so its fixed layer
+            cannot cover the drawer footer (Sign Out). */}
+        {!mobileMenuOpen && (
+          <MobileBottomNav role={role} onOpenMore={() => setMobileMenuOpen(true)} />
+        )}
       </div>
     </NavigationPendingProvider>
   );

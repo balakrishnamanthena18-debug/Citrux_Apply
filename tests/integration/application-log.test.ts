@@ -68,14 +68,25 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
         }),
       },
       job: {
-        findUnique: vi.fn().mockResolvedValue({
+        findFirst: vi.fn().mockResolvedValue({
           id: mockJobId,
           status: JobStatus.OPEN,
           title: "Staff Frontend Engineer",
           companyName: "Airbnb",
           source: "Company Career",
+          visibility: "GLOBAL",
+          ownerCandidateId: null,
+          organizationId: mockOrgId,
         }),
         create: vi.fn(),
+      },
+      candidateJobOpportunity: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: "99999999-9999-4999-8999-999999999999",
+          candidateId: mockCandidateId,
+          jobId: mockJobId,
+        }),
       },
       application: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -171,7 +182,7 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
         }),
       },
       job: {
-        findUnique: vi.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
       },
     };
 
@@ -208,13 +219,22 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
         }),
       },
       job: {
-        findUnique: vi.fn().mockResolvedValue({
+        findFirst: vi.fn().mockResolvedValue({
           id: mockJobId,
           status: JobStatus.OPEN,
           title: "Staff Engineer",
           companyName: "Google",
           source: "LinkedIn",
+          visibility: "GLOBAL",
+          ownerCandidateId: null,
+          organizationId: mockOrgId,
         }),
+      },
+      candidateJobOpportunity: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "99999999-9999-4999-8999-999999999999",
+        }),
+        create: vi.fn(),
       },
       application: {
         findFirst: vi.fn().mockResolvedValue({

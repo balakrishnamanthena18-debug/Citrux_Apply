@@ -20,6 +20,8 @@ export interface JobListItem {
   source?: string | null;
   externalUrl?: string | null;
   createdAt: string | Date;
+  visibility?: "GLOBAL" | "CANDIDATE_PRIVATE";
+  ownerCandidateName?: string;
   _count: { applications: number };
 }
 
@@ -35,24 +37,36 @@ const JOB_SOURCES = [
 ];
 
 interface Props {
-  jobs: JobListItem[];
+  catalogJobs: JobListItem[];
+  leadJobs: JobListItem[];
   onCreateJob: (formData: FormData) => Promise<void>;
+  onShareToCatalog?: (jobId: string) => Promise<{ success: boolean; error?: string }>;
+  canShareToCatalog?: boolean;
   returnToDesk?: boolean;
   returnCandidateId?: string;
+  initialTab?: "catalog" | "leads";
 }
 
 export function EmployeeJobsWorkbench({
-  jobs,
+  catalogJobs,
+  leadJobs,
   onCreateJob,
+  onShareToCatalog,
+  canShareToCatalog = false,
   returnToDesk = false,
   returnCandidateId = "",
+  initialTab = "catalog",
 }: Props) {
+  const [tab, setTab] = useState<"catalog" | "leads">(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [sourceFilter, setSourceFilter] = useState("ALL");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [isPending, startTransition] = useTransition();
+  const [shareError, setShareError] = useState<string | null>(null);
   const pageSize = 15;
+
+  const jobs = tab === "catalog" ? catalogJobs : leadJobs;
 
   const filtered = useMemo(() => {
     let result = jobs;
@@ -91,16 +105,49 @@ export function EmployeeJobsWorkbench({
       <div className="bg-white p-5 rounded-[16px] border border-[#E5EAE7] shadow-2xs">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[#0F1720]">Job Catalog & Sourcing</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[#0F1720]">Job Opportunities</h1>
             <p className="text-xs text-[#64748B] mt-0.5">
-              Record opportunities found externally on LinkedIn, Indeed, or career pages for candidate application matching.
+              Organization Job Catalog (reusable) and candidate-specific job leads in your operational scope.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#EDF1EF] text-[#0F1720] border border-[#E5EAE7]">
-              {jobs.length} Active Catalog {jobs.length === 1 ? "Job" : "Jobs"}
+              {catalogJobs.length} Catalog
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#0B3B2C]/10 text-[#0B3B2C] border border-[#0B3B2C]/15">
+              {leadJobs.length} Private leads
             </span>
           </div>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setTab("catalog");
+              setPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-[12px] text-xs font-semibold border transition ${
+              tab === "catalog"
+                ? "bg-[#12A150]/10 border-[#12A150]/30 text-[#0B3B2C]"
+                : "bg-white border-[#E5EAE7] text-[#64748B]"
+            }`}
+          >
+            Job Catalog
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("leads");
+              setPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-[12px] text-xs font-semibold border transition ${
+              tab === "leads"
+                ? "bg-[#12A150]/10 border-[#12A150]/30 text-[#0B3B2C]"
+                : "bg-white border-[#E5EAE7] text-[#64748B]"
+            }`}
+          >
+            My Candidate Job Leads
+          </button>
         </div>
       </div>
 
@@ -109,10 +156,10 @@ export function EmployeeJobsWorkbench({
         <div className="lg:col-span-1 bg-white p-5 rounded-[16px] border border-[#E5EAE7] shadow-2xs space-y-4">
           <div className="border-b border-[#EDF1EF] pb-3">
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#0F1720]">
-              Record External Job
+              Add to Job Catalog
             </h2>
             <p className="text-[11px] text-[#64748B] mt-0.5">
-              Enter details discovered from external job listings.
+              Reusable organization jobs. For a candidate-only lead, use Application Desk → Candidate Job Lead.
             </p>
           </div>
 
@@ -312,6 +359,11 @@ export function EmployeeJobsWorkbench({
             </div>
 
             <table className="min-w-full divide-y divide-[#E5EAE7] text-left text-xs">
+              {shareError ? (
+                <div className="mx-4 mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-800">
+                  {shareError}
+                </div>
+              ) : null}
               <thead className="bg-[#F7F9F8] font-semibold uppercase tracking-wider text-[#64748B] text-[11px]">
                 <tr>
                   <th className="px-4 py-3">Title & Company</th>
@@ -319,12 +371,18 @@ export function EmployeeJobsWorkbench({
                   <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Applications</th>
                   <th className="px-4 py-3">Created</th>
+                  {tab === "leads" && canShareToCatalog ? (
+                    <th className="px-4 py-3">Actions</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5EAE7]">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-[#94A3B8] italic">
+                    <td
+                      colSpan={tab === "leads" && canShareToCatalog ? 6 : 5}
+                      className="px-4 py-8 text-center text-[#94A3B8] italic"
+                    >
                       No jobs matched the current filters.
                     </td>
                   </tr>
@@ -332,8 +390,20 @@ export function EmployeeJobsWorkbench({
                   paginated.map((job) => (
                     <tr key={job.id} className="hover:bg-[#F7F9F8]/80 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="font-bold text-[#0F1720]">{job.title}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-[#0F1720]">{job.title}</div>
+                          {job.visibility === "CANDIDATE_PRIVATE" && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#0B3B2C] bg-[#0B3B2C]/10 px-1.5 py-0.5 rounded">
+                              Private
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[#64748B] font-medium">{job.companyName}</div>
+                        {job.ownerCandidateName && (
+                          <div className="text-[11px] text-[#0B3B2C] mt-0.5">
+                            For {job.ownerCandidateName}
+                          </div>
+                        )}
                         {job.externalUrl && (
                           <a
                             href={job.externalUrl}
@@ -366,6 +436,26 @@ export function EmployeeJobsWorkbench({
                       <td className="px-4 py-3 text-[#64748B] text-[11px]">
                         {new Date(job.createdAt).toLocaleDateString()}
                       </td>
+                      {tab === "leads" && canShareToCatalog && onShareToCatalog ? (
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => {
+                              setShareError(null);
+                              startTransition(async () => {
+                                const res = await onShareToCatalog(job.id);
+                                if (!res.success) {
+                                  setShareError(res.error || "Failed to share to catalog");
+                                }
+                              });
+                            }}
+                            className="rounded-md border border-[#0B3B2C]/25 bg-[#0B3B2C]/5 px-2 py-1 text-[11px] font-semibold text-[#0B3B2C] hover:bg-[#0B3B2C]/10 disabled:opacity-50"
+                          >
+                            Share with Job Catalog
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   ))
                 )}

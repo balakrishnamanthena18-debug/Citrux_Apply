@@ -123,6 +123,16 @@ describe("Comprehensive IDOR & Authorization Negative-Path Matrix (tests/integra
             }),
             update: vi.fn().mockResolvedValue({ id: candidateBCandId }),
           },
+          application: { findMany: vi.fn().mockResolvedValue([]) },
+          applicationIntelligenceRun: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
+          applicationAlignmentResult: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
+          applicationReadinessResult: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
         };
         return callback(tx as any);
       });

@@ -23,6 +23,9 @@ import { formatSalary, getCandidateStatusPresentation } from "@/lib/utils/status
 import { RecordHeader } from "@/components/ui/RecordHeader";
 import { ApplicationLifecycleBar } from "@/components/application/ApplicationLifecycleBar";
 import { TelemetryGauge } from "@/components/ui/TelemetryGauge";
+import { loadStaffApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
+import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
+import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -33,7 +36,8 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);
 
-  const { application, employees, candidateDocs } = await withRlsContext(ctx.userId, async (tx) => {
+  const { application, employees, candidateDocs, intelligence, intelligenceLoadFailed } =
+    await withRlsContext(ctx.userId, async (tx) => {
     const app = await tx.application.findUnique({
       where: { id, organizationId: ctx.organizationId },
       include: {
@@ -55,7 +59,15 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
         stateHistory: { orderBy: { createdAt: "desc" }, include: { changedBy: true } },
       },
     });
-    if (!app) return { application: null, employees: [], candidateDocs: [] };
+    if (!app) {
+      return {
+        application: null,
+        employees: [],
+        candidateDocs: [],
+        intelligence: null as ApplicationIntelligenceViewModel | null,
+        intelligenceLoadFailed: false,
+      };
+    }
 
     const emps = await tx.membership.findMany({
       where: { organizationId: ctx.organizationId, role: { in: ["EMPLOYEE", "ADMIN"] }, status: "ACTIVE" },
@@ -67,7 +79,26 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
       orderBy: { createdAt: "desc" },
     });
 
-    return { application: app, employees: emps, candidateDocs: docs };
+    let intel: ApplicationIntelligenceViewModel | null = null;
+    let intelFailed = false;
+    try {
+      const loaded = await loadStaffApplicationIntelligence({
+        db: tx,
+        applicationId: app.id,
+        organizationId: ctx.organizationId,
+      });
+      intel = loaded.ok ? loaded.view : null;
+    } catch {
+      intelFailed = true;
+    }
+
+    return {
+      application: app,
+      employees: emps,
+      candidateDocs: docs,
+      intelligence: intel,
+      intelligenceLoadFailed: intelFailed,
+    };
   });
 
   if (!application) {
@@ -510,6 +541,12 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
               </div>
             </div>
           </div>
+
+          <ApplicationIntelligencePanel
+            view={intelligence}
+            audience="staff"
+            loadFailed={intelligenceLoadFailed}
+          />
 
           {/* Application Materials Preparation */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">

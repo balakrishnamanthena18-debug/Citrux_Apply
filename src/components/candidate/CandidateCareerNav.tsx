@@ -1,20 +1,10 @@
 "use client";
 
 import React from "react";
+import type { CareerSectionKey } from "@/lib/candidate/career-sections";
 
-export type CareerSectionKey =
-  | "overview"
-  | "personal"
-  | "summary"
-  | "experience"
-  | "education"
-  | "skills"
-  | "certifications"
-  | "work_auth"
-  | "preferences"
-  | "documents"
-  | "verification"
-  | "history";
+export type { CareerSectionKey };
+export { CAREER_SECTION_KEYS, isCareerSectionKey } from "@/lib/candidate/career-sections";
 
 export interface NavSectionItem {
   key: CareerSectionKey;
@@ -31,6 +21,7 @@ interface Props {
     experiences: number;
     educations: number;
     skills: number;
+    projects: number;
     certifications: number;
     documents: number;
     needsAttentionCount?: number;
@@ -75,6 +66,12 @@ export function CandidateCareerNav({
       label: "Skills Catalog",
       badge: counts?.skills,
       icon: "⚡",
+    },
+    {
+      key: "projects",
+      label: "Projects",
+      badge: counts?.projects,
+      icon: "🛠️",
     },
     {
       key: "certifications",

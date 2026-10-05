@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAuthenticatedContext, requireEmployeeOrAdmin } from "@/lib/auth/context";
+import { getAuthenticatedContext, requireAdmin, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { logUserAuditEvent } from "@/lib/audit";
 import {
   JobCreateSchema,
   JobUpdateSchema,
+  CandidateJobLeadCreateSchema,
+  ShareJobToCatalogSchema,
   ApplicationCreateSchema,
   ApplicationMaterialSchema,
   ApplicationStatusTransitionSchema,
@@ -19,6 +21,8 @@ import {
   StartApplicationDeskSchema,
   type JobCreateInput,
   type JobUpdateInput,
+  type CandidateJobLeadCreateInput,
+  type ShareJobToCatalogInput,
   type ApplicationCreateInput,
   type ApplicationMaterialInput,
   type ApplicationStatusTransitionInput,
@@ -37,8 +41,12 @@ import {
   AuditAction,
   Role,
   JobStatus,
+  JobVisibility,
   Prisma,
 } from "@/generated/prisma";
+import { syncJobDescriptionSnapshotAfterJobWrite } from "@/lib/application-intelligence/requirement-set";
+import { markApplicationIntelligenceStale } from "@/lib/application-intelligence/runs";
+import { freshnessAfterTrigger } from "@/lib/application-intelligence/stale";
 import {
   AuthorizationError,
   ConflictError,
@@ -46,6 +54,11 @@ import {
   NotFoundError,
   ValidationError,
 } from "@/lib/errors";
+import {
+  assertJobUsableForCandidate,
+  catalogJobsWhere,
+  deskJobsWhere,
+} from "@/lib/job/visibility";
 
 import { ALLOWED_APPLICATION_TRANSITIONS } from "./constants";
 
@@ -61,6 +74,7 @@ function revalidateApplicationViews(applicationId?: string) {
     revalidatePath("/employee/application-log");
     revalidatePath("/employee/applications");
     revalidatePath("/employee/jobs");
+    revalidatePath("/employee/candidates");
     revalidatePath("/employee");
     revalidatePath("/candidate/applications");
     revalidatePath("/candidate");
@@ -91,8 +105,17 @@ export async function createJobAction(
     const ctx = await getAuthenticatedContext();
     requireEmployeeOrAdmin(ctx);
 
+    // Catalog create path: always GLOBAL (private leads use createCandidateJobLeadAction).
+    const visibility = parsed.data.visibility ?? JobVisibility.GLOBAL;
+    if (visibility !== JobVisibility.GLOBAL) {
+      return {
+        success: false,
+        error: "Use Create Job Lead for candidate-private jobs",
+      };
+    }
+
     const job = await withRlsContext(ctx.userId, async (tx) => {
-      return tx.job.create({
+      const created = await tx.job.create({
         data: {
           organizationId: ctx.organizationId,
           title: parsed.data.title,
@@ -108,9 +131,26 @@ export async function createJobAction(
           externalUrl: parsed.data.externalUrl || null,
           qualificationNotes: parsed.data.qualificationNotes || null,
           status: JobStatus.OPEN,
+          visibility: JobVisibility.GLOBAL,
+          ownerCandidateId: null,
           createdById: ctx.userId,
         },
       });
+
+      await syncJobDescriptionSnapshotAfterJobWrite(
+        tx,
+        {
+          id: created.id,
+          organizationId: created.organizationId,
+          jobDescription: created.jobDescription,
+          externalUrl: created.externalUrl,
+          source: created.source,
+          updatedAt: created.updatedAt,
+        },
+        ctx.userId
+      );
+
+      return created;
     });
 
     await logUserAuditEvent({
@@ -119,7 +159,11 @@ export async function createJobAction(
       action: "JOB_CREATED",
       entityType: "Job",
       entityId: job.id,
-      details: { title: job.title, companyName: job.companyName },
+      details: {
+        title: job.title,
+        companyName: job.companyName,
+        visibility: JobVisibility.GLOBAL,
+      },
     });
 
     revalidateApplicationViews();
@@ -127,6 +171,182 @@ export async function createJobAction(
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to create job" };
   }
+}
+
+/**
+ * Creates a CANDIDATE_PRIVATE job lead + CandidateJobOpportunity.
+ * Does NOT enter the organization Job Catalog.
+ */
+export async function createCandidateJobLeadAction(
+  input: CandidateJobLeadCreateInput
+): Promise<ActionResult<{ jobId: string; opportunityId: string }>> {
+  const parsed = CandidateJobLeadCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireEmployeeOrAdmin(ctx);
+
+    const result = await withRlsContext(ctx.userId, async (tx) => {
+      const candidate = await tx.candidate.findFirst({
+        where: {
+          id: parsed.data.candidateId,
+          organizationId: ctx.organizationId,
+          status: { not: "ARCHIVED" },
+        },
+        select: { id: true },
+      });
+      if (!candidate) throw new NotFoundError("Candidate not found or unauthorized");
+
+      const job = await tx.job.create({
+        data: {
+          organizationId: ctx.organizationId,
+          title: parsed.data.title,
+          companyName: parsed.data.companyName,
+          jobDescription: parsed.data.jobDescription,
+          location: parsed.data.location || null,
+          isRemote: parsed.data.isRemote,
+          employmentType: parsed.data.employmentType,
+          salaryMin: parsed.data.salaryMin ?? null,
+          salaryMax: parsed.data.salaryMax ?? null,
+          salaryCurrency: parsed.data.salaryCurrency,
+          source: parsed.data.source || null,
+          externalUrl: parsed.data.externalUrl || null,
+          status: JobStatus.OPEN,
+          visibility: JobVisibility.CANDIDATE_PRIVATE,
+          ownerCandidateId: candidate.id,
+          createdById: ctx.userId,
+        },
+      });
+
+      await syncJobDescriptionSnapshotAfterJobWrite(
+        tx,
+        {
+          id: job.id,
+          organizationId: job.organizationId,
+          jobDescription: job.jobDescription,
+          externalUrl: job.externalUrl,
+          source: job.source,
+          updatedAt: job.updatedAt,
+        },
+        ctx.userId
+      );
+
+      const opportunity = await tx.candidateJobOpportunity.create({
+        data: {
+          organizationId: ctx.organizationId,
+          candidateId: candidate.id,
+          jobId: job.id,
+          discoveredById: ctx.userId,
+          status: "ACTIVE",
+        },
+      });
+
+      return { jobId: job.id, opportunityId: opportunity.id, title: job.title, companyName: job.companyName };
+    });
+
+    await logUserAuditEvent({
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
+      action: "JOB_CREATED",
+      entityType: "Job",
+      entityId: result.jobId,
+      details: {
+        title: result.title,
+        companyName: result.companyName,
+        visibility: JobVisibility.CANDIDATE_PRIVATE,
+        ownerCandidateId: parsed.data.candidateId,
+        opportunityId: result.opportunityId,
+      },
+    });
+
+    revalidateApplicationViews();
+    return {
+      success: true,
+      data: { jobId: result.jobId, opportunityId: result.opportunityId },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to create candidate job lead" };
+  }
+}
+
+/** Promote a private job lead into the organization Job Catalog (ADMIN only). */
+export async function shareJobToCatalogAction(
+  input: ShareJobToCatalogInput
+): Promise<ActionResult<{ jobId: string }>> {
+  const parsed = ShareJobToCatalogSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireAdmin(ctx);
+
+    const job = await withRlsContext(ctx.userId, async (tx) => {
+      const existing = await tx.job.findFirst({
+        where: { id: parsed.data.jobId, organizationId: ctx.organizationId },
+      });
+      if (!existing) throw new NotFoundError("Job not found");
+      if (existing.visibility === JobVisibility.GLOBAL) {
+        return existing;
+      }
+
+      return tx.job.update({
+        where: { id: existing.id },
+        data: {
+          visibility: JobVisibility.GLOBAL,
+          ownerCandidateId: null,
+        },
+      });
+    });
+
+    await logUserAuditEvent({
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
+      action: "JOB_UPDATED",
+      entityType: "Job",
+      entityId: job.id,
+      details: { sharedToCatalog: true, visibility: JobVisibility.GLOBAL },
+    });
+
+    revalidateApplicationViews();
+    return { success: true, data: { jobId: job.id } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to share job to catalog" };
+  }
+}
+
+async function ensureCandidateJobOpportunity(
+  tx: Prisma.TransactionClient,
+  args: {
+    organizationId: string;
+    candidateId: string;
+    jobId: string;
+    discoveredById: string;
+  }
+) {
+  const existing = await tx.candidateJobOpportunity.findUnique({
+    where: {
+      candidateId_jobId: {
+        candidateId: args.candidateId,
+        jobId: args.jobId,
+      },
+    },
+  });
+  if (existing) return existing;
+
+  return tx.candidateJobOpportunity.create({
+    data: {
+      organizationId: args.organizationId,
+      candidateId: args.candidateId,
+      jobId: args.jobId,
+      discoveredById: args.discoveredById,
+      status: "ACTIVE",
+    },
+  });
 }
 
 export async function updateJobAction(
@@ -147,7 +367,7 @@ export async function updateJobAction(
       });
       if (!existing) throw new NotFoundError("Job not found");
 
-      return tx.job.update({
+      const updated = await tx.job.update({
         where: { id: existing.id },
         data: {
           title: parsed.data.title,
@@ -165,6 +385,21 @@ export async function updateJobAction(
           status: parsed.data.status,
         },
       });
+
+      await syncJobDescriptionSnapshotAfterJobWrite(
+        tx,
+        {
+          id: updated.id,
+          organizationId: updated.organizationId,
+          jobDescription: updated.jobDescription,
+          externalUrl: updated.externalUrl,
+          source: updated.source,
+          updatedAt: updated.updatedAt,
+        },
+        ctx.userId
+      );
+
+      return updated;
     });
 
     await logUserAuditEvent({
@@ -209,14 +444,22 @@ export async function createApplicationAction(
         throw new ValidationError("Cannot create applications for archived candidates");
       }
 
-      // 2. Verify job exists in same org and is OPEN
-      const job = await tx.job.findUnique({
+      // 2. Verify job is OPEN and scoped for this candidate
+      const job = await tx.job.findFirst({
         where: { id: parsed.data.jobId, organizationId: ctx.organizationId },
       });
       if (!job) throw new NotFoundError("Job not found in organization");
       if (job.status !== "OPEN") {
         throw new ValidationError(`Cannot create applications for ${job.status} jobs`);
       }
+      assertJobUsableForCandidate(job, ctx.organizationId, candidate.id);
+
+      const opportunity = await ensureCandidateJobOpportunity(tx, {
+        organizationId: ctx.organizationId,
+        candidateId: candidate.id,
+        jobId: job.id,
+        discoveredById: ctx.userId,
+      });
 
       // 3. Check partial unique index constraint: only 1 active/non-terminal application per candidate+job
       const existingActive = await tx.application.findFirst({
@@ -253,6 +496,7 @@ export async function createApplicationAction(
           organizationId: ctx.organizationId,
           candidateId: candidate.id,
           jobId: job.id,
+          candidateJobOpportunityId: opportunity.id,
           status: ApplicationStatus.DISCOVERED,
           assignedEmployeeId: parsed.data.assignedEmployeeId || null,
         },
@@ -390,7 +634,7 @@ export async function updateApplicationMaterialAction(
         data: { isCurrent: false },
       });
 
-      return tx.applicationMaterial.create({
+      const created = await tx.applicationMaterial.create({
         data: {
           applicationId: app.id,
           candidateDocumentId: parsed.data.candidateDocumentId || null,
@@ -402,6 +646,16 @@ export async function updateApplicationMaterialAction(
           createdById: ctx.userId,
         },
       });
+
+      // Gate 12: material version change → mark prior intelligence STALE (no recompute).
+      await markApplicationIntelligenceStale(tx, {
+        applicationId: app.id,
+        organizationId: ctx.organizationId,
+        actorUserId: ctx.userId,
+        freshness: freshnessAfterTrigger("APPLICATION_MATERIAL_CHANGED"),
+      });
+
+      return created;
     });
 
     await logUserAuditEvent({
@@ -1198,8 +1452,8 @@ export async function startApplicationFromDeskAction(
         throw new ValidationError("Cannot create applications for an archived candidate");
       }
 
-      // 2. Verify Job exists in org catalog and is OPEN (authoritative Job reference)
-      const job = await tx.job.findUnique({
+      // 2. Verify Job is OPEN and usable for THIS candidate (catalog or their private lead)
+      const job = await tx.job.findFirst({
         where: { id: parsed.data.jobId, organizationId: ctx.organizationId },
         select: {
           id: true,
@@ -1207,6 +1461,9 @@ export async function startApplicationFromDeskAction(
           title: true,
           companyName: true,
           source: true,
+          visibility: true,
+          ownerCandidateId: true,
+          organizationId: true,
         },
       });
       if (!job) {
@@ -1215,8 +1472,17 @@ export async function startApplicationFromDeskAction(
       if (job.status !== JobStatus.OPEN) {
         throw new ValidationError(`Cannot create applications for ${job.status} jobs`);
       }
+      assertJobUsableForCandidate(job, ctx.organizationId, candidate.id);
 
-      // 3. Prevent duplicate active applications for same candidate + job
+      // 3. Ensure CandidateJobOpportunity (no Job duplication)
+      const opportunity = await ensureCandidateJobOpportunity(tx, {
+        organizationId: ctx.organizationId,
+        candidateId: candidate.id,
+        jobId: job.id,
+        discoveredById: ctx.userId,
+      });
+
+      // 4. Prevent duplicate active applications for same candidate + job
       const existingApp = await tx.application.findFirst({
         where: {
           candidateId: candidate.id,
@@ -1232,18 +1498,18 @@ export async function startApplicationFromDeskAction(
         );
       }
 
-      // 4. Create canonical Application in initial DISCOVERED status
+      // 5. Create canonical Application linked to Job + Opportunity
       const application = await tx.application.create({
         data: {
           organizationId: ctx.organizationId,
           candidateId: candidate.id,
           jobId: job.id,
+          candidateJobOpportunityId: opportunity.id,
           assignedEmployeeId: ctx.userId,
           status: ApplicationStatus.DISCOVERED,
         },
       });
 
-      // 5. Create initial ApplicationStateHistory
       await tx.applicationStateHistory.create({
         data: {
           applicationId: application.id,
@@ -1254,7 +1520,6 @@ export async function startApplicationFromDeskAction(
         },
       });
 
-      // 6. Record staff internal note if provided
       if (parsed.data.internalNotes) {
         await tx.internalNote.create({
           data: {
@@ -1270,6 +1535,7 @@ export async function startApplicationFromDeskAction(
       return {
         applicationId: application.id,
         jobId: job.id,
+        opportunityId: opportunity.id,
         isExistingJob: true,
         jobTitle: job.title,
         companyName: job.companyName,
@@ -1277,7 +1543,6 @@ export async function startApplicationFromDeskAction(
       };
     });
 
-    // 7. Authoritative Audit event
     await logUserAuditEvent({
       userId: ctx.userId,
       organizationId: ctx.organizationId,
@@ -1288,6 +1553,7 @@ export async function startApplicationFromDeskAction(
         viaApplicationDesk: true,
         candidateId: parsed.data.candidateId,
         jobId: result.jobId,
+        opportunityId: result.opportunityId,
         isExistingJob: true,
       },
     });
@@ -1513,9 +1779,13 @@ export async function searchDeskCandidatesAction(
   }
 }
 
-/** Server-side OPEN job search for Application Desk (no jobDescription in list). */
+/**
+ * Server-side OPEN job search for Application Desk.
+ * Requires candidateId — returns GLOBAL catalog jobs + that candidate's private leads only.
+ */
 export async function searchDeskJobsAction(
-  query: string
+  query: string,
+  candidateId?: string
 ): Promise<
   ActionResult<
     Array<{
@@ -1531,6 +1801,98 @@ export async function searchDeskJobsAction(
       source: string | null;
       externalUrl: string | null;
       jobDescription: string | null;
+      visibility: "GLOBAL" | "CANDIDATE_PRIVATE";
+    }>
+  >
+> {
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireEmployeeOrAdmin(ctx);
+    if (!candidateId) {
+      return { success: false, error: "Select a candidate before searching jobs" };
+    }
+    const q = query.trim();
+
+    const rows = await withRlsContext(ctx.userId, async (tx) => {
+      const candidate = await tx.candidate.findFirst({
+        where: {
+          id: candidateId,
+          organizationId: ctx.organizationId,
+          status: { not: "ARCHIVED" },
+        },
+        select: { id: true },
+      });
+      if (!candidate) throw new NotFoundError("Candidate not found");
+
+      const scope = deskJobsWhere(ctx.organizationId, candidate.id);
+      return tx.job.findMany({
+        where: {
+          AND: [
+            scope,
+            ...(q
+              ? [
+                  {
+                    OR: [
+                      { title: { contains: q, mode: "insensitive" as const } },
+                      { companyName: { contains: q, mode: "insensitive" as const } },
+                      { location: { contains: q, mode: "insensitive" as const } },
+                      { source: { contains: q, mode: "insensitive" as const } },
+                    ],
+                  },
+                ]
+              : []),
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          companyName: true,
+          location: true,
+          isRemote: true,
+          employmentType: true,
+          salaryMin: true,
+          salaryMax: true,
+          salaryCurrency: true,
+          source: true,
+          externalUrl: true,
+          visibility: true,
+        },
+        orderBy: [{ visibility: "asc" }, { createdAt: "desc" }],
+        take: DESK_SEARCH_LIMIT,
+      });
+    });
+
+    return {
+      success: true,
+      data: rows.map((j) => ({
+        ...j,
+        salaryCurrency: j.salaryCurrency || "USD",
+        jobDescription: null,
+      })),
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to search jobs" };
+  }
+}
+
+/** Catalog-only search (GLOBAL reusable jobs). */
+export async function searchCatalogJobsAction(
+  query: string
+): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      title: string;
+      companyName: string;
+      location: string | null;
+      isRemote: boolean;
+      employmentType: string;
+      salaryMin: number | null;
+      salaryMax: number | null;
+      salaryCurrency: string;
+      source: string | null;
+      externalUrl: string | null;
+      visibility: "GLOBAL";
     }>
   >
 > {
@@ -1542,7 +1904,7 @@ export async function searchDeskJobsAction(
     const rows = await withRlsContext(ctx.userId, async (tx) => {
       return tx.job.findMany({
         where: {
-          organizationId: ctx.organizationId,
+          ...catalogJobsWhere(ctx.organizationId),
           status: JobStatus.OPEN,
           ...(q
             ? {
@@ -1567,6 +1929,7 @@ export async function searchDeskJobsAction(
           salaryCurrency: true,
           source: true,
           externalUrl: true,
+          visibility: true,
         },
         orderBy: { createdAt: "desc" },
         take: DESK_SEARCH_LIMIT,
@@ -1578,17 +1941,21 @@ export async function searchDeskJobsAction(
       data: rows.map((j) => ({
         ...j,
         salaryCurrency: j.salaryCurrency || "USD",
-        jobDescription: null,
+        visibility: "GLOBAL" as const,
       })),
     };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to search jobs" };
+    return { success: false, error: err.message || "Failed to search catalog jobs" };
   }
 }
 
-/** Fetch job description only when Inspect/select needs the detail panel. */
+/**
+ * Fetch job description for Desk select/inspect.
+ * Requires candidateId so CANDIDATE_PRIVATE jobs cannot be loaded outside that candidate's scope.
+ */
 export async function getDeskJobDetailAction(
-  jobId: string
+  jobId: string,
+  candidateId?: string
 ): Promise<
   ActionResult<{
     id: string;
@@ -1603,18 +1970,34 @@ export async function getDeskJobDetailAction(
     source: string | null;
     externalUrl: string | null;
     jobDescription: string | null;
+    visibility: "GLOBAL" | "CANDIDATE_PRIVATE";
   }>
 > {
   try {
     const ctx = await getAuthenticatedContext();
     requireEmployeeOrAdmin(ctx);
+    if (!candidateId) {
+      return { success: false, error: "Select a candidate before loading job details" };
+    }
 
     const job = await withRlsContext(ctx.userId, async (tx) => {
+      const candidate = await tx.candidate.findFirst({
+        where: {
+          id: candidateId,
+          organizationId: ctx.organizationId,
+          status: { not: "ARCHIVED" },
+        },
+        select: { id: true },
+      });
+      if (!candidate) throw new NotFoundError("Candidate not found");
+
+      // Scope at query boundary: GLOBAL + this candidate's private leads only (never another candidate's).
       return tx.job.findFirst({
         where: {
-          id: jobId,
-          organizationId: ctx.organizationId,
-          status: JobStatus.OPEN,
+          AND: [
+            deskJobsWhere(ctx.organizationId, candidate.id),
+            { id: jobId },
+          ],
         },
         select: {
           id: true,
@@ -1629,6 +2012,8 @@ export async function getDeskJobDetailAction(
           source: true,
           externalUrl: true,
           jobDescription: true,
+          visibility: true,
+          ownerCandidateId: true,
         },
       });
     });

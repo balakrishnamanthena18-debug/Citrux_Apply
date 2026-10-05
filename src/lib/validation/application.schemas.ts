@@ -37,6 +37,8 @@ export const ApplicationApprovalStatusEnum = z.enum([
   "REVISION_REQUESTED",
 ]);
 
+export const JobVisibilityEnum = z.enum(["GLOBAL", "CANDIDATE_PRIVATE"]);
+
 export const JobCreateSchema = z.object({
   title: z.string().trim().min(1, "Job title is required").max(255),
   companyName: z.string().trim().min(1, "Company name is required").max(255),
@@ -50,6 +52,43 @@ export const JobCreateSchema = z.object({
   source: z.string().trim().max(100).optional().nullable(),
   externalUrl: z.string().trim().url().max(1024).optional().nullable().or(z.literal("")),
   qualificationNotes: z.string().trim().max(5000).optional().nullable(),
+  /** Defaults to GLOBAL catalog. Use createCandidateJobLeadAction for private leads. */
+  visibility: JobVisibilityEnum.default("GLOBAL"),
+  ownerCandidateId: z.string().uuid().optional().nullable(),
+}).superRefine((val, ctx) => {
+  if (val.visibility === "CANDIDATE_PRIVATE" && !val.ownerCandidateId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Candidate-private jobs require an owner candidate",
+      path: ["ownerCandidateId"],
+    });
+  }
+  if (val.visibility === "GLOBAL" && val.ownerCandidateId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Catalog jobs cannot be owned by a candidate",
+      path: ["ownerCandidateId"],
+    });
+  }
+});
+
+export const CandidateJobLeadCreateSchema = z.object({
+  candidateId: z.string().uuid("Select a candidate."),
+  title: z.string().trim().min(1, "Job title is required").max(255),
+  companyName: z.string().trim().min(1, "Company name is required").max(255),
+  jobDescription: z.string().trim().min(1, "Job description is required"),
+  location: z.string().trim().max(255).optional().nullable(),
+  isRemote: z.boolean().default(false),
+  employmentType: JobEmploymentTypeEnum.default("FULL_TIME"),
+  salaryMin: z.number().int().min(0).max(10000000).optional().nullable(),
+  salaryMax: z.number().int().min(0).max(10000000).optional().nullable(),
+  salaryCurrency: z.string().trim().min(3).max(10).default("USD"),
+  source: z.string().trim().max(100).optional().nullable(),
+  externalUrl: z.string().trim().url().max(1024).optional().nullable().or(z.literal("")),
+});
+
+export const ShareJobToCatalogSchema = z.object({
+  jobId: z.string().uuid("Invalid job ID"),
 });
 
 export const JobUpdateSchema = z.object({
@@ -135,6 +174,8 @@ export const StartApplicationDeskSchema = z.object({
 
 export type JobCreateInput = z.input<typeof JobCreateSchema>;
 export type JobUpdateInput = z.input<typeof JobUpdateSchema>;
+export type CandidateJobLeadCreateInput = z.input<typeof CandidateJobLeadCreateSchema>;
+export type ShareJobToCatalogInput = z.input<typeof ShareJobToCatalogSchema>;
 export type ApplicationCreateInput = z.input<typeof ApplicationCreateSchema>;
 export type ApplicationMaterialInput = z.input<typeof ApplicationMaterialSchema>;
 export type ApplicationStatusTransitionInput = z.input<typeof ApplicationStatusTransitionSchema>;

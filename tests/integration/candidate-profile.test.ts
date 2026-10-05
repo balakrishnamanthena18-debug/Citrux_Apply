@@ -6,6 +6,8 @@ import {
   deleteCandidateExperienceAction,
   upsertCandidateEducationAction,
   deleteCandidateEducationAction,
+  upsertCandidateProjectAction,
+  deleteCandidateProjectAction,
   syncCandidateSkillsAction,
 } from "@/lib/candidate/actions";
 import { getAuthenticatedContext } from "@/lib/auth/context";
@@ -32,6 +34,7 @@ describe("Candidate Profile Management Integration (tests/integration/candidate-
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withRlsContext).mockReset();
     vi.mocked(getAuthenticatedContext).mockResolvedValue({
       userId: mockUserId,
       email: "candidate@test.com",
@@ -84,6 +87,17 @@ describe("Candidate Profile Management Integration (tests/integration/candidate-
             id: mockCandidateId,
             headline: "Staff Software Engineer",
           }),
+        },
+        // Gate 12: profile update marks intelligence stale when present
+        application: { findMany: vi.fn().mockResolvedValue([]) },
+        applicationIntelligenceRun: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        applicationAlignmentResult: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        applicationReadinessResult: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
         },
       };
       return callback(tx as any);
@@ -261,7 +275,166 @@ describe("Candidate Profile Management Integration (tests/integration/candidate-
     expect(delResult.success).toBe(true);
   });
 
-  it("6. Synchronizes candidate skills with locked minimal schema (name string only)", async () => {
+  it("6. Creates, updates, and deletes candidate projects with ownership scoping", async () => {
+    const mockProjectId = "123e4567-e89b-12d3-a456-426614174010";
+
+    vi.mocked(withRlsContext).mockImplementationOnce(async (_userId, callback) => {
+      const tx = {
+        candidate: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: mockCandidateId,
+            userId: mockUserId,
+            status: "ACTIVE",
+          }),
+        },
+        candidateProject: {
+          create: vi.fn().mockResolvedValue({
+            id: mockProjectId,
+            candidateId: mockCandidateId,
+            title: "Inventory sync service",
+          }),
+        },
+      };
+      return callback(tx as any);
+    });
+
+    const createResult = await upsertCandidateProjectAction({
+      title: "Inventory sync service",
+      role: "Lead engineer",
+      description: "Built warehouse sync.",
+      technologies: ["TypeScript", "PostgreSQL"],
+      startDate: "2024-01-01",
+      endDate: "2024-06-30",
+    });
+
+    expect(createResult.success).toBe(true);
+    expect(createResult.data?.projectId).toBe(mockProjectId);
+    expect(logUserAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "CANDIDATE_PROFILE_UPDATED",
+        entityType: "CandidateProject",
+        entityId: mockProjectId,
+      })
+    );
+
+    vi.mocked(withRlsContext).mockImplementationOnce(async (_userId, callback) => {
+      const tx = {
+        candidate: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: mockCandidateId,
+            userId: mockUserId,
+            status: "ACTIVE",
+          }),
+        },
+        candidateProject: {
+          findFirst: vi.fn().mockResolvedValue({ id: mockProjectId }),
+          update: vi.fn().mockResolvedValue({
+            id: mockProjectId,
+            title: "Inventory sync service v2",
+          }),
+        },
+      };
+      return callback(tx as any);
+    });
+
+    const updateResult = await upsertCandidateProjectAction({
+      id: mockProjectId,
+      title: "Inventory sync service v2",
+      technologies: ["TypeScript"],
+    });
+    expect(updateResult.success).toBe(true);
+
+    vi.mocked(withRlsContext).mockImplementationOnce(async (_userId, callback) => {
+      const tx = {
+        candidate: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: mockCandidateId,
+            userId: mockUserId,
+            status: "ACTIVE",
+          }),
+        },
+        candidateProject: {
+          findFirst: vi.fn().mockResolvedValue({ id: mockProjectId }),
+          delete: vi.fn().mockResolvedValue({ id: mockProjectId }),
+        },
+      };
+      return callback(tx as any);
+    });
+
+    const deleteResult = await deleteCandidateProjectAction(mockProjectId);
+    expect(deleteResult.success).toBe(true);
+  });
+
+  it("6b. Blocks project update/delete when project is outside candidate ownership", async () => {
+    const foreignProjectId = "123e4567-e89b-12d3-a456-426614174099";
+
+    vi.mocked(withRlsContext).mockImplementationOnce(async (_userId, callback) => {
+      const tx = {
+        candidate: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: mockCandidateId,
+            userId: mockUserId,
+            status: "ACTIVE",
+          }),
+        },
+        candidateProject: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+      };
+      return callback(tx as any);
+    });
+
+    const updateResult = await upsertCandidateProjectAction({
+      id: foreignProjectId,
+      title: "Should not update",
+    });
+    expect(updateResult.success).toBe(false);
+    expect(updateResult.error).toBe("Project not found");
+
+    vi.mocked(withRlsContext).mockImplementationOnce(async (_userId, callback) => {
+      const tx = {
+        candidate: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: mockCandidateId,
+            userId: mockUserId,
+            status: "ACTIVE",
+          }),
+        },
+        candidateProject: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+      };
+      return callback(tx as any);
+    });
+
+    const deleteResult = await deleteCandidateProjectAction(foreignProjectId);
+    expect(deleteResult.success).toBe(false);
+    expect(deleteResult.error).toBe("Project not found");
+  });
+
+  it("6c. Rejects invalid project validation and non-candidate roles", async () => {
+    const validation = await upsertCandidateProjectAction({
+      title: "",
+    } as any);
+    expect(validation.success).toBe(false);
+
+    vi.mocked(getAuthenticatedContext).mockResolvedValueOnce({
+      userId: mockUserId,
+      email: "employee@test.com",
+      role: "EMPLOYEE" as any,
+      organizationId: mockOrgId,
+      status: "ACTIVE" as any,
+      membershipStatus: "ACTIVE" as any,
+    });
+
+    const roleDenied = await upsertCandidateProjectAction({
+      title: "Should reject for employee",
+    });
+    expect(roleDenied.success).toBe(false);
+    expect(roleDenied.error).toContain("Only candidates");
+  });
+
+  it("7. Synchronizes candidate skills with locked minimal schema (name string only)", async () => {
     vi.mocked(withRlsContext).mockImplementation(async (_userId, callback) => {
       const tx = {
         candidate: {

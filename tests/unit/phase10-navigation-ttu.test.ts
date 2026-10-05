@@ -95,9 +95,9 @@ describe("Phase 10 — Navigation Time-to-Usable invariants", () => {
           role: "CANDIDATE",
           organizationId: "org-a",
           userId: "user-1",
-          candidateId: "cand-1",
+          candidateId: "user-1",
         })
-      ).toBe("candidate:cand-1");
+      ).toBe("candidate:user-1");
 
       expect(
         getChannelName({

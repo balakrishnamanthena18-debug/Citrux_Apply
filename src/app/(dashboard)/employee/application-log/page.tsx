@@ -1,6 +1,7 @@
 import { requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withAuthenticatedData } from "@/lib/db/authenticated-data";
 import { ApplicationStatus, JobStatus } from "@/generated/prisma";
+import { catalogJobsWhere } from "@/lib/job/visibility";
 import {
   ApplicationLogWorkbench,
   type CandidateOption,
@@ -46,6 +47,7 @@ function mapJob(j: {
   source: string | null;
   externalUrl: string | null;
   jobDescription?: string | null;
+  visibility?: "GLOBAL" | "CANDIDATE_PRIVATE";
 }): JobOption {
   return {
     id: j.id,
@@ -60,6 +62,7 @@ function mapJob(j: {
     source: j.source,
     externalUrl: j.externalUrl,
     jobDescription: j.jobDescription ?? null,
+    visibility: j.visibility ?? "GLOBAL",
   };
 }
 
@@ -125,18 +128,19 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
         orderBy: [{ user: { firstName: "asc" } }, { user: { lastName: "asc" } }],
         take: DESK_SELECTOR_LIMIT,
       }),
+      // Initial catalog page: GLOBAL reusable jobs only (never private leads).
       tx.job.findMany({
         where: {
-          organizationId: auth.organizationId,
+          ...catalogJobsWhere(auth.organizationId),
           status: JobStatus.OPEN,
         },
-        select: jobListSelect,
+        select: { ...jobListSelect, visibility: true },
         orderBy: { createdAt: "desc" },
         take: DESK_SELECTOR_LIMIT,
       }),
       tx.job.count({
         where: {
-          organizationId: auth.organizationId,
+          ...catalogJobsWhere(auth.organizationId),
           status: JobStatus.OPEN,
         },
       }),
@@ -188,8 +192,15 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
           id: selectedJobId,
           organizationId: auth.organizationId,
           status: JobStatus.OPEN,
+          // Allow preselect of GLOBAL or private lead for the selected candidate only.
+          OR: [
+            { visibility: "GLOBAL" },
+            ...(selectedCandidateId
+              ? [{ visibility: "CANDIDATE_PRIVATE" as const, ownerCandidateId: selectedCandidateId }]
+              : []),
+          ],
         },
-        select: { ...jobListSelect, jobDescription: true },
+        select: { ...jobListSelect, jobDescription: true, visibility: true },
       });
       if (job) {
         selectedJobDetail = mapJob(job);

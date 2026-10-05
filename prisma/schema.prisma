@@ -98,6 +98,19 @@ enum JobStatus {
   ARCHIVED
 }
 
+/// GLOBAL = organization Job Catalog (reusable).
+/// CANDIDATE_PRIVATE = candidate-specific job lead (not catalog).
+enum JobVisibility {
+  GLOBAL
+  CANDIDATE_PRIVATE
+}
+
+enum CandidateJobOpportunityStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
 enum JobEmploymentType {
   FULL_TIME
   PART_TIME
@@ -273,6 +286,18 @@ enum AuditAction {
   TASK_GOVERNANCE_POLICY_UPDATED
   EMPLOYEE_TEAM_LEAD_CHANGED
   TASK_CREATION_DENIED
+
+  // Phase 2 Application Intelligence foundation (contracts only; no AI execution)
+  JOB_DESCRIPTION_SNAPSHOT_CAPTURED
+  JOB_REQUIREMENT_SET_CREATED
+  JOB_REQUIREMENT_SET_INVALIDATED
+  APPLICATION_INTELLIGENCE_REQUESTED
+  APPLICATION_INTELLIGENCE_STARTED
+  APPLICATION_INTELLIGENCE_COMPLETED
+  APPLICATION_INTELLIGENCE_FAILED
+  APPLICATION_INTELLIGENCE_INVALIDATED
+  APPLICATION_INTELLIGENCE_MARKED_STALE
+  APPLICATION_INTELLIGENCE_RECOMPUTE_REQUESTED
 }
 
 enum DesignationStatus {
@@ -308,6 +333,7 @@ model Organization {
   auditEvents           AuditEvent[]
   candidates            Candidate[]
   jobs                  Job[]
+  candidateJobOpportunities CandidateJobOpportunity[]
   applications          Application[]
   tasks                 Task[]
   taskGovernancePolicy  TaskGovernancePolicy?
@@ -317,6 +343,12 @@ model Organization {
   notifications         Notification[]
   emailDeliveryLogs     EmailDeliveryLog[]
   privacyRequests       PrivacyRequest[]
+  jobDescriptionSnapshots JobDescriptionSnapshot[]
+  jobRequirementSets      JobRequirementSet[]
+  applicationIntelligenceRuns ApplicationIntelligenceRun[]
+  applicationAlignmentResults ApplicationAlignmentResult[]
+  applicationReadinessResults ApplicationReadinessResult[]
+  candidateFactAttestations   CandidateFactAttestation[]
 
   @@map("organizations")
 }
@@ -355,6 +387,7 @@ model User {
   verifiedCandidates   Candidate[]               @relation("CandidateVerifier")
   uploadedDocuments    CandidateDocument[]       @relation("DocumentUploader")
   createdJobs          Job[]                     @relation("JobCreator")
+  discoveredJobOpportunities CandidateJobOpportunity[] @relation("OpportunityDiscoverer")
   assignedApplications Application[]             @relation("ApplicationAssignee")
   approvedApplications     Application[]             @relation("ApplicationApprover")
   createdMaterials         ApplicationMaterial[]     @relation("MaterialCreator")
@@ -372,6 +405,8 @@ model User {
   privacyRequestsSubmitted PrivacyRequest[]          @relation("PrivacyRequestedBy")
   privacyRequestsVerified  PrivacyRequest[]          @relation("PrivacyVerifiedBy")
   privacyRequestsCompleted PrivacyRequest[]          @relation("PrivacyCompletedBy")
+  intelligenceRunsRequested ApplicationIntelligenceRun[] @relation("IntelligenceRunRequester")
+  factAttestationsAuthored  CandidateFactAttestation[]   @relation("FactAttestationAuthor")
 
   @@map("users")
 }
@@ -511,10 +546,14 @@ model Candidate {
   certifications       CandidateCertification[]
   documents            CandidateDocument[]
   applications         Application[]
+  jobOpportunities     CandidateJobOpportunity[]
+  ownedPrivateJobs     Job[]                     @relation("PrivateJobOwner")
   tasks                Task[]
   conversations        Conversation[]
   internalNotes        InternalNote[]
   privacyRequests      PrivacyRequest[]
+  intelligenceRuns     ApplicationIntelligenceRun[]
+  factAttestations     CandidateFactAttestation[]
 
   @@index([organizationId, status])
   @@index([assignedEmployeeId, status])
@@ -657,17 +696,54 @@ model Job {
   externalUrl        String?           @db.VarChar(1024)
   qualificationNotes String?           @db.Text
   status             JobStatus         @default(OPEN)
+  /// GLOBAL = catalog; CANDIDATE_PRIVATE = lead for ownerCandidateId only.
+  visibility         JobVisibility     @default(GLOBAL)
+  /// Required when visibility = CANDIDATE_PRIVATE; null for catalog jobs.
+  ownerCandidateId   String?           @db.Uuid
   createdById        String            @db.Uuid
   createdAt          DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
 
   organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdBy          User              @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  ownerCandidate     Candidate?        @relation("PrivateJobOwner", fields: [ownerCandidateId], references: [id], onDelete: Restrict)
   applications       Application[]
+  opportunities      CandidateJobOpportunity[]
   tasks              Task[]
+  descriptionSnapshots JobDescriptionSnapshot[]
+  requirementSets      JobRequirementSet[]
+  intelligenceRuns     ApplicationIntelligenceRun[]
 
   @@index([organizationId, status])
+  @@index([organizationId, visibility, status])
+  @@index([ownerCandidateId, status])
   @@map("jobs")
+}
+
+/// Operational decision to pursue a Job for a specific Candidate.
+/// Application references both this opportunity and the canonical Job.
+model CandidateJobOpportunity {
+  id              String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String                        @db.Uuid
+  candidateId     String                        @db.Uuid
+  jobId           String                        @db.Uuid
+  discoveredById  String                        @db.Uuid
+  status          CandidateJobOpportunityStatus @default(ACTIVE)
+  notes           String?                       @db.Text
+  createdAt       DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime                      @default(now()) @updatedAt @db.Timestamptz(6)
+
+  organization    Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate       Candidate                     @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  job             Job                           @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  discoveredBy    User                          @relation("OpportunityDiscoverer", fields: [discoveredById], references: [id], onDelete: Restrict)
+  applications    Application[]
+
+  @@unique([candidateId, jobId])
+  @@index([organizationId, status])
+  @@index([candidateId, status])
+  @@index([jobId])
+  @@map("candidate_job_opportunities")
 }
 
 model Application {
@@ -675,6 +751,8 @@ model Application {
   organizationId       String                     @db.Uuid
   candidateId          String                     @db.Uuid
   jobId                String                     @db.Uuid
+  /// Operational opportunity link (backfilled for legacy apps).
+  candidateJobOpportunityId String?               @db.Uuid
   status               ApplicationStatus          @default(DISCOVERED)
   assignedEmployeeId   String?                    @db.Uuid
   approvalStatus       ApplicationApprovalStatus?
@@ -691,6 +769,7 @@ model Application {
   organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   candidate            Candidate                  @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   job                  Job                        @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  candidateJobOpportunity CandidateJobOpportunity? @relation(fields: [candidateJobOpportunityId], references: [id], onDelete: SetNull)
   assignedEmployee     User?                      @relation("ApplicationAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
   approver             User?                      @relation("ApplicationApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
   materials            ApplicationMaterial[]
@@ -700,10 +779,14 @@ model Application {
   qaReviews            ApplicationQaReview[]
   conversations        Conversation[]
   internalNotes        InternalNote[]
+  intelligenceRuns     ApplicationIntelligenceRun[]
+  alignmentResults     ApplicationAlignmentResult[]
+  readinessResults     ApplicationReadinessResult[]
 
   @@index([organizationId, status])
   @@index([assignedEmployeeId, status])
   @@index([candidateId, status])
+  @@index([candidateJobOpportunityId])
   @@map("applications")
 }
 
@@ -1092,4 +1175,218 @@ model RateLimitBucket {
   @@map("rate_limit_buckets")
 }
 
+// ==========================================
+// Phase 2 — Application Intelligence foundation
+// Contracts + persistence only. No AI execution.
+// ==========================================
 
+/// Provenance of a candidate fact referenced by intelligence.
+/// AI_INFERRED must never become canonical Candidate truth automatically.
+enum FactProvenance {
+  VERIFIED
+  CANDIDATE_PROVIDED
+  EMPLOYEE_PROVIDED
+  AI_INFERRED
+  UNKNOWN
+}
+
+enum IntelligenceRunStatus {
+  QUEUED
+  RUNNING
+  RETRY_PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum IntelligenceResultFreshness {
+  CURRENT
+  STALE
+  RECOMPUTE_REQUIRED
+}
+
+enum IntelligenceValidationStatus {
+  PENDING
+  PASSED
+  FAILED
+  SKIPPED
+}
+
+/// Immutable JD capture. Analyses must pin to a snapshot, never live Job.jobDescription alone.
+model JobDescriptionSnapshot {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String   @db.Uuid
+  jobId            String   @db.Uuid
+  sourceText       String   @db.Text
+  contentHash      String   @db.VarChar(64)
+  sourceUrl        String?  @db.VarChar(1024)
+  sourceLabel      String?  @db.VarChar(100)
+  sourceVersionId  String   @db.VarChar(128)
+  capturedAt       DateTime @default(now()) @db.Timestamptz(6)
+  capturedById     String?  @db.Uuid
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  job              Job          @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  requirementSets  JobRequirementSet[]
+  intelligenceRuns ApplicationIntelligenceRun[]
+
+  @@unique([jobId, contentHash])
+  @@index([organizationId, jobId])
+  @@index([jobId, capturedAt])
+  @@map("job_description_snapshots")
+}
+
+/// Structured requirements container bound to an exact JD snapshot.
+/// Never floats independently of its source snapshot. Content is append-only;
+/// freshness may be marked STALE/RECOMPUTE_REQUIRED when a newer snapshot exists.
+model JobRequirementSet {
+  id                String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String                      @db.Uuid
+  jobId             String                      @db.Uuid
+  snapshotId        String                      @db.Uuid
+  schemaVersion     String                      @db.VarChar(32)
+  extractionVersion String                      @db.VarChar(32)
+  normalizationVersion String                   @db.VarChar(32)
+  freshness         IntelligenceResultFreshness @default(CURRENT)
+  /// JSON array of structured requirements (see requirements-contract).
+  requirements      Json                        @default("[]") @db.JsonB
+  createdAt         DateTime                    @default(now()) @db.Timestamptz(6)
+
+  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  job               Job                         @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  snapshot          JobDescriptionSnapshot      @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  intelligenceRuns  ApplicationIntelligenceRun[]
+
+  @@index([organizationId, jobId])
+  @@index([snapshotId])
+  @@index([jobId, freshness])
+  @@map("job_requirement_sets")
+}
+
+/// Traceable intelligence analysis request/execution record.
+model ApplicationIntelligenceRun {
+  id                 String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String                        @db.Uuid
+  /// Optional: job-only analyses (e.g. JOB_REQUIREMENT_EXTRACTION) omit candidate/application.
+  candidateId        String?                       @db.Uuid
+  applicationId      String?                       @db.Uuid
+  jobId              String                        @db.Uuid
+  snapshotId         String                        @db.Uuid
+  requirementSetId   String?
+  requestedById      String?
+  /// e.g. JOB_REQUIREMENT_EXTRACTION | APPLICATION_INTELLIGENCE
+  analysisPurpose    String                        @default("APPLICATION_INTELLIGENCE") @db.VarChar(64)
+  status             IntelligenceRunStatus         @default(QUEUED)
+  freshness          IntelligenceResultFreshness   @default(CURRENT)
+  validationStatus   IntelligenceValidationStatus  @default(PENDING)
+  provider           String                        @db.VarChar(64)
+  model              String                        @db.VarChar(128)
+  promptVersion      String                        @db.VarChar(64)
+  schemaVersion      String                        @db.VarChar(64)
+  scoringVersion     String                        @db.VarChar(64)
+  idempotencyKey     String                        @db.VarChar(191)
+  sourceDataVersion  String                        @db.VarChar(128)
+  attemptCount       Int                           @default(0)
+  maxAttempts        Int                           @default(3)
+  leaseExpiresAt     DateTime?                     @db.Timestamptz(6)
+  /// Validated provider envelope only (Gate 4). Not Alignment/Readiness scoring.
+  validatedPayload   Json?                         @db.JsonB
+  providerRequestId  String?                       @db.VarChar(128)
+  errorCode          String?                       @db.VarChar(64)
+  errorMessage       String?                       @db.Text
+  createdAt          DateTime                      @default(now()) @db.Timestamptz(6)
+  startedAt          DateTime?                     @db.Timestamptz(6)
+  completedAt        DateTime?                     @db.Timestamptz(6)
+
+  organization       Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate          Candidate?                    @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  application        Application?                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job                Job                           @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  snapshot           JobDescriptionSnapshot        @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  requirementSet     JobRequirementSet?            @relation(fields: [requirementSetId], references: [id], onDelete: SetNull)
+  requestedBy        User?                         @relation("IntelligenceRunRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  alignmentResult    ApplicationAlignmentResult?
+  readinessResult    ApplicationReadinessResult?
+
+  @@unique([idempotencyKey])
+  @@index([organizationId, applicationId, createdAt])
+  @@index([candidateId, createdAt])
+  @@index([status, createdAt])
+  @@index([status, leaseExpiresAt])
+  @@index([applicationId, freshness, status])
+  @@index([analysisPurpose, jobId, createdAt])
+  @@map("application_intelligence_runs")
+}
+
+model ApplicationAlignmentResult {
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String                      @db.Uuid
+  applicationId    String                      @db.Uuid
+  runId            String                      @unique @db.Uuid
+  freshness        IntelligenceResultFreshness @default(CURRENT)
+  scoringVersion   String                      @db.VarChar(64)
+  overallScore     Int?
+  dimensionScores  Json                        @default("{}") @db.JsonB
+  evidence         Json                        @default("[]") @db.JsonB
+  createdAt        DateTime                    @default(now()) @db.Timestamptz(6)
+
+  organization     Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  application      Application                 @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  run              ApplicationIntelligenceRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, applicationId])
+  @@index([applicationId, freshness])
+  @@map("application_alignment_results")
+}
+
+model ApplicationReadinessResult {
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String                      @db.Uuid
+  applicationId    String                      @db.Uuid
+  runId            String                      @unique @db.Uuid
+  freshness        IntelligenceResultFreshness @default(CURRENT)
+  /// READY | READY_WITH_WARNINGS | REVIEW_REQUIRED | BLOCKED | UNKNOWN
+  readinessState   String                      @db.VarChar(32)
+  blockers         Json                        @default("[]") @db.JsonB
+  warnings         Json                        @default("[]") @db.JsonB
+  nextActions      Json                        @default("[]") @db.JsonB
+  evidence         Json                        @default("[]") @db.JsonB
+  createdAt        DateTime                    @default(now()) @db.Timestamptz(6)
+
+  organization     Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  application      Application                 @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  run              ApplicationIntelligenceRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, applicationId])
+  @@index([applicationId, freshness])
+  @@map("application_readiness_results")
+}
+
+/// Sparse field-level provenance attestations (Design Lock Option B).
+/// Default without a row: CANDIDATE_PROVIDED when the fact exists.
+/// AI_INFERRED must never be stored here as canonical truth.
+model CandidateFactAttestation {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String         @db.Uuid
+  candidateId    String         @db.Uuid
+  /// Career/entity type key, e.g. CandidateSkill | CandidateExperience | Candidate
+  entityType     String         @db.VarChar(64)
+  /// Entity row id; for Candidate-level fields use candidateId
+  entityId       String         @db.Uuid
+  /// Field name within entity, or "*" for entity-level attestation
+  field          String         @db.VarChar(128)
+  provenance     FactProvenance
+  attestedById   String?        @db.Uuid
+  attestedAt     DateTime       @default(now()) @db.Timestamptz(6)
+  note           String?        @db.Text
+  createdAt      DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(6)
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  candidate      Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  attestedBy     User?          @relation("FactAttestationAuthor", fields: [attestedById], references: [id], onDelete: SetNull)
+
+  @@unique([candidateId, entityType, entityId, field])
+  @@index([organizationId, candidateId])
+  @@index([candidateId, entityType, entityId])
+  @@map("candidate_fact_attestations")
+}

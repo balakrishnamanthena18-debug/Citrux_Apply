@@ -9,14 +9,24 @@ describe("Targeted Realtime Event Bus & Deduplication Unit Tests", () => {
   });
 
   describe("1. Scoped Channel Name Generation & Tenant Isolation", () => {
-    it("generates isolated candidate channel scoped strictly to candidateId", () => {
+    it("generates isolated candidate channel from the Auth/User.id channel key", () => {
+      // Production sets scope.candidateId = userId (not Prisma Candidate.id).
       const scope: SubscriptionScope = {
         role: "CANDIDATE",
         organizationId: "org-1",
         userId: "user-cand-1",
-        candidateId: "cand-123",
+        candidateId: "user-cand-1",
       };
-      expect(getChannelName(scope)).toBe("candidate:cand-123");
+      expect(getChannelName(scope)).toBe("candidate:user-cand-1");
+    });
+
+    it("falls back to userId when candidateId is omitted", () => {
+      const scope: SubscriptionScope = {
+        role: "CANDIDATE",
+        organizationId: "org-1",
+        userId: "user-cand-1",
+      };
+      expect(getChannelName(scope)).toBe("candidate:user-cand-1");
     });
 
     it("generates team-scoped channel for Team Leads with a team assignment", () => {

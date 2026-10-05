@@ -10,6 +10,7 @@ import {
   formatSalary,
   getCandidateActionRequirement,
 } from "@/lib/utils/status-presenter";
+import { formatApplicationCardDate } from "@/lib/utils/format-application-date";
 import { InstantTabs, TabItem } from "@/components/workbench/InstantTabs";
 import { InstantSearch } from "@/components/workbench/InstantSearch";
 import { TablePagination } from "@/components/workbench/TablePagination";
@@ -242,7 +243,7 @@ export function CandidateApplicationsWorkbench({
                       )}
 
                       <span className="text-xs text-[#94A3B8]">
-                        Updated {new Date(app.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                        Updated {formatApplicationCardDate(app.updatedAt, { year: false })}
                       </span>
                     </div>
 
@@ -266,7 +267,7 @@ export function CandidateApplicationsWorkbench({
 
                     {app.status === "SUBMITTED" && latestSub && (
                       <div className="text-[11px] text-emerald-800 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded inline-block">
-                        ✓ Submitted on {new Date(latestSub.submittedAt).toLocaleDateString()} (Attempt #{latestSub.attemptNumber})
+                        ✓ Submitted on {formatApplicationCardDate(latestSub.submittedAt)} (Attempt #{latestSub.attemptNumber})
                       </div>
                     )}
                   </div>

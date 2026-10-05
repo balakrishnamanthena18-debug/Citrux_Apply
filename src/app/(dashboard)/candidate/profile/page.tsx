@@ -2,13 +2,23 @@ import { getAuthenticatedContext } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { CandidateCareerWorkspace } from "@/components/candidate/CandidateCareerWorkspace";
 import { CandidateHistoryItem } from "@/components/candidate/CareerChangeHistory";
+import { isCareerSectionKey } from "@/lib/candidate/career-sections";
 import { AuditAction } from "@/generated/prisma";
 import { redirect } from "next/navigation";
 
-export default async function CandidateProfilePage() {
+interface Props {
+  searchParams?: Promise<{ section?: string }>;
+}
+
+export default async function CandidateProfilePage({ searchParams }: Props) {
   const ctx = await getAuthenticatedContext();
   if (ctx.role === "ADMIN") redirect("/admin");
   if (ctx.role === "EMPLOYEE") redirect("/employee");
+
+  const resolvedParams = searchParams ? await searchParams : {};
+  const initialSection = isCareerSectionKey(resolvedParams.section)
+    ? resolvedParams.section
+    : "overview";
 
   const data = await withRlsContext(ctx.userId, async (tx) => {
     let cand = await tx.candidate.findUnique({
@@ -142,12 +152,26 @@ export default async function CandidateProfilePage() {
     entityType: evt.entityType,
   }));
 
+  const workspaceKey = [
+    candidate.id,
+    candidate.updatedAt?.toISOString?.() ?? String(candidate.updatedAt ?? ""),
+    initialSection,
+    candidate.projects?.length ?? 0,
+    candidate.experiences?.length ?? 0,
+    candidate.educations?.length ?? 0,
+    candidate.skills?.length ?? 0,
+    candidate.certifications?.length ?? 0,
+    candidate.documents?.length ?? 0,
+  ].join(":");
+
   return (
     <CandidateCareerWorkspace
+      key={workspaceKey}
       candidate={candidate}
       userEmail={candidate.user?.email || ctx.email}
       userName={userName}
       changeHistory={changeHistory}
+      initialSection={initialSection}
     />
   );
 }

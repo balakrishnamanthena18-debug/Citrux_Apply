@@ -21,46 +21,110 @@ export default async function EmployeeCandidateDetailPage({
 
   const { id: candidateId } = await params;
 
-  const { candidate, staffMembers } = await withRlsContext(ctx.userId, async (tx) => {
-    const cand = await tx.candidate.findFirst({
-      where: { id: candidateId, organizationId: ctx.organizationId },
-      include: {
-        user: true,
-        assignedEmployee: true,
-        verifier: true,
-        experiences: { orderBy: { orderIndex: "asc" } },
-        educations: { orderBy: { orderIndex: "asc" } },
-        skills: { orderBy: { createdAt: "asc" } },
-        projects: { orderBy: { orderIndex: "asc" } },
-        certifications: { orderBy: { createdAt: "asc" } },
-        documents: { orderBy: { createdAt: "desc" } },
-        applications: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            job: true,
-            assignedEmployee: true,
+  const { candidate, staffMembers, privateOpportunities, catalogAvailable } = await withRlsContext(
+    ctx.userId,
+    async (tx) => {
+      const cand = await tx.candidate.findFirst({
+        where: { id: candidateId, organizationId: ctx.organizationId },
+        include: {
+          user: true,
+          assignedEmployee: true,
+          verifier: true,
+          experiences: { orderBy: { orderIndex: "asc" } },
+          educations: { orderBy: { orderIndex: "asc" } },
+          skills: { orderBy: { createdAt: "asc" } },
+          projects: { orderBy: { orderIndex: "asc" } },
+          certifications: { orderBy: { createdAt: "asc" } },
+          documents: { orderBy: { createdAt: "desc" } },
+          applications: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              job: true,
+              assignedEmployee: true,
+            },
+          },
+          tasks: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              assignedEmployee: true,
+            },
           },
         },
-        tasks: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            assignedEmployee: true,
-          },
+      });
+
+      const staff = await tx.membership.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          role: { in: ["EMPLOYEE", "ADMIN"] },
+          status: "ACTIVE",
         },
-      },
-    });
+        include: { user: true },
+      });
 
-    const staff = await tx.membership.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        role: { in: ["EMPLOYEE", "ADMIN"] },
-        status: "ACTIVE",
-      },
-      include: { user: true },
-    });
+      const privateOpps = cand
+        ? await tx.candidateJobOpportunity.findMany({
+            where: {
+              organizationId: ctx.organizationId,
+              candidateId: cand.id,
+              status: "ACTIVE",
+              job: { visibility: "CANDIDATE_PRIVATE" },
+            },
+            include: {
+              job: {
+                select: {
+                  id: true,
+                  title: true,
+                  companyName: true,
+                  source: true,
+                  location: true,
+                  isRemote: true,
+                  visibility: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+          })
+        : [];
 
-    return { candidate: cand, staffMembers: staff };
-  });
+      const linkedJobIds = cand
+        ? (
+            await tx.candidateJobOpportunity.findMany({
+              where: { candidateId: cand.id, organizationId: ctx.organizationId },
+              select: { jobId: true },
+            })
+          ).map((o) => o.jobId)
+        : [];
+
+      const catalogJobs = cand
+        ? await tx.job.findMany({
+            where: {
+              organizationId: ctx.organizationId,
+              visibility: "GLOBAL",
+              status: "OPEN",
+              ...(linkedJobIds.length > 0 ? { id: { notIn: linkedJobIds } } : {}),
+            },
+            select: {
+              id: true,
+              title: true,
+              companyName: true,
+              source: true,
+              location: true,
+              isRemote: true,
+            },
+            orderBy: { createdAt: "desc" },
+            take: 8,
+          })
+        : [];
+
+      return {
+        candidate: cand,
+        staffMembers: staff,
+        privateOpportunities: privateOpps,
+        catalogAvailable: catalogJobs,
+      };
+    }
+  );
 
   if (!candidate) {
     notFound();
@@ -293,6 +357,76 @@ export default async function EmployeeCandidateDetailPage({
         candidateName={candidateName}
         documents={candidate.documents as any}
       />
+
+      {/* Candidate Job Opportunities */}
+      <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-5">
+        <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Candidate Job Opportunities</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Private leads for this candidate versus reusable organization catalog jobs.
+            </p>
+          </div>
+          <Link
+            href={`/employee/application-log?candidateId=${candidate.id}`}
+            className="text-xs font-medium text-[#0B3B2C] hover:underline"
+          >
+            Open Application Desk →
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#0B3B2C]">
+              Candidate-specific
+            </div>
+            {privateOpportunities.length === 0 ? (
+              <div className="p-4 text-xs text-slate-500 border border-dashed border-slate-200 rounded-md">
+                No private job leads for this candidate yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                {privateOpportunities.map((opp) => (
+                  <div key={opp.id} className="px-3 py-2.5">
+                    <div className="text-sm font-semibold text-slate-900">{opp.job.title}</div>
+                    <div className="text-xs text-slate-600">{opp.job.companyName}</div>
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                      <span>{opp.job.source || "External"}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-[#0B3B2C]">Private opportunity</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              Organization Catalog
+            </div>
+            {catalogAvailable.length === 0 ? (
+              <div className="p-4 text-xs text-slate-500 border border-dashed border-slate-200 rounded-md">
+                No additional catalog jobs available to add.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                {catalogAvailable.map((job) => (
+                  <div key={job.id} className="px-3 py-2.5">
+                    <div className="text-sm font-semibold text-slate-900">{job.title}</div>
+                    <div className="text-xs text-slate-600">{job.companyName}</div>
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                      <span>{job.source || "External"}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-slate-700">Available to add</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Applications Section */}
       <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
