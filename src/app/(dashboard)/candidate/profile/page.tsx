@@ -118,6 +118,13 @@ export default async function CandidateProfilePage({ searchParams }: Props) {
     "Candidate";
 
   const getHistoryDescription = (evt: (typeof auditEvents)[0]): string => {
+    if (
+      evt.action === AuditAction.CANDIDATE_PROFILE_UPDATED &&
+      evt.entityType === "CandidateProject"
+    ) {
+      return "Updated your projects";
+    }
+
     switch (evt.action) {
       case AuditAction.CANDIDATE_PROFILE_UPDATED:
         return "Updated professional profile & personal details";
@@ -138,7 +145,7 @@ export default async function CandidateProfilePage({ searchParams }: Props) {
       case AuditAction.CANDIDATE_AUTHORIZATION_MODE_CHANGED:
         return "Application authorization preference updated";
       case AuditAction.CANDIDATE_CREATED:
-        return "Initialized canonical career record";
+        return "Initialized career profile";
       default:
         return "Updated career profile";
     }

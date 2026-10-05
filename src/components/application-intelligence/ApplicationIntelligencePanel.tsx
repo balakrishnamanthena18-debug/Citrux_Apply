@@ -1,4 +1,5 @@
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
+import { CANDIDATE_ASSESSMENT_HEADING } from "@/lib/application-intelligence/human-assessment";
 import { ApplicationIntelligenceSection } from "./ApplicationIntelligenceSection";
 
 type Props = {
@@ -9,9 +10,9 @@ type Props = {
 };
 
 /**
- * Presentational server wrapper for Application Detail intelligence.
+ * Presentational server wrapper for Application Detail assessment UI.
  * Parent pages load the view model inside the authorized RLS transaction
- * and pass it here so intelligence failures never block job/status/materials.
+ * and pass it here so assessment failures never block job/status/materials.
  */
 export function ApplicationIntelligencePanel({
   view,
@@ -30,14 +31,14 @@ export function ApplicationIntelligencePanel({
           id="application-intelligence-error-heading"
           className="text-xs font-semibold uppercase tracking-wider text-slate-600"
         >
-          Application Intelligence
+          {CANDIDATE_ASSESSMENT_HEADING}
         </h2>
         <p className="text-sm font-semibold text-slate-900">
-          Analysis unavailable
+          We couldn&apos;t load your assessment right now
         </p>
         <p className="text-xs text-slate-600 leading-relaxed">
-          The application intelligence analysis could not be loaded. Other
-          application details remain available.
+          Your application details remain available. Try again in a moment —
+          your application itself is not affected.
         </p>
       </section>
     );

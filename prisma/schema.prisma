@@ -1284,7 +1284,7 @@ model ApplicationIntelligenceRun {
   schemaVersion      String                        @db.VarChar(64)
   scoringVersion     String                        @db.VarChar(64)
   idempotencyKey     String                        @db.VarChar(191)
-  sourceDataVersion  String                        @db.VarChar(128)
+  sourceDataVersion  String                        @db.VarChar(256)
   attemptCount       Int                           @default(0)
   maxAttempts        Int                           @default(3)
   leaseExpiresAt     DateTime?                     @db.Timestamptz(6)

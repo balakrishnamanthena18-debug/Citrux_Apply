@@ -4,6 +4,7 @@
  */
 
 import type { FitStatus, ReadinessState } from "./constants";
+import { humanPhaseMessaging } from "./human-assessment";
 
 export type IntelligenceUiPhase =
   | "NOT_AVAILABLE"
@@ -175,33 +176,7 @@ function messagingForPhase(phase: IntelligenceUiPhase): {
   title: string;
   body: string;
 } {
-  switch (phase) {
-    case "NOT_AVAILABLE":
-      return {
-        title: "No analysis available yet",
-        body: "The system has not generated intelligence for this application. Absence of analysis is not a negative result.",
-      };
-    case "PENDING":
-      return {
-        title: "Analysis in progress",
-        body: "We're analyzing the job requirements and application information. Results will appear when the analysis completes.",
-      };
-    case "FAILED":
-      return {
-        title: "Analysis unavailable",
-        body: "The application intelligence analysis could not be completed. Existing application workflow is unaffected.",
-      };
-    case "STALE":
-      return {
-        title: "Intelligence is based on an older source version",
-        body: "Displayed results may not reflect the latest candidate facts or job description. Treat them as historical until recomputed. Intelligence is advisory and does not replace QA, candidate approval, or submission.",
-      };
-    case "CURRENT":
-      return {
-        title: "Application Intelligence",
-        body: "Advisory fit and readiness from persisted analysis. Intelligence does not approve, submit, or change application state — QA, candidate approval, and submission remain separate workflow authorities.",
-      };
-  }
+  return humanPhaseMessaging(phase);
 }
 
 export function buildApplicationIntelligenceViewModel(input: {

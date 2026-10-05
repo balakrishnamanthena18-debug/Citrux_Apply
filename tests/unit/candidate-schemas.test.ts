@@ -138,6 +138,15 @@ describe("Candidate Core Validation Schemas (tests/unit/candidate-schemas.test.t
       });
       expect(result.success).toBe(true);
     });
+
+    it("rejects end date before start date", () => {
+      const result = CandidateProjectSchema.safeParse({
+        title: "Timeline project",
+        startDate: "2025-06-01",
+        endDate: "2024-01-01",
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("CandidateAssignmentSchema", () => {

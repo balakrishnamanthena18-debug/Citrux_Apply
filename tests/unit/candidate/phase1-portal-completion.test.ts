@@ -38,7 +38,8 @@ describe("Phase 1 — Candidate Portal Completion", () => {
       expect(workspace).toContain("ProjectEditor");
       expect(workspace).toContain('activeSection === "projects"');
       expect(editor).toContain("upsertCandidateProjectAction");
-      expect(editor).toContain("No projects added yet.");
+      expect(editor).toContain("Add the work you&apos;re most proud of");
+      expect(editor).toContain("Show earlier");
       expect(existsSync(join(ROOT, "src/app/(dashboard)/candidate/projects"))).toBe(false);
     });
   });

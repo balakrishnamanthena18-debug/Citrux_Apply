@@ -701,27 +701,92 @@ export default async function EmployeeCandidateDetailPage({
           )}
         </div>
 
-        {/* Projects */}
-        {candidate.projects.length > 0 && (
-          <div className="border-t border-slate-100 pt-4">
-            <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wide mb-3">Projects</h3>
+        {/* Projects — always visible when authorized; read-only */}
+        <div className="border-t border-slate-100 pt-4" data-testid="staff-candidate-projects">
+          <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wide mb-3">
+            Projects
+          </h3>
+          {candidate.projects.length === 0 ? (
+            <span className="text-xs text-slate-400 italic">
+              No projects recorded yet.
+            </span>
+          ) : (
             <div className="space-y-3">
-              {candidate.projects.map((proj) => (
-                <div key={proj.id} className="p-3.5 rounded border border-slate-100 bg-slate-50 text-xs">
-                  <div className="font-semibold text-slate-900 flex items-center justify-between">
-                    <span>{proj.title} {proj.role && `(${proj.role})`}</span>
-                    {proj.url && (
-                      <a href={proj.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                        Visit Project →
-                      </a>
+              {candidate.projects.map((proj) => {
+                const dateRange = [
+                  proj.startDate
+                    ? new Date(proj.startDate).toLocaleDateString([], {
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : null,
+                  proj.endDate
+                    ? new Date(proj.endDate).toLocaleDateString([], {
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" — ");
+
+                return (
+                  <div
+                    key={proj.id}
+                    className="p-3.5 rounded border border-slate-100 bg-slate-50 text-xs space-y-2"
+                  >
+                    <div className="font-semibold text-slate-900 flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        {proj.title}
+                        {proj.role ? ` · ${proj.role}` : ""}
+                      </span>
+                      {proj.url && (
+                        <a
+                          href={proj.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline shrink-0"
+                        >
+                          Open link →
+                        </a>
+                      )}
+                    </div>
+                    {dateRange && (
+                      <div className="text-slate-500">{dateRange}</div>
                     )}
+                    {proj.description && (
+                      <p className="text-slate-700 whitespace-pre-line">
+                        {proj.description}
+                      </p>
+                    )}
+                    {proj.highlights?.length > 0 && (
+                      <ul className="list-disc list-inside text-slate-700 space-y-0.5">
+                        {proj.highlights.map((h, i) => (
+                          <li key={i}>{h}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {proj.technologies?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {proj.technologies.map((tech, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-white text-slate-700 border border-slate-200"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-slate-400">
+                      Source: Candidate provided
+                    </p>
                   </div>
-                  {proj.description && <p className="mt-1.5 text-slate-700 whitespace-pre-line">{proj.description}</p>}
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Certifications */}
         {candidate.certifications.length > 0 && (

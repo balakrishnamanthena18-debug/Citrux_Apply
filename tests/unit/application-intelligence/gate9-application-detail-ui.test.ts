@@ -215,7 +215,7 @@ describe("Gate 9 — presentation view model", () => {
       latestRun: null,
     });
     expect(empty.phase).toBe("NOT_AVAILABLE");
-    expect(empty.messaging.title).toMatch(/No analysis available/i);
+    expect(empty.messaging.title).toMatch(/hasn.?t been assessed/i);
 
     const pending = buildApplicationIntelligenceViewModel({
       viewer: "CANDIDATE",
@@ -230,7 +230,7 @@ describe("Gate 9 — presentation view model", () => {
       },
     });
     expect(pending.phase).toBe("PENDING");
-    expect(pending.messaging.title).toMatch(/in progress/i);
+    expect(pending.messaging.title).toMatch(/reviewing your profile/i);
 
     const failed = buildApplicationIntelligenceViewModel({
       viewer: "CANDIDATE",
@@ -245,13 +245,13 @@ describe("Gate 9 — presentation view model", () => {
       },
     });
     expect(failed.phase).toBe("FAILED");
-    expect(failed.messaging.title).toMatch(/unavailable/i);
+    expect(failed.messaging.title).toMatch(/couldn.?t complete the assessment/i);
 
     const stale = buildApplicationIntelligenceViewModel(
       baseCompletedInput({ freshness: "STALE" })
     );
     expect(stale.phase).toBe("STALE");
-    expect(stale.messaging.title).toMatch(/older source version/i);
+    expect(stale.messaging.title).toMatch(/out of date/i);
   });
 
   it("maps all readiness states without inventing scores", () => {
@@ -291,18 +291,19 @@ describe("Gate 9 — UI rendering states", () => {
     const html = renderSection(
       buildApplicationIntelligenceViewModel(baseCompletedInput())
     );
-    expect(html).toContain("Application Intelligence");
+    expect(html).toContain("Application Assessment");
     expect(html).toContain('data-testid="application-intelligence-section"');
-    expect(html).toContain("READY WITH WARNINGS");
+    expect(html).toContain("Good match, with a few things to review");
     expect(html).toContain("5+ years Python");
+    expect(html).toContain("3.5 verified years");
+    expect(html).toContain("View detailed assessment");
+    // Technical enums remain available under detailed assessment disclosure
     expect(html).toContain("PARTIAL");
     expect(html).toContain("MATCHED");
     expect(html).toContain("MISSING");
     expect(html).toContain("UNKNOWN");
     expect(html).toContain("REQUIRED");
     expect(html).toContain("PREFERRED");
-    expect(html).toContain("3.5 verified years");
-    expect(html).toContain("Evidence →");
     expect(html).not.toContain("92%");
   });
 
@@ -315,8 +316,8 @@ describe("Gate 9 — UI rendering states", () => {
         latestRun: null,
       })
     );
-    expect(empty).toContain("No analysis available yet");
-    expect(empty).not.toContain("poor fit");
+    expect(empty).toContain("hasn&#x27;t been assessed yet");
+    expect(empty).toContain("does not mean that you are a poor match");
 
     const pending = renderSection(
       buildApplicationIntelligenceViewModel({
@@ -332,8 +333,8 @@ describe("Gate 9 — UI rendering states", () => {
         },
       })
     );
-    expect(pending).toContain("Analysis in progress");
-    expect(pending).toContain("QUEUED");
+    expect(pending).toContain("reviewing your profile");
+    expect(pending).not.toContain("QUEUED");
     expect(pending).not.toContain("%");
 
     const failed = renderSection(
@@ -350,7 +351,7 @@ describe("Gate 9 — UI rendering states", () => {
         },
       })
     );
-    expect(failed).toContain("Analysis unavailable");
+    expect(failed).toContain("couldn&#x27;t complete the assessment");
     expect(failed).not.toContain("SECRET_KEY_LEAK");
     expect(failed).not.toContain("stack");
 
@@ -359,8 +360,9 @@ describe("Gate 9 — UI rendering states", () => {
         baseCompletedInput({ freshness: "STALE" })
       )
     );
-    expect(stale).toContain("older source version");
-    expect(stale).toContain("STALE");
+    expect(stale).toContain("may be out of date");
+    const stalePrimary = stale.split("View detailed assessment")[0]!;
+    expect(stalePrimary).not.toMatch(/>STALE</);
   });
 
   it("renders readiness READY and BLOCKED with blockers / next actions", () => {
@@ -369,7 +371,7 @@ describe("Gate 9 — UI rendering states", () => {
         baseCompletedInput({ readinessState: "READY", warnings: [], nextActions: [] })
       )
     );
-    expect(ready).toContain("READY");
+    expect(ready).toContain("Strong match");
 
     const blocked = renderSection(
       buildApplicationIntelligenceViewModel(
@@ -390,10 +392,11 @@ describe("Gate 9 — UI rendering states", () => {
         })
       )
     );
-    expect(blocked).toContain("BLOCKED");
+    expect(blocked).toContain("Important to resolve");
     expect(blocked).toContain("Candidate approval missing");
-    expect(blocked).toContain("Request candidate approval");
-    expect(blocked).toContain("does not change application state");
+    expect(blocked).toContain("candidate approval");
+    expect(blocked).toContain("does not change");
+    expect(blocked).toContain("application state");
   });
 
   it("hides staff metadata from candidates and shows it for staff", () => {
@@ -407,9 +410,9 @@ describe("Gate 9 — UI rendering states", () => {
     const staffHtml = renderSection(staffView, "staff");
     const candidateHtml = renderSection(candidateView, "candidate");
 
-    expect(staffHtml).toContain("Staff operational metadata");
+    expect(staffHtml).toContain("staff metadata");
     expect(staffHtml).toContain("align-1");
-    expect(candidateHtml).not.toContain("Staff operational metadata");
+    expect(candidateHtml).not.toContain("staff metadata");
     expect(candidateHtml).not.toContain("align-1");
   });
 
@@ -422,9 +425,9 @@ describe("Gate 9 — UI rendering states", () => {
       })
     );
     expect(html).toContain('data-testid="application-intelligence-error"');
-    expect(html).toContain("Analysis unavailable");
+    expect(html).toContain("couldn&#x27;t load your assessment");
     expect(html).not.toContain("matched");
-    expect(html).not.toContain("overall fit");
+    expect(html).not.toContain("Your match");
   });
 
   it("uses stacked cards and details disclosure (no giant table markup)", () => {
@@ -518,7 +521,8 @@ describe("Gate 9 — Application Detail integration + authorization boundaries",
     expect(section).not.toMatch(/transitionApplication|withdrawApplication|approveApplication/);
     expect(section).not.toMatch(/computeDeterministic/);
     expect(presentation).not.toMatch(/computeDeterministic/);
-    expect(section).toMatch(/does not change\s+application state/);
+    expect(section).toMatch(/does not change/);
+    expect(section).toMatch(/application state/);
   });
 });
 
@@ -526,15 +530,13 @@ describe("Gate 9 — regressions Gate 4–8 contracts untouched by UI layer", ()
   it("keeps Gate 8 explainability versions and MISSING vocabulary", () => {
     expect(EXPLAINABILITY_CONTRACT_VERSION).toBe("explainability.v1");
     expect(ALIGNMENT_EVIDENCE_SCHEMA_VERSION).toBe("alignment-evidence.v1");
-    const section = readFileSync(
-      join(
-        ROOT,
-        "src/components/application-intelligence/ApplicationIntelligenceSection.tsx"
-      ),
+    const human = readFileSync(
+      join(ROOT, "src/lib/application-intelligence/human-assessment.ts"),
       "utf8"
     );
-    expect(section).toContain("MISSING");
-    expect(section).not.toContain("MISMATCH");
+    expect(human).toContain("MISSING");
+    expect(human).toContain("MATCHED");
+    expect(human).not.toContain("MISMATCH");
   });
 
   it("does not add Evidence model or scoring weight changes in schema", () => {

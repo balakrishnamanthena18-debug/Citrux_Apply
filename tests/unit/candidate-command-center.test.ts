@@ -121,6 +121,7 @@ describe("Candidate Command Center & Operations Workspace Unit Tests", () => {
         experiencesCount: 3,
         educationsCount: 1,
         skillsCount: 8,
+        projectsCount: 2,
         documentsCount: 2,
         verificationStatus: "VERIFIED",
       };
@@ -134,6 +135,7 @@ describe("Candidate Command Center & Operations Workspace Unit Tests", () => {
       const isExpComplete = completeCandidate.experiencesCount > 0;
       const isEduComplete = completeCandidate.educationsCount > 0;
       const isSkillsComplete = completeCandidate.skillsCount > 0;
+      const isProjectsComplete = completeCandidate.projectsCount > 0;
       const isResumeComplete = completeCandidate.documentsCount > 0;
       const isWorkAuthComplete = Boolean(
         completeCandidate.workAuthorization && completeCandidate.workAuthorization !== "OTHER"
@@ -144,6 +146,7 @@ describe("Candidate Command Center & Operations Workspace Unit Tests", () => {
       expect(isExpComplete).toBe(true);
       expect(isEduComplete).toBe(true);
       expect(isSkillsComplete).toBe(true);
+      expect(isProjectsComplete).toBe(true);
       expect(isResumeComplete).toBe(true);
       expect(isWorkAuthComplete).toBe(true);
     });
@@ -159,6 +162,7 @@ describe("Candidate Command Center & Operations Workspace Unit Tests", () => {
         experiencesCount: 0,
         educationsCount: 0,
         skillsCount: 0,
+        projectsCount: 0,
         documentsCount: 0,
         verificationStatus: "UNVERIFIED",
       };
@@ -167,10 +171,12 @@ describe("Candidate Command Center & Operations Workspace Unit Tests", () => {
         incompleteCandidate.phone && (incompleteCandidate.city || incompleteCandidate.country)
       );
       const isExpComplete = incompleteCandidate.experiencesCount > 0;
+      const isProjectsComplete = incompleteCandidate.projectsCount > 0;
       const isResumeComplete = incompleteCandidate.documentsCount > 0;
 
       expect(isContactComplete).toBe(false);
       expect(isExpComplete).toBe(false);
+      expect(isProjectsComplete).toBe(false);
       expect(isResumeComplete).toBe(false);
     });
   });

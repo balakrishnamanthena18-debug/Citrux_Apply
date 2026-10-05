@@ -72,7 +72,7 @@ export function ProfileOverviewSection({
       detail:
         candidate.projects && candidate.projects.length > 0
           ? `${candidate.projects.length} project(s) recorded`
-          : "No projects added yet",
+          : "Add the work you're most proud of",
     },
     {
       id: "work_auth",
@@ -104,6 +104,40 @@ export function ProfileOverviewSection({
   ];
 
   const incompleteItems = completenessItems.filter((i) => !i.isComplete);
+
+  const experienceCount = candidate.experiences?.length ?? 0;
+  const skillsCount = candidate.skills?.length ?? 0;
+  const projectsCount = candidate.projects?.length ?? 0;
+  const certificationsCount = candidate.certifications?.length ?? 0;
+  const educationCount = candidate.educations?.length ?? 0;
+
+  const careerEvidenceLines = [
+    experienceCount > 0
+      ? `${experienceCount} work experience ${experienceCount === 1 ? "entry" : "entries"}`
+      : null,
+    skillsCount > 0
+      ? `${skillsCount} documented ${skillsCount === 1 ? "skill" : "skills"}`
+      : null,
+    projectsCount > 0
+      ? `${projectsCount} ${projectsCount === 1 ? "project" : "projects"}`
+      : null,
+    certificationsCount > 0
+      ? `${certificationsCount} ${certificationsCount === 1 ? "certification" : "certifications"}`
+      : null,
+    educationCount > 0
+      ? `${educationCount} education ${educationCount === 1 ? "record" : "records"}`
+      : null,
+  ].filter(Boolean) as string[];
+
+  const featuredProjects = Array.isArray(candidate.projects)
+    ? [...candidate.projects]
+        .sort(
+          (a: { orderIndex?: number; title?: string }, b: { orderIndex?: number; title?: string }) =>
+            (a.orderIndex ?? 0) - (b.orderIndex ?? 0) ||
+            String(a.title ?? "").localeCompare(String(b.title ?? ""))
+        )
+        .slice(0, 3)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -137,7 +171,7 @@ export function ProfileOverviewSection({
                 {candidate.headline || userEmail}
               </p>
               <p className="text-[11px] text-slate-400 mt-1">
-                Canonical Career Record · Managed by Operations OS
+                Your career profile · Managed by you
               </p>
             </div>
           </div>
@@ -185,15 +219,107 @@ export function ProfileOverviewSection({
         </div>
       )}
 
-      {/* Factual Career Health Checklist */}
+      {/* Career evidence summary — deterministic counts only */}
+      <div
+        className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden"
+        data-testid="career-evidence-summary"
+      >
+        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+            Your career profile
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            A summary of information you have already recorded
+          </p>
+        </div>
+        <div className="p-5 space-y-4 text-xs">
+          {careerEvidenceLines.length > 0 ? (
+            <div>
+              <p className="text-slate-600 mb-2">Your profile shows:</p>
+              <ul className="space-y-1.5 text-slate-800">
+                {careerEvidenceLines.map((line) => (
+                  <li key={line} className="flex items-start gap-2">
+                    <span className="text-slate-400 mt-0.5" aria-hidden>
+                      ·
+                    </span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-slate-600">
+              Start with experience, skills, or a project so employers can see
+              what you bring.
+            </p>
+          )}
+
+          {projectsCount === 0 && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-700">
+              Complete your Projects section to give employers a clearer picture
+              of your hands-on experience.{" "}
+              <button
+                type="button"
+                onClick={() => onNavigateSection("projects")}
+                className="font-semibold text-slate-900 underline underline-offset-2 cursor-pointer"
+              >
+                Add a project
+              </button>
+            </div>
+          )}
+
+          {(featuredProjects.length > 0 ||
+            skillsCount > 0 ||
+            certificationsCount > 0) && (
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Career highlights
+              </p>
+              {featuredProjects.length > 0 && (
+                <div>
+                  <p className="font-semibold text-slate-800 mb-1">
+                    Featured projects
+                  </p>
+                  <ul className="space-y-1 text-slate-600">
+                    {featuredProjects.map(
+                      (p: { id: string; title: string; role?: string | null }) => (
+                        <li key={p.id}>
+                          {p.title}
+                          {p.role ? ` · ${p.role}` : ""}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+              {skillsCount > 0 && (
+                <p className="text-slate-600">
+                  <span className="font-semibold text-slate-800">Skills: </span>
+                  {skillsCount} recorded
+                </p>
+              )}
+              {certificationsCount > 0 && (
+                <p className="text-slate-600">
+                  <span className="font-semibold text-slate-800">
+                    Certifications:{" "}
+                  </span>
+                  {certificationsCount} recorded
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Profile completeness checklist */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-              Canonical Record Health & Completeness
+              Profile completeness
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Verified career facts utilized for resume tailoring and application staging
+              Keep your career record clear and up to date
             </p>
           </div>
 
@@ -205,7 +331,7 @@ export function ProfileOverviewSection({
             }`}
           >
             {incompleteItems.length === 0
-              ? "All Core Sections Configured"
+              ? "Good foundation"
               : `${incompleteItems.length} section(s) need attention`}
           </span>
         </div>

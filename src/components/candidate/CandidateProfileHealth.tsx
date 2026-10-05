@@ -21,6 +21,7 @@ interface Props {
     experiencesCount: number;
     educationsCount: number;
     skillsCount: number;
+    projectsCount: number;
     documentsCount: number;
     verificationStatus?: string | null;
   };
@@ -78,6 +79,17 @@ export function CandidateProfileHealth({ candidate }: Props) {
           : "Add core competencies & tools",
     },
     {
+      id: "projects",
+      label: "Projects",
+      isComplete: candidate.projectsCount > 0,
+      details:
+        candidate.projectsCount > 0
+          ? `${candidate.projectsCount} project${
+              candidate.projectsCount > 1 ? "s" : ""
+            } recorded`
+          : "Add work you're proud of",
+    },
+    {
       id: "resume",
       label: "Tailoring Resume & Files",
       isComplete: candidate.documentsCount > 0,
@@ -112,7 +124,7 @@ export function CandidateProfileHealth({ candidate }: Props) {
               Career Profile Health
             </h2>
             <p className="text-xs text-[#64748B] mt-0.5">
-              Canonical fact verification & profile completeness
+              What you&apos;ve recorded and what still needs attention
             </p>
           </div>
 
@@ -170,7 +182,7 @@ export function CandidateProfileHealth({ candidate }: Props) {
       {/* Footer CTA */}
       <div className="px-5 py-3.5 border-t border-[#EDF1EF] bg-[#F7F9F8] flex items-center justify-between">
         <span className="text-xs text-[#64748B]">
-          Canonical source of truth
+          Your career information
         </span>
         <Link
           href="/candidate/profile"

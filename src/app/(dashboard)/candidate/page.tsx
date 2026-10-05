@@ -34,6 +34,7 @@ export default async function CandidatePortalPage() {
         experiences: { select: { id: true } },
         educations: { select: { id: true } },
         skills: { select: { id: true } },
+        projects: { select: { id: true } },
         documents: {
           select: {
             id: true,
@@ -78,6 +79,7 @@ export default async function CandidatePortalPage() {
           experiences: { select: { id: true } },
           educations: { select: { id: true } },
           skills: { select: { id: true } },
+          projects: { select: { id: true } },
           documents: {
             select: {
               id: true,
@@ -348,6 +350,7 @@ export default async function CandidatePortalPage() {
         experiencesCount: candidate.experiences.length,
         educationsCount: candidate.educations.length,
         skillsCount: candidate.skills.length,
+        projectsCount: candidate.projects.length,
         documentsCount: candidate.documents.length,
         verificationStatus: candidate.verificationStatus,
       }}

@@ -360,16 +360,16 @@ describe("Gate 12 — status namespace separation", () => {
 
     const stale = completedView({ freshness: "STALE", readinessState: "BLOCKED" });
     expect(stale.phase).toBe("STALE");
-    expect(stale.messaging.body).toMatch(/advisory/i);
+    expect(stale.messaging.body).toMatch(/guide|approval/i);
   });
 });
 
 describe("Gate 12 — candidate / staff UX", () => {
-  it("renders advisory disclaimer and intelligence-readiness labeling", () => {
+  it("renders advisory disclaimer and human assessment labeling", () => {
     const view = completedView();
-    expect(view.messaging.body).toMatch(/advisory/i);
-    expect(view.messaging.body).toMatch(/does not approve|approval/i);
-    expect(INTELLIGENCE_ADVISORY_DISCLAIMER).toMatch(/advisory/i);
+    expect(view.messaging.body).toMatch(/guide|approval/i);
+    expect(view.messaging.body).toMatch(/not an approval|approval/i);
+    expect(INTELLIGENCE_ADVISORY_DISCLAIMER).toMatch(/guide, not an approval/i);
 
     const candidateHtml = renderToStaticMarkup(
       createElement(ApplicationIntelligenceSection, {
@@ -378,9 +378,9 @@ describe("Gate 12 — candidate / staff UX", () => {
       })
     );
     expect(candidateHtml).toContain("intelligence-advisory-disclaimer");
-    expect(candidateHtml).toMatch(/Intelligence is advisory/);
-    expect(candidateHtml).toMatch(/Intelligence readiness/);
-    expect(candidateHtml).toMatch(/Not application status/);
+    expect(candidateHtml).toMatch(/guide, not an approval decision/i);
+    expect(candidateHtml).toMatch(/Application Assessment/);
+    expect(candidateHtml).toMatch(/Your match/i);
     expect(candidateHtml).not.toMatch(/AI approved your application/i);
     expect(candidateHtml).not.toMatch(/guarantees? (an )?interview/i);
 
@@ -429,7 +429,7 @@ describe("Gate 12 — candidate / staff UX", () => {
       },
     });
     expect(failed.phase).toBe("FAILED");
-    expect(failed.messaging.body).toMatch(/workflow is unaffected/i);
+    expect(failed.messaging.body).toMatch(/not affected/i);
 
     for (const view of [
       completedView(),

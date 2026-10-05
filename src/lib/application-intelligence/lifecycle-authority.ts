@@ -74,7 +74,7 @@ export const LIFECYCLE_AUTHORITY_MATRIX = [
 ] as const;
 
 export const INTELLIGENCE_ADVISORY_DISCLAIMER =
-  "Intelligence is advisory. Application approval and submission follow the application workflow.";
+  "Your assessment is a guide, not an approval decision. Your application still goes through the normal review, approval, and submission process.";
 
 export const STAFF_AUTHORITY_GUIDANCE = {
   intelligence: "Advisory decision support — fit, readiness, blockers, evidence",

@@ -496,7 +496,7 @@ describe("Gate 10 — internal information + provider secret boundary", () => {
         audience: "staff",
       })
     );
-    expect(html).toContain("Staff operational metadata");
+    expect(html).toContain("staff metadata");
     expect(html).not.toContain("NVIDIA_API_KEY");
     expect(html).not.toContain("nvapi-");
     expect(isStaffOnly("failureDiagnostics")).toBe(true);

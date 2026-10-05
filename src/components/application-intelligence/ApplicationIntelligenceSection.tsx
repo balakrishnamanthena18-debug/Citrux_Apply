@@ -1,6 +1,23 @@
 "use client";
 
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
+import {
+  CANDIDATE_ADVISORY_DISCLAIMER,
+  CANDIDATE_ASSESSMENT_HEADING,
+  CANDIDATE_ASSESSMENT_SUBTITLE,
+  STAFF_ADVISORY_DISCLAIMER,
+  buildAssessmentSummary,
+  buildWhatWeFoundLines,
+  humanFitExplanation,
+  humanFitStatusLabel,
+  humanFreshnessLabel,
+  humanImportanceLabel,
+  humanIssueExplanation,
+  humanRecommendation,
+  selectReviewItems,
+  selectStrengthItems,
+  strengthDisplayLabel,
+} from "@/lib/application-intelligence/human-assessment";
 
 type Props = {
   view: ApplicationIntelligenceViewModel;
@@ -8,139 +25,65 @@ type Props = {
   audience: "candidate" | "staff";
 };
 
-function StatusChip({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "positive" | "caution" | "attention" | "critical" | "neutral";
-}) {
-  const styles: Record<typeof tone, string> = {
-    positive: "bg-emerald-50 text-emerald-800 border-emerald-200",
-    caution: "bg-amber-50 text-amber-900 border-amber-200",
-    attention: "bg-orange-50 text-orange-900 border-orange-200",
-    critical: "bg-rose-50 text-rose-800 border-rose-200",
-    neutral: "bg-slate-50 text-slate-700 border-slate-200",
-  };
+function FindingIcon({ kind }: { kind: "matched" | "partial" | "missing" | "unknown" }) {
+  const map = {
+    matched: { symbol: "✓", className: "text-emerald-700" },
+    partial: { symbol: "◐", className: "text-amber-800" },
+    missing: { symbol: "!", className: "text-rose-700" },
+    unknown: { symbol: "?", className: "text-slate-600" },
+  } as const;
+  const item = map[kind];
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${styles[tone]}`}
-    >
-      <span aria-hidden="true" className="text-[10px]">
-        {tone === "positive"
-          ? "●"
-          : tone === "caution" || tone === "attention"
-            ? "▲"
-            : tone === "critical"
-              ? "■"
-              : "○"}
-      </span>
-      <span>{label}</span>
+    <span aria-hidden="true" className={`font-semibold ${item.className}`}>
+      {item.symbol}
     </span>
   );
-}
-
-function readinessTone(
-  state: string | null
-): "positive" | "caution" | "attention" | "critical" | "neutral" {
-  switch (state) {
-    case "READY":
-      return "positive";
-    case "READY_WITH_WARNINGS":
-      return "caution";
-    case "REVIEW_REQUIRED":
-      return "attention";
-    case "BLOCKED":
-      return "critical";
-    default:
-      return "neutral";
-  }
-}
-
-function fitTone(
-  status: string
-): "positive" | "caution" | "attention" | "critical" | "neutral" {
-  switch (status) {
-    case "MATCHED":
-      return "positive";
-    case "PARTIAL":
-      return "attention";
-    case "MISSING":
-      return "critical";
-    default:
-      return "neutral";
-  }
-}
-
-function freshnessTone(
-  phase: ApplicationIntelligenceViewModel["phase"]
-): "positive" | "caution" | "attention" | "critical" | "neutral" {
-  switch (phase) {
-    case "CURRENT":
-      return "positive";
-    case "STALE":
-      return "caution";
-    case "PENDING":
-      return "attention";
-    case "FAILED":
-      return "critical";
-    default:
-      return "neutral";
-  }
-}
-
-function freshnessLabel(phase: ApplicationIntelligenceViewModel["phase"]): string {
-  switch (phase) {
-    case "CURRENT":
-      return "CURRENT";
-    case "STALE":
-      return "STALE";
-    case "PENDING":
-      return "PENDING";
-    case "FAILED":
-      return "FAILED";
-    default:
-      return "NOT_AVAILABLE";
-  }
 }
 
 function FitItemRow({
   item,
   index,
-  showRuleIds,
+  showTechnical,
 }: {
   item: ApplicationIntelligenceViewModel["fitItems"][number];
   index: number;
-  showRuleIds: boolean;
+  showTechnical: boolean;
 }) {
-  const panelId = `intel-fit-${item.requirementId || index}`;
+  const panelId = `assessment-fit-${item.requirementId || index}`;
+  const isOptional = item.importance === "PREFERRED";
+
   return (
     <li className="rounded-lg border border-slate-200 bg-white">
       <details className="group">
         <summary
-          className="flex cursor-pointer list-none flex-col gap-2 px-3 py-3 sm:flex-row sm:items-start sm:justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 rounded-lg"
+          className="flex cursor-pointer list-none flex-col gap-2 px-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 rounded-lg"
           aria-controls={panelId}
         >
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <StatusChip
-                label={item.importance}
-                tone={item.importance === "REQUIRED" ? "critical" : "neutral"}
-              />
-              <StatusChip label={item.status} tone={fitTone(item.status)} />
-            </div>
-            <p className="text-sm font-semibold text-slate-900 break-words">
-              {item.requirementValue}
-            </p>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              {item.explanation}
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
+                isOptional
+                  ? "border-slate-200 bg-slate-50 text-slate-700"
+                  : "border-slate-300 bg-white text-slate-800"
+              }`}
+            >
+              {humanImportanceLabel(item.importance)}
+            </span>
+            <span className="text-[11px] font-medium text-slate-600">
+              {humanFitStatusLabel(item.status)}
+            </span>
           </div>
-          <span className="shrink-0 text-[11px] font-semibold text-slate-500 group-open:hidden">
-            Evidence →
+          <p className="text-sm font-semibold text-slate-900 break-words">
+            {item.requirementValue}
+          </p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {humanFitExplanation(item)}
+          </p>
+          <span className="text-[11px] font-semibold text-slate-500 group-open:hidden">
+            Why we say this →
           </span>
-          <span className="hidden shrink-0 text-[11px] font-semibold text-slate-500 group-open:inline">
-            Hide evidence
+          <span className="hidden text-[11px] font-semibold text-slate-500 group-open:inline">
+            Hide details
           </span>
         </summary>
         <div
@@ -149,29 +92,48 @@ function FitItemRow({
         >
           <div>
             <p className="font-semibold uppercase tracking-wider text-[10px] text-slate-500">
-              Candidate evidence
+              From your profile
             </p>
             <p className="mt-0.5 leading-relaxed">
-              {item.candidateEvidenceSummary || "No candidate evidence attached."}
+              {item.candidateEvidenceSummary ||
+                "No matching detail was attached from your profile."}
             </p>
-            {item.candidateProvenance && (
-              <p className="mt-1 text-slate-500">
-                Source provenance: {item.candidateProvenance}
-              </p>
-            )}
           </div>
           <div>
             <p className="font-semibold uppercase tracking-wider text-[10px] text-slate-500">
-              Job evidence
+              From the job description
             </p>
             <p className="mt-0.5 leading-relaxed whitespace-pre-wrap">
-              {item.jobEvidenceExcerpt || "No job excerpt persisted."}
+              {item.jobEvidenceExcerpt || "No job excerpt was attached."}
             </p>
           </div>
-          {showRuleIds && item.ruleId && (
-            <p className="text-slate-500">
-              Rule: <span className="font-mono text-[11px]">{item.ruleId}</span>
-            </p>
+          {showTechnical && (
+            <div className="rounded-md border border-slate-100 bg-slate-50 px-2 py-2 text-[11px] text-slate-600 space-y-1">
+              <p className="font-semibold uppercase tracking-wider text-[10px] text-slate-500">
+                Technical details
+              </p>
+              <p>
+                Status: <span className="font-mono">{item.status}</span>
+              </p>
+              <p>
+                Importance:{" "}
+                <span className="font-mono">{item.importance}</span>
+              </p>
+              {item.ruleId && (
+                <p>
+                  Rule: <span className="font-mono">{item.ruleId}</span>
+                </p>
+              )}
+              {item.candidateProvenance && (
+                <p>
+                  Provenance:{" "}
+                  <span className="font-mono">{item.candidateProvenance}</span>
+                </p>
+              )}
+              {item.explanation && (
+                <p className="leading-relaxed">{item.explanation}</p>
+              )}
+            </div>
           )}
         </div>
       </details>
@@ -181,14 +143,19 @@ function FitItemRow({
 
 export function ApplicationIntelligenceSection({ view, audience }: Props) {
   const showCompleted = view.phase === "CURRENT" || view.phase === "STALE";
-  // Rule IDs are explainability contract identifiers — safe for both audiences.
-  // Staff also see operational result/run metadata separately.
-  const showRuleIds = showCompleted;
-  const requiredItems = view.fitItems.filter((f) => f.importance === "REQUIRED");
-  const preferredItems = view.fitItems.filter((f) => f.importance === "PREFERRED");
-  const otherItems = view.fitItems.filter(
-    (f) => f.importance !== "REQUIRED" && f.importance !== "PREFERRED"
-  );
+  const disclaimer =
+    audience === "staff"
+      ? STAFF_ADVISORY_DISCLAIMER
+      : CANDIDATE_ADVISORY_DISCLAIMER;
+  const summary = showCompleted ? buildAssessmentSummary(view) : null;
+  const findings = showCompleted ? buildWhatWeFoundLines(view) : [];
+  const strengths = showCompleted ? selectStrengthItems(view.fitItems) : [];
+  const reviewItems = showCompleted ? selectReviewItems(view.fitItems) : [];
+  const recommendation = showCompleted
+    ? humanRecommendation(view.nextActions)
+    : null;
+  const scoreLabel =
+    view.overallScore !== null ? `${view.overallScore} / 100` : null;
 
   return (
     <section
@@ -197,30 +164,31 @@ export function ApplicationIntelligenceSection({ view, audience }: Props) {
       data-testid="application-intelligence-section"
       data-intelligence-phase={view.phase}
     >
-      <div className="flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <h2
             id="application-intelligence-heading"
             className="text-xs font-semibold uppercase tracking-wider text-slate-600"
           >
-            Application Intelligence
+            {CANDIDATE_ASSESSMENT_HEADING}
           </h2>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            {view.messaging.body}
+          <p className="text-sm text-slate-700 leading-relaxed">
+            {CANDIDATE_ASSESSMENT_SUBTITLE}
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <StatusChip
-            label={freshnessLabel(view.phase)}
-            tone={freshnessTone(view.phase)}
-          />
-          {view.readinessState && (
-            <StatusChip
-              label={`Intelligence readiness: ${view.readinessState.replace(/_/g, " ")}`}
-              tone={readinessTone(view.readinessState)}
-            />
-          )}
-        </div>
+        <span
+          className={`inline-flex w-fit rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
+            view.phase === "CURRENT"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : view.phase === "STALE" || view.phase === "PENDING"
+                ? "border-amber-200 bg-amber-50 text-amber-900"
+                : view.phase === "FAILED"
+                  ? "border-rose-200 bg-rose-50 text-rose-800"
+                  : "border-slate-200 bg-slate-50 text-slate-700"
+          }`}
+        >
+          {humanFreshnessLabel(view.phase)}
+        </span>
       </div>
 
       <p
@@ -228,336 +196,327 @@ export function ApplicationIntelligenceSection({ view, audience }: Props) {
         data-testid="intelligence-advisory-disclaimer"
         role="note"
       >
-        Intelligence is advisory. Application approval and submission follow the
-        application workflow. This panel does not replace QA, candidate approval,
-        or external submission.
-        {audience === "staff"
-          ? " Staff: treat fit/readiness as decision support; QA, approval, and submission remain separate authorities."
-          : ""}
+        {disclaimer}
       </p>
 
       {!showCompleted && (
         <div
-          className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5"
+          className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 space-y-2"
           role="status"
           aria-live="polite"
         >
           <p className="text-sm font-semibold text-slate-900">
             {view.messaging.title}
           </p>
-          <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+          <p className="text-xs text-slate-600 leading-relaxed">
             {view.messaging.body}
           </p>
-          {view.phase === "PENDING" && view.runStatus && (
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Status: {view.runStatus}
-            </p>
-          )}
         </div>
       )}
 
-      {showCompleted && (
+      {showCompleted && summary && (
         <>
-          {/* Fit summary — mobile priority: readiness, fit, blockers */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Fit summary
-            </h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Intelligence readiness
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-4 sm:px-5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Your match
+              </p>
+              <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-4">
+                <p className="text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">
+                  {scoreLabel ?? "—"}
                 </p>
-                <p className="mt-1 text-sm font-bold text-slate-900">
-                  {view.readinessState?.replace(/_/g, " ") || "UNKNOWN"}
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  Not application status
+                <p className="text-sm font-semibold text-slate-800 pb-1">
+                  {summary.matchHeadline}
                 </p>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Overall fit
-                </p>
-                <p className="mt-1 text-sm font-bold text-slate-900">
-                  {view.overallScore !== null ? `${view.overallScore}` : "Not scored"}
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  Persisted scoring contract value
-                </p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 sm:col-span-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Requirements
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <StatusChip
-                    label={`${view.counts.matched} matched`}
-                    tone="positive"
-                  />
-                  <StatusChip
-                    label={`${view.counts.partial} partial`}
-                    tone="attention"
-                  />
-                  <StatusChip
-                    label={`${view.counts.missing} missing`}
-                    tone="critical"
-                  />
-                  <StatusChip
-                    label={`${view.counts.unknown} unknown`}
-                    tone="neutral"
-                  />
-                </div>
-                <p className="mt-2 text-[11px] text-slate-500">
-                  {view.counts.required} required · {view.counts.preferred}{" "}
-                  preferred
-                </p>
-              </div>
+              <p className="mt-3 text-sm text-slate-700 leading-relaxed">
+                {summary.summaryParagraph}
+              </p>
+              <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+                Overall match based on the information currently available.
+              </p>
             </div>
+
             {view.phase === "STALE" && (
               <p
-                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 leading-relaxed"
                 role="status"
               >
-                Intelligence is based on an older source version. Do not treat
-                this as current analysis.
+                Your assessment may be out of date. This assessment was created
+                using an earlier version of your profile or the job description.
+                An updated assessment is needed.
               </p>
             )}
           </div>
 
-          {/* Readiness detail */}
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Readiness
-            </h3>
-            {view.blockers.length === 0 &&
-              view.warnings.length === 0 &&
-              view.unknowns.length === 0 && (
-                <p className="text-xs text-slate-600">
-                  No blockers or warnings persisted for this result.
-                </p>
-              )}
-            {view.blockers.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-rose-800">Blockers</p>
-                <ul className="space-y-2">
-                  {view.blockers.map((b) => (
-                    <li
-                      key={b.code}
-                      className="rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2 text-xs text-rose-950"
-                    >
-                      <p className="font-semibold">{b.message}</p>
-                      <p className="mt-0.5 text-rose-900/80">{b.why}</p>
-                      {b.explanation && (
-                        <p className="mt-1 text-rose-900/70">{b.explanation}</p>
+          {findings.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                What we found
+              </h3>
+              <ul className="space-y-1.5">
+                {findings.map((line) => (
+                  <li
+                    key={line.kind}
+                    className="flex items-start gap-2 text-sm text-slate-700"
+                  >
+                    <FindingIcon kind={line.kind} />
+                    <span>{line.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {strengths.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Your strengths
+              </h3>
+              <ul className="space-y-2">
+                {strengths.map((item, i) => (
+                  <li
+                    key={item.requirementId || `strength-${i}`}
+                    className="flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2 text-sm text-slate-800"
+                  >
+                    <span aria-hidden="true" className="text-emerald-700 font-semibold">
+                      ✓
+                    </span>
+                    <span>
+                      <span className="font-medium">
+                        {strengthDisplayLabel(item)}
+                      </span>
+                      {item.candidateEvidenceSummary && (
+                        <span className="block text-xs text-slate-600 mt-0.5">
+                          Based on: {item.candidateEvidenceSummary}
+                        </span>
                       )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {view.warnings.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-amber-900">Warnings</p>
-                <ul className="space-y-2">
-                  {view.warnings.map((w) => (
-                    <li
-                      key={w.code}
-                      className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-950"
-                    >
-                      <p className="font-semibold">{w.message}</p>
-                      <p className="mt-0.5 text-amber-900/80">{w.why}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {view.unknowns.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-slate-700">
-                  Unknown conditions
-                </p>
-                <ul className="space-y-2">
-                  {view.unknowns.map((u) => (
-                    <li
-                      key={u.code}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
-                    >
-                      <p className="font-semibold">{u.message}</p>
-                      <p className="mt-0.5">{u.why}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {view.nextActions.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-slate-700">
-                  Next action
-                </p>
-                <ul className="space-y-1.5">
-                  {view.nextActions.map((a) => (
-                    <li
-                      key={a.code}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800"
-                    >
-                      {a.label}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-[11px] text-slate-500">
-                  Next actions are informational. This panel does not change
-                  application state.
-                </p>
-              </div>
-            )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {view.blockers.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-rose-800">
+                Important to resolve
+              </h3>
+              <ul className="space-y-2">
+                {view.blockers.map((b) => (
+                  <li
+                    key={b.code}
+                    className="rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2 text-xs text-rose-950 leading-relaxed"
+                  >
+                    <p className="font-semibold text-sm">{b.message}</p>
+                    <p className="mt-1">{humanIssueExplanation(b)}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {reviewItems.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Things to review
+              </h3>
+              <ul className="space-y-2">
+                {reviewItems.map((item, i) => (
+                  <li
+                    key={item.requirementId || `review-${i}`}
+                    className="rounded-lg border border-amber-200/80 bg-amber-50/40 px-3 py-3 space-y-1.5"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span aria-hidden="true" className="text-amber-800 font-semibold">
+                        ⚠
+                      </span>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {item.requirementValue}
+                      </p>
+                      <span className="text-[11px] font-medium text-slate-600">
+                        {humanImportanceLabel(item.importance)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 leading-relaxed pl-5">
+                      {humanFitExplanation(item)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {view.warnings.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-amber-900">
+                Additional notes
+              </h3>
+              <ul className="space-y-2">
+                {view.warnings.map((w) => (
+                  <li
+                    key={w.code}
+                    className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-950 leading-relaxed"
+                  >
+                    <p className="font-semibold">{w.message}</p>
+                    <p className="mt-0.5">{humanIssueExplanation(w)}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              What this means
+            </h3>
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {summary.whatThisMeans}
+            </p>
           </div>
 
-          {/* Requirement breakdown */}
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Why this fit
-            </h3>
-            {requiredItems.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-slate-800">
-                  Required requirements
+          {recommendation && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                What we recommend
+              </h3>
+              <p className="rounded-lg border border-slate-200 px-3 py-3 text-sm text-slate-800 leading-relaxed">
+                {recommendation}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                This recommendation is informational only. It does not change
+                your application state.
+              </p>
+            </div>
+          )}
+
+          <details className="rounded-lg border border-slate-200">
+            <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg">
+              View detailed assessment →
+            </summary>
+            <div className="space-y-4 border-t border-slate-100 px-3 py-4">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Detailed requirement-by-requirement review. Technical status
+                codes stay inside each item&apos;s details.
+              </p>
+
+              {view.fitItems.length === 0 ? (
+                <p className="text-xs text-slate-600">
+                  No requirement details were available with this assessment.
                 </p>
+              ) : (
                 <ul className="space-y-2">
-                  {requiredItems.map((item, i) => (
+                  {view.fitItems.map((item, i) => (
                     <FitItemRow
-                      key={item.requirementId || `req-${i}`}
+                      key={item.requirementId || `fit-${i}`}
                       item={item}
                       index={i}
-                      showRuleIds={showRuleIds}
+                      showTechnical
                     />
                   ))}
                 </ul>
-              </div>
-            )}
-            {preferredItems.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-slate-800">
-                  Preferred requirements
-                </p>
-                <ul className="space-y-2">
-                  {preferredItems.map((item, i) => (
-                    <FitItemRow
-                      key={item.requirementId || `pref-${i}`}
-                      item={item}
-                      index={i + requiredItems.length}
-                      showRuleIds={showRuleIds}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-            {otherItems.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold text-slate-800">
-                  Other requirements
-                </p>
-                <ul className="space-y-2">
-                  {otherItems.map((item, i) => (
-                    <FitItemRow
-                      key={item.requirementId || `other-${i}`}
-                      item={item}
-                      index={i + requiredItems.length + preferredItems.length}
-                      showRuleIds={showRuleIds}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-            {view.fitItems.length === 0 && (
-              <p className="text-xs text-slate-600">
-                No requirement fit items were persisted with this result.
-              </p>
-            )}
-          </div>
+              )}
 
-          {/* Versions / evidence metadata */}
-          <details className="rounded-lg border border-slate-200">
-            <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg">
-              Evidence versions
-            </summary>
-            <dl className="grid grid-cols-1 gap-2 border-t border-slate-100 px-3 py-3 text-xs text-slate-700 sm:grid-cols-2">
-              <div>
-                <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                  Scoring
-                </dt>
-                <dd className="font-mono text-[11px]">
-                  {view.versions.scoringVersion || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                  Readiness
-                </dt>
-                <dd className="font-mono text-[11px]">
-                  {view.versions.readinessVersion || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                  Normalization
-                </dt>
-                <dd className="font-mono text-[11px]">
-                  {view.versions.normalizationVersion || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                  Explainability
-                </dt>
-                <dd className="font-mono text-[11px]">
-                  {view.versions.explainabilityVersion || "—"}
-                </dd>
-              </div>
-            </dl>
+              <details className="rounded-lg border border-slate-100 bg-slate-50/60">
+                <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg">
+                  Assessment details
+                </summary>
+                <dl className="grid grid-cols-1 gap-2 border-t border-slate-100 px-3 py-3 text-xs text-slate-700 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                      Internal readiness
+                    </dt>
+                    <dd className="font-mono text-[11px]">
+                      {view.readinessState || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                      Freshness
+                    </dt>
+                    <dd className="font-mono text-[11px]">
+                      {view.freshness || view.phase}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                      Scoring
+                    </dt>
+                    <dd className="font-mono text-[11px]">
+                      {view.versions.scoringVersion || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                      Explainability
+                    </dt>
+                    <dd className="font-mono text-[11px]">
+                      {view.versions.explainabilityVersion || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                      Readiness version
+                    </dt>
+                    <dd className="font-mono text-[11px]">
+                      {view.versions.readinessVersion || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                      Normalization
+                    </dt>
+                    <dd className="font-mono text-[11px]">
+                      {view.versions.normalizationVersion || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              </details>
+
+              {audience === "staff" && view.staffMeta && (
+                <details className="rounded-lg border border-slate-200">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg">
+                    Application Intelligence — staff metadata
+                  </summary>
+                  <dl className="grid grid-cols-1 gap-2 border-t border-slate-100 px-3 py-3 text-xs text-slate-700 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                        Alignment result
+                      </dt>
+                      <dd className="font-mono text-[11px] break-all">
+                        {view.staffMeta.alignmentResultId || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                        Readiness result
+                      </dt>
+                      <dd className="font-mono text-[11px] break-all">
+                        {view.staffMeta.readinessResultId || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                        Run
+                      </dt>
+                      <dd className="font-mono text-[11px] break-all">
+                        {view.staffMeta.runId || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase text-slate-500">
+                        Purpose
+                      </dt>
+                      <dd className="font-mono text-[11px]">
+                        {view.staffMeta.analysisPurpose || "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
+              )}
+            </div>
           </details>
-
-          {audience === "staff" && view.staffMeta && (
-            <details className="rounded-lg border border-slate-200">
-              <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg">
-                Staff operational metadata
-              </summary>
-              <dl className="grid grid-cols-1 gap-2 border-t border-slate-100 px-3 py-3 text-xs text-slate-700 sm:grid-cols-2">
-                <div>
-                  <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                    Alignment result
-                  </dt>
-                  <dd className="font-mono text-[11px] break-all">
-                    {view.staffMeta.alignmentResultId || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                    Readiness result
-                  </dt>
-                  <dd className="font-mono text-[11px] break-all">
-                    {view.staffMeta.readinessResultId || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                    Run
-                  </dt>
-                  <dd className="font-mono text-[11px] break-all">
-                    {view.staffMeta.runId || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-semibold uppercase text-slate-500">
-                    Purpose
-                  </dt>
-                  <dd className="font-mono text-[11px]">
-                    {view.staffMeta.analysisPurpose || "—"}
-                  </dd>
-                </div>
-              </dl>
-            </details>
-          )}
         </>
       )}
     </section>

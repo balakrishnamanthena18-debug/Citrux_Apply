@@ -64,18 +64,29 @@ export const CandidateSkillSchema = z.object({
   name: z.string().trim().min(1, "Skill name is required").max(100),
 });
 
-export const CandidateProjectSchema = z.object({
-  id: z.string().uuid().optional(),
-  title: z.string().trim().min(1, "Project title is required").max(200),
-  role: z.string().trim().max(100).optional().nullable(),
-  url: z.string().trim().url().max(500).optional().nullable().or(z.literal("")),
-  description: z.string().trim().max(5000).optional().nullable(),
-  highlights: z.array(z.string().trim().max(500)).max(20).default([]),
-  technologies: z.array(z.string().trim().max(100)).max(50).default([]),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  orderIndex: z.number().int().min(0).default(0),
-});
+export const CandidateProjectSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    title: z.string().trim().min(1, "Project title is required").max(200),
+    role: z.string().trim().max(100).optional().nullable(),
+    url: z.string().trim().url().max(500).optional().nullable().or(z.literal("")),
+    description: z.string().trim().max(5000).optional().nullable(),
+    highlights: z.array(z.string().trim().max(500)).max(20).default([]),
+    technologies: z.array(z.string().trim().max(100)).max(50).default([]),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+    orderIndex: z.number().int().min(0).default(0),
+  })
+  .refine(
+    (data) => {
+      if (!data.startDate || !data.endDate) return true;
+      return data.endDate >= data.startDate;
+    },
+    {
+      message: "End date must be on or after the start date",
+      path: ["endDate"],
+    }
+  );
 
 export const CandidateCertificationSchema = z.object({
   id: z.string().uuid().optional(),

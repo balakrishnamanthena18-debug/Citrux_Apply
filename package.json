@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:gate13": "npx --yes tsx scripts/gate13-e2e-verify.ts",
     "prisma:generate": "prisma generate && node -e \"import('fs').then(fs => fs.writeFileSync('src/generated/prisma/index.ts', 'export * from \\\"./client\\\";\\nexport * from \\\"./enums\\\";\\nexport * from \\\"./models\\\";\\nexport * from \\\"./commonInputTypes\\\";\\n'))\"",
     "prisma:validate": "prisma validate",
     "email:apply-supabase-auth-smtp": "npx --yes tsx scripts/apply-supabase-auth-smtp.ts",

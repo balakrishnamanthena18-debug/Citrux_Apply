@@ -20,6 +20,7 @@ export * from "./alignment";
 export * from "./readiness";
 export * from "./evidence-contract";
 export * from "./presentation";
+export * from "./human-assessment";
 export * from "./load-application-intelligence";
 export * from "./runs";
 export * from "./run-state-machine";

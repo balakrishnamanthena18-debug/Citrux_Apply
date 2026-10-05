@@ -64,7 +64,7 @@ export async function reclaimExpiredLeases(now = new Date()): Promise<number> {
       "leaseExpiresAt" = NULL,
       "completedAt" = CASE
         WHEN r."attemptCount" < r."maxAttempts" THEN NULL
-        ELSE ${now}
+        ELSE NOW()
       END,
       "validationStatus" = CASE
         WHEN r."attemptCount" < r."maxAttempts" THEN r."validationStatus"
@@ -75,7 +75,7 @@ export async function reclaimExpiredLeases(now = new Date()): Promise<number> {
       FROM "application_intelligence_runs"
       WHERE status = 'RUNNING'::"IntelligenceRunStatus"
         AND "leaseExpiresAt" IS NOT NULL
-        AND "leaseExpiresAt" < ${now}
+        AND "leaseExpiresAt" < ${now}::timestamptz
       ORDER BY "leaseExpiresAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED

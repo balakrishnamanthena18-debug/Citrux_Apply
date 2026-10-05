@@ -27,6 +27,7 @@ interface Props {
     experiencesCount: number;
     educationsCount: number;
     skillsCount: number;
+    projectsCount: number;
     documentsCount: number;
     verificationStatus?: string | null;
   };
