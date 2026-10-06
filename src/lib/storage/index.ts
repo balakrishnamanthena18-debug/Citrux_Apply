@@ -168,6 +168,65 @@ export async function downloadCandidateDocumentBytes(
 
 export const SUBMISSION_EVIDENCE_BUCKET = "submission-evidence";
 
+/** O5 — dedicated private outcome evidence (not career-document vault). */
+export const OUTCOME_EVIDENCE_BUCKET = "outcome-evidence";
+
+/**
+ * Deterministic tenant-isolated path for outcome evidence.
+ * Format: tenants/{org}/applications/{appId}/outcomes/{outcomeId}-{filename}
+ */
+export function generateOutcomeEvidencePath(
+  organizationId: string,
+  applicationId: string,
+  outcomeId: string,
+  originalFilename: string
+): string {
+  const sanitized = sanitizeFilename(originalFilename).toLowerCase();
+  return `tenants/${organizationId}/applications/${applicationId}/outcomes/${outcomeId}-${sanitized}`;
+}
+
+export function isCanonicalOutcomeEvidencePath(
+  storagePath: string,
+  organizationId: string,
+  applicationId: string
+): boolean {
+  if (!storagePath || typeof storagePath !== "string") return false;
+  const prefix = `tenants/${organizationId}/applications/${applicationId}/outcomes/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const remaining = storagePath.slice(prefix.length);
+  if (!remaining || remaining.includes("..") || remaining.includes("//")) {
+    return false;
+  }
+  return true;
+}
+
+export async function createSignedOutcomeEvidenceDownloadUrl(
+  storagePath: string,
+  expiresInSeconds: number = 60
+): Promise<string | null> {
+  const supabase = await getStorageClient();
+  const { data, error } = await supabase.storage
+    .from(OUTCOME_EVIDENCE_BUCKET)
+    .createSignedUrl(storagePath, expiresInSeconds);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
+export async function createSignedOutcomeEvidenceUploadUrl(
+  storagePath: string
+): Promise<{ signedUrl: string; path: string; token: string } | null> {
+  const supabase = await getStorageClient();
+  const { data, error } = await supabase.storage
+    .from(OUTCOME_EVIDENCE_BUCKET)
+    .createSignedUploadUrl(storagePath);
+  if (error || !data) return null;
+  return {
+    signedUrl: data.signedUrl,
+    path: data.path,
+    token: data.token,
+  };
+}
+
 /**
  * Generates a deterministic, tenant-isolated storage path for submission evidence documents.
  * Format: tenants/{organizationId}/applications/{applicationId}/submissions/{submissionId}-{sanitizedFilename}
@@ -190,7 +249,7 @@ export async function createSignedSubmissionEvidenceDownloadUrl(
   storagePath: string,
   expiresInSeconds: number = 60
 ): Promise<string | null> {
-  const supabase = await createServerClient();
+  const supabase = await getStorageClient();
   const { data, error } = await supabase.storage
     .from(SUBMISSION_EVIDENCE_BUCKET)
     .createSignedUrl(storagePath, expiresInSeconds);
@@ -209,7 +268,7 @@ export async function createSignedSubmissionEvidenceDownloadUrl(
 export async function createSignedSubmissionEvidenceUploadUrl(
   storagePath: string
 ): Promise<{ signedUrl: string; path: string; token: string } | null> {
-  const supabase = await createServerClient();
+  const supabase = await getStorageClient();
   const { data, error } = await supabase.storage
     .from(SUBMISSION_EVIDENCE_BUCKET)
     .createSignedUploadUrl(storagePath);

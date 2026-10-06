@@ -5,6 +5,23 @@
 
 import type { ApplicationStatus } from "@/generated/prisma";
 
+/** Phase 5T — derived responsibility actor (no schema enum). */
+export type ExpectedActor =
+  | "EMPLOYEE"
+  | "CANDIDATE"
+  | "EXTERNAL"
+  | "NONE"
+  | "UNKNOWN";
+
+/** Phase 5T — derived waiting kind (no stuck/SLA). */
+export type WaitingKind =
+  | "EMPLOYEE_ACTION"
+  | "CANDIDATE_RESPONSE"
+  | "EXTERNAL_OUTCOME"
+  | "QA_REVIEW"
+  | "TERMINAL"
+  | "UNKNOWN";
+
 /** Operational queues. NEEDS_ATTENTION semantics are frozen (Phase 5J). */
 export type OperationalApplicationQueue =
   | "all"
@@ -105,6 +122,17 @@ export interface OperationalApplicationItem {
   currentStateAgeKind: CurrentStateAgeKind;
   /** Deterministic server-formatted age label (e.g. "12 min") or "AGE_UNAVAILABLE". */
   currentStateAgeLabel: string;
+  /** Phase 5T — who is expected to act (derived; no SLA). */
+  expectedActor: ExpectedActor;
+  /** Phase 5T — what the Application is waiting for (derived; no stuck). */
+  waitingKind: WaitingKind;
+  /** Staff-facing Waiting For label. */
+  waitingForLabel: string;
+  /** ISO wait start; null when AGE_UNAVAILABLE. */
+  waitingSince: string | null;
+  waitingAgeKind: CurrentStateAgeKind;
+  /** Informational wait age label (never overdue/stuck). */
+  waitingAgeLabel: string;
   nextAction: string;
 }
 

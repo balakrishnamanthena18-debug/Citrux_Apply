@@ -19,6 +19,9 @@ import { loadCandidateApplicationIntelligence } from "@/lib/application-intellig
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
 import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
 import { ResumeReviewPanel } from "@/components/resume-intelligence/ResumeReviewPanel";
+import { listOutcomesForCandidate } from "@/lib/application/outcome-service";
+import type { OutcomePresentation } from "@/lib/application/outcome-service";
+import { CandidateOutcomesPanel } from "@/components/application/CandidateOutcomesPanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -73,12 +76,18 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
       }
     }
 
+    let outcomes: OutcomePresentation[] = [];
+    if (app) {
+      outcomes = await listOutcomesForCandidate(tx, ctx, app.id);
+    }
+
     return {
       application: app,
       candidate,
       existingConv,
       intelligence,
       intelligenceLoadFailed,
+      outcomes,
     };
   });
 
@@ -92,6 +101,7 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
     existingConv,
     intelligence,
     intelligenceLoadFailed,
+    outcomes,
   } = data;
   const currentMaterial = application.materials[0];
   const presentation = getCandidateStatusPresentation(application.status);
@@ -159,6 +169,17 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
           <ApplicationProgressTracker status={application.status} />
         </div>
       </div>
+
+      <CandidateOutcomesPanel
+        applicationId={application.id}
+        outcomes={outcomes}
+        canReport={application.submissions.length > 0}
+        submitted={
+          application.status === ApplicationStatus.SUBMITTED ||
+          application.status === ApplicationStatus.REJECTED ||
+          application.submissions.length > 0
+        }
+      />
 
       {/* 2. Priority Candidate Action Banner if Awaiting Approval */}
       {application.status === ApplicationStatus.AWAITING_APPROVAL && (

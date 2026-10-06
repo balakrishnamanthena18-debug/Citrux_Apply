@@ -28,6 +28,8 @@ import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelli
 import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
 import { ResumeReviewPanel } from "@/components/resume-intelligence/ResumeReviewPanel";
 import { deriveNextActionGuidance } from "@/lib/application/operations-guidance";
+import { resolveCurrentStateEnteredAt } from "@/lib/application/operations-aging";
+import { resolveWaitingAttribution } from "@/lib/application/operations-waiting";
 import {
   listEligibleAssignees,
   resolveAssignmentAuthority,
@@ -35,6 +37,9 @@ import {
 import { isAssigneeInactiveInOrganization } from "@/lib/application/orphan-scope";
 import { hasKnownAssignmentSnapshot } from "@/lib/application/assignment-snapshot";
 import { resolveContinuityVisibilityScope } from "@/lib/application/continuity-scope";
+import { listOutcomesForStaff } from "@/lib/application/outcome-service";
+import type { OutcomePresentation } from "@/lib/application/outcome-service";
+import { StaffOutcomesPanel } from "@/components/application/StaffOutcomesPanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -54,6 +59,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     candidateDocs,
     intelligence,
     intelligenceLoadFailed,
+    outcomes,
   } =
     await withRlsContext(ctx.userId, async (tx) => {
     const app = await tx.application.findUnique({
@@ -87,6 +93,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
         candidateDocs: [],
         intelligence: null as ApplicationIntelligenceViewModel | null,
         intelligenceLoadFailed: false,
+        outcomes: [] as OutcomePresentation[],
       };
     }
 
@@ -154,6 +161,10 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
       intelFailed = true;
     }
 
+    const outcomeRows = await listOutcomesForStaff(tx, ctx, app.id, {
+      includeInactive: true,
+    });
+
     return {
       application: app,
       assigneeOptions: eligible.options,
@@ -163,6 +174,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
       candidateDocs: docs,
       intelligence: intel,
       intelligenceLoadFailed: intelFailed,
+      outcomes: outcomeRows,
     };
   });
 
@@ -171,6 +183,18 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
   }
 
   const currentMaterial = application.materials[0];
+
+  const waitingAttribution = resolveWaitingAttribution(
+    application.status,
+    new Date(),
+    {
+      statusHistoryEnteredAt: resolveCurrentStateEnteredAt(
+        application.status,
+        application.stateHistory
+      ),
+      approvalRequestedAt: application.approvalRequestedAt,
+    }
+  );
 
   const candidateName =
     [application.candidate.user.firstName, application.candidate.user.lastName].filter(Boolean).join(" ") ||
@@ -341,10 +365,37 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
         </div>
       </div>
 
-      {/* Operational Next Action Banner */}
-      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex items-center gap-2 text-xs text-slate-600">
-        <span className="font-bold text-slate-900 uppercase text-[10px] tracking-wide">Next Operational Action:</span>
-        <span className="font-medium text-slate-800">{deriveNextActionGuidance(application.status)}</span>
+      {/* Waiting responsibility + Next Action (Phase 5T — informational, not stuck/SLA) */}
+      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
+        <div>
+          <div className="font-bold text-slate-900 uppercase text-[10px] tracking-wide mb-0.5">
+            Waiting For
+          </div>
+          <div className="font-medium text-slate-800" aria-label={`Waiting for ${waitingAttribution.waitingForLabel}`}>
+            {waitingAttribution.waitingForLabel}
+          </div>
+        </div>
+        <div>
+          <div className="font-bold text-slate-900 uppercase text-[10px] tracking-wide mb-0.5">
+            Waiting Since
+          </div>
+          <div className="font-medium text-slate-800">
+            {waitingAttribution.waitingAgeKind === "AGE" && waitingAttribution.waitingSince
+              ? `${new Date(waitingAttribution.waitingSince).toLocaleDateString([], {
+                  month: "short",
+                  day: "numeric",
+                })} · ${waitingAttribution.waitingAgeLabel}`
+              : "AGE_UNAVAILABLE"}
+          </div>
+        </div>
+        <div>
+          <div className="font-bold text-slate-900 uppercase text-[10px] tracking-wide mb-0.5">
+            Next Action
+          </div>
+          <div className="font-medium text-slate-800">
+            {deriveNextActionGuidance(application.status)}
+          </div>
+        </div>
       </div>
 
       {/* Prominent READY Operational Banner */}
@@ -977,6 +1028,12 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
               </p>
             )}
           </div>
+
+          <StaffOutcomesPanel
+            applicationId={application.id}
+            outcomes={outcomes}
+            canRecord={application.submissions.length > 0}
+          />
 
           {/* Immutable Submission History & Evidence */}
           {application.submissions.length > 0 && (

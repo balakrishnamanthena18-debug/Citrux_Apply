@@ -114,7 +114,9 @@ export const CANDIDATE_STATUS_MAP: Record<ApplicationStatus, CandidateStatusPres
   },
   REJECTED: {
     label: "Application rejected",
-    description: "Role was closed or candidate was not selected by employer.",
+    // Neutral: REJECTED may follow early staff reject or post-submit paths.
+    // Do not claim employer/candidate cause from status alone.
+    description: "This application is closed and no longer active.",
     badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
     progressStage: 5,
     isTerminal: true,

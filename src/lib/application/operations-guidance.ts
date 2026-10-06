@@ -30,7 +30,9 @@ export function deriveNextActionGuidance(status: ApplicationStatus): string {
     case "RESUBMISSION":
       return "Perform manual external resubmission and record attempt details.";
     case "REJECTED":
-      return "Application was rejected by candidate during approval stage.";
+      // Neutral: REJECTED has multiple entry paths (early staff reject, post-submit).
+      // Do not claim candidate-approval or employer cause from status alone.
+      return "Application was rejected and is no longer active.";
     case "WITHDRAWN":
       return "Application was withdrawn.";
     case "FAILED":

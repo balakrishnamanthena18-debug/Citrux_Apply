@@ -114,7 +114,7 @@ export async function resolveAssignmentAuthority(
  * Phase 5M active-owner scope + Phase 5O inactive former-scope + Phase 5R
  * active continuity subject (assignment-time snapshot). Never client team/manager IDs.
  */
-async function applicationInStructuralScope(
+export async function applicationInStructuralScope(
   tx: Prisma.TransactionClient,
   ctx: AuthenticatedContext,
   application: {

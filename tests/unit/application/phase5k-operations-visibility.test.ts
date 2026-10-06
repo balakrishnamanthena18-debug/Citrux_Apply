@@ -73,6 +73,9 @@ function makeApp(overrides: Record<string, unknown>) {
     createdAt: new Date("2026-10-01T10:00:00.000Z"),
     updatedAt: new Date("2026-10-02T10:00:00.000Z"),
     assignedEmployeeId: USER_A,
+    assignedTeamKey: null,
+    assignedManagerId: null,
+    approvalRequestedAt: null,
     candidateId: "c1",
     jobId: "j1",
     assignedEmployee: {
@@ -658,6 +661,8 @@ describe("Phase 5K — console wiring (static)", () => {
     expect(page).not.toContain("take: 150");
     expect(workbench).toContain("Unassigned");
     expect(workbench).toContain("currentStateAgeLabel");
+    expect(workbench).toContain("Waiting For");
+    expect(workbench).toContain("waitingForLabel");
     expect(workbench).not.toContain("result.filter((a) => a.assignedEmployeeId");
   });
 

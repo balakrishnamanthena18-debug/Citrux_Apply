@@ -12,6 +12,7 @@ import { AuthorizationError } from "@/lib/errors";
 import { sanitizePaginationLimit } from "@/lib/utils/sanitization";
 import { attachAgesFromHistoryBatch } from "./operations-aging";
 import { deriveNextActionGuidance } from "./operations-guidance";
+import { resolveWaitingAttribution } from "./operations-waiting";
 import { resolveManagerScope, resolveTeamLeadScope } from "./operations-scope";
 import {
   buildInactiveAssigneeOrphanWhere,
@@ -159,6 +160,7 @@ const APP_SELECT = {
   assignedEmployeeId: true,
   assignedTeamKey: true,
   assignedManagerId: true,
+  approvalRequestedAt: true,
   candidateId: true,
   jobId: true,
   assignedEmployee: {
@@ -540,7 +542,8 @@ export async function listOperationalApplications(
       ages.get(row.id)!,
       ownerInactive,
       forceContinuityFlag ||
-        continuityOutsideScopeForViewer(row, ownerInactive, continuityViewer)
+        continuityOutsideScopeForViewer(row, ownerInactive, continuityViewer),
+      now
     );
   });
 
@@ -646,6 +649,7 @@ async function hydrateWithAging(
     assignedEmployeeId: string | null;
     assignedTeamKey: string | null;
     assignedManagerId: string | null;
+    approvalRequestedAt: Date | null;
     candidateId: string;
     jobId: string;
     assignedEmployee: {
@@ -694,7 +698,8 @@ async function hydrateWithAging(
       ages.get(row.id)!,
       ownerInactive,
       forceContinuityFlag ||
-        continuityOutsideScopeForViewer(row, ownerInactive, continuityViewer)
+        continuityOutsideScopeForViewer(row, ownerInactive, continuityViewer),
+      now
     );
   });
 }
@@ -708,6 +713,7 @@ function toItem(
     assignedEmployeeId: string | null;
     assignedTeamKey?: string | null;
     assignedManagerId?: string | null;
+    approvalRequestedAt?: Date | null;
     candidateId: string;
     jobId: string;
     assignedEmployee: {
@@ -741,7 +747,8 @@ function toItem(
     label: string;
   },
   ownerInactive: boolean,
-  continuityOutsideScope: boolean
+  continuityOutsideScope: boolean,
+  now: Date = new Date()
 ): OperationalApplicationItem {
   let nextAction = deriveNextActionGuidance(row.status);
   if (ownerInactive) {
@@ -751,6 +758,11 @@ function toItem(
     nextAction =
       "Owner remains active but is outside your current structural scope. Reassign if operational ownership should move.";
   }
+
+  const waiting = resolveWaitingAttribution(row.status, now, {
+    statusHistoryEnteredAt: age.currentStateEnteredAt,
+    approvalRequestedAt: row.approvalRequestedAt ?? null,
+  });
 
   return {
     id: row.id,
@@ -773,6 +785,12 @@ function toItem(
     currentStateEnteredAt: age.currentStateEnteredAt,
     currentStateAgeKind: age.kind,
     currentStateAgeLabel: age.label,
+    expectedActor: waiting.expectedActor,
+    waitingKind: waiting.waitingKind,
+    waitingForLabel: waiting.waitingForLabel,
+    waitingSince: waiting.waitingSince,
+    waitingAgeKind: waiting.waitingAgeKind,
+    waitingAgeLabel: waiting.waitingAgeLabel,
     nextAction,
   };
 }

@@ -134,6 +134,10 @@ describe("Phase 5R — continuity visibility", () => {
   });
 
   it("9/10. Manager continuity uses assignedManagerId = viewer", () => {
+    const emptyReports = buildManagerContinuityWhere(ORG_A, USER_MGR_X, []);
+    expect(emptyReports.assignedEmployeeId).toEqual({ not: null });
+    expect(JSON.stringify(emptyReports)).not.toContain('"notIn":[]');
+
     const where = buildManagerContinuityWhere(ORG_A, USER_MGR_X, [USER_B]);
     expect(where.assignedManagerId).toBe(USER_MGR_X);
     expect(where.assignedEmployeeId).toEqual({

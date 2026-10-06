@@ -45,9 +45,15 @@ export function buildTeamLeadContinuityWhere(
   if (teamKeys.length === 0) {
     return { organizationId, id: { in: [] } };
   }
+  // Prisma rejects notIn: [] — empty current scope means every ACTIVE owner is outside.
+  const assigneeFilter =
+    currentAssigneeUserIds.length === 0
+      ? { not: null }
+      : { not: null, notIn: currentAssigneeUserIds };
+
   return {
     organizationId,
-    assignedEmployeeId: { not: null, notIn: currentAssigneeUserIds },
+    assignedEmployeeId: assigneeFilter,
     assignedTeamKey: { in: teamKeys },
     assignedEmployee: { is: activeAssigneeFilter(organizationId) },
   };
@@ -62,9 +68,15 @@ export function buildManagerContinuityWhere(
   managerUserId: string,
   currentReportUserIds: string[]
 ): Prisma.ApplicationWhereInput {
+  // Prisma rejects notIn: [] — empty report list means every ACTIVE owner is outside.
+  const assigneeFilter =
+    currentReportUserIds.length === 0
+      ? { not: null }
+      : { not: null, notIn: currentReportUserIds };
+
   return {
     organizationId,
-    assignedEmployeeId: { not: null, notIn: currentReportUserIds },
+    assignedEmployeeId: assigneeFilter,
     assignedManagerId: managerUserId,
     assignedEmployee: { is: activeAssigneeFilter(organizationId) },
   };

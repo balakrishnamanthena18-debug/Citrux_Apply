@@ -577,6 +577,7 @@ export function EmployeeApplicationsWorkbench({
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Age</th>
+                  <th className="px-4 py-3">Waiting For</th>
                   <th className="px-4 py-3">Next Action</th>
                   <th className="px-4 py-3">Submission</th>
                   <th className="px-4 py-3 text-right">Action</th>
@@ -685,6 +686,25 @@ export function EmployeeApplicationsWorkbench({
                             )}
                           </div>
                         )}
+                      </td>
+
+                      <td className="px-4 py-3 whitespace-nowrap max-w-[140px]">
+                        <div
+                          aria-label={`Waiting for ${app.waitingForLabel}`}
+                        >
+                          <span className="font-semibold text-[#0F1720]">
+                            {app.waitingForLabel}
+                          </span>
+                          {app.waitingAgeKind === "AGE" ? (
+                            <div className="text-[10px] text-[#64748B]">
+                              {app.waitingAgeLabel}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-[#94A3B8] italic">
+                              AGE_UNAVAILABLE
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       <td className="px-4 py-3 max-w-[220px]">

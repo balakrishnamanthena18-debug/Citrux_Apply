@@ -8,6 +8,7 @@ import {
   registerCandidateDocumentSelfAction,
 } from "@/lib/candidate/actions";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
+import { DestructiveAction } from "@/components/ui/destructive-action";
 
 export interface CandidateVaultDocument {
   id: string;
@@ -46,6 +47,7 @@ export function CandidateDocumentVault({
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [exitingDocId, setExitingDocId] = useState<string | null>(null);
 
   // Document Viewer State
   const [viewingDocId, setViewingDocId] = useState<string | null>(null);
@@ -389,30 +391,6 @@ export function CandidateDocumentVault({
     }
   };
 
-  const handleDelete = async (docId: string, title: string) => {
-    if (!window.confirm(`Are you sure you want to remove "${title}"?`)) {
-      return;
-    }
-
-    setIsDeletingId(docId);
-    setErrorMsg(null);
-    try {
-      const res = await deleteCandidateDocumentAction(docId);
-      if (res.success) {
-        setDocuments((prev) => prev.filter((d) => d.id !== docId));
-        onDocumentDeleted?.();
-        setSuccessToast(`"${title}" removed.`);
-        setTimeout(() => setSuccessToast(null), 3000);
-      } else {
-        setErrorMsg(res.error || "Failed to remove document");
-      }
-    } catch {
-      setErrorMsg("Network error deleting document");
-    } finally {
-      setIsDeletingId(null);
-    }
-  };
-
   return (
     <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
       {/* Header */}
@@ -547,7 +525,11 @@ export function CandidateDocumentVault({
             return (
               <div
                 key={doc.id}
-                className="p-4 hover:bg-slate-50/75 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                className={`p-4 hover:bg-slate-50/75 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                  exitingDocId === doc.id
+                    ? "opacity-0 -translate-y-2 scale-98 pointer-events-none"
+                    : "opacity-100 translate-y-0 scale-100"
+                }`}
               >
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -598,15 +580,44 @@ export function CandidateDocumentVault({
                     {isDownloadingId === doc.id ? "…" : "Download"}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(doc.id, doc.title)}
-                    disabled={isDeletingId === doc.id}
-                    className="px-2.5 py-1.5 rounded-md text-xs font-medium text-rose-600 hover:bg-rose-50 transition disabled:opacity-50 cursor-pointer"
-                    title="Remove document"
-                  >
-                    {isDeletingId === doc.id ? "…" : "Delete"}
-                  </button>
+                  <DestructiveAction
+                    actionLabel="Delete"
+                    entityName="document"
+                    entityTitle={doc.title}
+                    entityId={doc.id}
+                    confirmTitle="Delete this document?"
+                    confirmDescription="This document will be permanently removed from your document vault. This action cannot be undone."
+                    confirmLabel="Delete"
+                    cancelLabel="Cancel"
+                    processingLabel="Deleting document…"
+                    successLabel="Document deleted"
+                    variant="ghost"
+                    size="sm"
+                    mode="modal"
+                    onConfirm={async () => {
+                      const res = await deleteCandidateDocumentAction(doc.id);
+                      if (!res.success) {
+                        throw new Error(res.error || "Failed to remove document");
+                      }
+                    }}
+                    onSuccess={() => {
+                      setExitingDocId(doc.id);
+                      setTimeout(() => {
+                        setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+                        onDocumentDeleted?.();
+                        setExitingDocId(null);
+                        setSuccessToast(`"${doc.title}" removed from vault.`);
+                        setTimeout(() => setSuccessToast(null), 3500);
+                      }, 280);
+                    }}
+                    onError={(err) => {
+                      setErrorMsg(
+                        err instanceof Error
+                          ? err.message
+                          : "Failed to remove document"
+                      );
+                    }}
+                  />
                 </div>
               </div>
             );
