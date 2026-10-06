@@ -9,6 +9,7 @@ import {
   type OperationalMetrics,
   type CandidateLogSummary,
 } from "@/components/application/ApplicationLogWorkbench";
+import { listRequestedApplicationIntake } from "@/lib/application/requested-intake";
 
 interface Props {
   searchParams?: Promise<{
@@ -326,11 +327,18 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
       }
     }
 
+    const requestedIntake = await listRequestedApplicationIntake(
+      tx,
+      auth.organizationId,
+      {}
+    );
+
     return {
       candidates: candidatesList,
       jobs: jobsList,
       metrics: operationalMetrics,
       initialCandidateSummary: candSummary,
+      requestedIntake,
     };
   });
 
@@ -342,6 +350,9 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
       initialSelectedCandidateId={selectedCandidateId}
       initialSelectedJobId={selectedJobId}
       initialCandidateSummary={data.initialCandidateSummary}
+      requestedIntakeItems={data.requestedIntake.items}
+      requestedIntakeNextCursor={data.requestedIntake.nextCursor}
+      requestedIntakeTotalPending={data.requestedIntake.totalPending}
     />
   );
 }

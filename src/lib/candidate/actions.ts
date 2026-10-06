@@ -42,6 +42,8 @@ import { CandidateStatus, Role, ApplicationAuthorizationMode, AuditAction } from
 import { AuthorizationError, InvalidStateTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
 import { markCandidateApplicationIntelligenceStale } from "@/lib/application-intelligence/runs";
 import { freshnessAfterTrigger } from "@/lib/application-intelligence/stale";
+import { invalidateCandidateJobMatchesForCandidate } from "@/lib/job-matching/invalidation";
+import { populateJobMatchWorkForCandidate } from "@/lib/job-matching/population";
 
 export interface ActionResult<T = unknown> {
   success: boolean;
@@ -176,6 +178,13 @@ export async function updateCandidateProfileSelfAction(
         reason: "CANDIDATE_PROFILE_CHANGED",
       });
 
+      // Phase 5C.6: Job Intelligence invalidation (async recompute via worker).
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: ctx.organizationId,
+        candidateId: updated.id,
+        reason: "CANDIDATE_PREFERENCES_CHANGED",
+      });
+
       return updated;
     });
 
@@ -217,39 +226,44 @@ export async function upsertCandidateExperienceAction(
         throw new NotFoundError("Candidate profile not found");
       }
 
-      if (parsed.data.id) {
-        return tx.candidateExperience.update({
-          where: { id: parsed.data.id, candidateId: candidate.id },
-          data: {
-            companyName: parsed.data.companyName,
-            jobTitle: parsed.data.jobTitle,
-            location: parsed.data.location,
-            isCurrent: parsed.data.isCurrent,
-            startDate: new Date(parsed.data.startDate),
-            endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
-            description: parsed.data.description,
-            achievements: parsed.data.achievements,
-            technologies: parsed.data.technologies,
-            orderIndex: parsed.data.orderIndex,
-          },
-        });
-      }
+      const row = parsed.data.id
+        ? await tx.candidateExperience.update({
+            where: { id: parsed.data.id, candidateId: candidate.id },
+            data: {
+              companyName: parsed.data.companyName,
+              jobTitle: parsed.data.jobTitle,
+              location: parsed.data.location,
+              isCurrent: parsed.data.isCurrent,
+              startDate: new Date(parsed.data.startDate),
+              endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
+              description: parsed.data.description,
+              achievements: parsed.data.achievements,
+              technologies: parsed.data.technologies,
+              orderIndex: parsed.data.orderIndex,
+            },
+          })
+        : await tx.candidateExperience.create({
+            data: {
+              candidateId: candidate.id,
+              companyName: parsed.data.companyName,
+              jobTitle: parsed.data.jobTitle,
+              location: parsed.data.location,
+              isCurrent: parsed.data.isCurrent,
+              startDate: new Date(parsed.data.startDate),
+              endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
+              description: parsed.data.description,
+              achievements: parsed.data.achievements,
+              technologies: parsed.data.technologies,
+              orderIndex: parsed.data.orderIndex,
+            },
+          });
 
-      return tx.candidateExperience.create({
-        data: {
-          candidateId: candidate.id,
-          companyName: parsed.data.companyName,
-          jobTitle: parsed.data.jobTitle,
-          location: parsed.data.location,
-          isCurrent: parsed.data.isCurrent,
-          startDate: new Date(parsed.data.startDate),
-          endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
-          description: parsed.data.description,
-          achievements: parsed.data.achievements,
-          technologies: parsed.data.technologies,
-          orderIndex: parsed.data.orderIndex,
-        },
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
+      return row;
     });
 
     await logUserAuditEvent({
@@ -284,6 +298,12 @@ export async function deleteCandidateExperienceAction(
 
       await tx.candidateExperience.delete({
         where: { id: experienceId, candidateId: candidate.id },
+      });
+
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
     });
 
@@ -323,37 +343,42 @@ export async function upsertCandidateEducationAction(
       });
       if (!candidate) throw new NotFoundError("Candidate profile not found");
 
-      if (parsed.data.id) {
-        return tx.candidateEducation.update({
-          where: { id: parsed.data.id, candidateId: candidate.id },
-          data: {
-            institution: parsed.data.institution,
-            degree: parsed.data.degree,
-            fieldOfStudy: parsed.data.fieldOfStudy,
-            startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
-            endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
-            graduationYear: parsed.data.graduationYear,
-            gpa: parsed.data.gpa,
-            honors: parsed.data.honors,
-            orderIndex: parsed.data.orderIndex,
-          },
-        });
-      }
+      const row = parsed.data.id
+        ? await tx.candidateEducation.update({
+            where: { id: parsed.data.id, candidateId: candidate.id },
+            data: {
+              institution: parsed.data.institution,
+              degree: parsed.data.degree,
+              fieldOfStudy: parsed.data.fieldOfStudy,
+              startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
+              endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
+              graduationYear: parsed.data.graduationYear,
+              gpa: parsed.data.gpa,
+              honors: parsed.data.honors,
+              orderIndex: parsed.data.orderIndex,
+            },
+          })
+        : await tx.candidateEducation.create({
+            data: {
+              candidateId: candidate.id,
+              institution: parsed.data.institution,
+              degree: parsed.data.degree,
+              fieldOfStudy: parsed.data.fieldOfStudy,
+              startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
+              endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
+              graduationYear: parsed.data.graduationYear,
+              gpa: parsed.data.gpa,
+              honors: parsed.data.honors,
+              orderIndex: parsed.data.orderIndex,
+            },
+          });
 
-      return tx.candidateEducation.create({
-        data: {
-          candidateId: candidate.id,
-          institution: parsed.data.institution,
-          degree: parsed.data.degree,
-          fieldOfStudy: parsed.data.fieldOfStudy,
-          startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
-          endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
-          graduationYear: parsed.data.graduationYear,
-          gpa: parsed.data.gpa,
-          honors: parsed.data.honors,
-          orderIndex: parsed.data.orderIndex,
-        },
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
+      return row;
     });
 
     await logUserAuditEvent({
@@ -388,6 +413,12 @@ export async function deleteCandidateEducationAction(
 
       await tx.candidateEducation.delete({
         where: { id: educationId, candidateId: candidate.id },
+      });
+
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
     });
 
@@ -444,6 +475,12 @@ export async function syncCandidateSkillsAction(
           })),
         });
       }
+
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
+      });
     });
 
     await logUserAuditEvent({
@@ -484,6 +521,7 @@ export async function upsertCandidateProjectAction(
       });
       if (!candidate) throw new NotFoundError("Candidate profile not found");
 
+      let row;
       if (parsed.data.id) {
         const existing = await tx.candidateProject.findFirst({
           where: { id: parsed.data.id, candidateId: candidate.id },
@@ -491,7 +529,7 @@ export async function upsertCandidateProjectAction(
         });
         if (!existing) throw new NotFoundError("Project not found");
 
-        return tx.candidateProject.update({
+        row = await tx.candidateProject.update({
           where: { id: existing.id },
           data: {
             title: parsed.data.title,
@@ -505,22 +543,29 @@ export async function upsertCandidateProjectAction(
             orderIndex: parsed.data.orderIndex,
           },
         });
+      } else {
+        row = await tx.candidateProject.create({
+          data: {
+            candidateId: candidate.id,
+            title: parsed.data.title,
+            role: parsed.data.role,
+            url: parsed.data.url || null,
+            description: parsed.data.description,
+            highlights: parsed.data.highlights,
+            technologies: parsed.data.technologies,
+            startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
+            endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
+            orderIndex: parsed.data.orderIndex,
+          },
+        });
       }
 
-      return tx.candidateProject.create({
-        data: {
-          candidateId: candidate.id,
-          title: parsed.data.title,
-          role: parsed.data.role,
-          url: parsed.data.url || null,
-          description: parsed.data.description,
-          highlights: parsed.data.highlights,
-          technologies: parsed.data.technologies,
-          startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
-          endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
-          orderIndex: parsed.data.orderIndex,
-        },
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
+      return row;
     });
 
     await logUserAuditEvent({
@@ -572,6 +617,12 @@ export async function deleteCandidateProjectAction(
       await tx.candidateProject.delete({
         where: { id: existing.id },
       });
+
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
+      });
     });
 
     await logUserAuditEvent({
@@ -613,33 +664,42 @@ export async function upsertCandidateCertificationAction(
       });
       if (!candidate) throw new NotFoundError("Candidate profile not found");
 
-      if (parsed.data.id) {
-        return tx.candidateCertification.update({
-          where: { id: parsed.data.id, candidateId: candidate.id },
-          data: {
-            name: parsed.data.name,
-            issuingAuthority: parsed.data.issuingAuthority,
-            credentialId: parsed.data.credentialId,
-            credentialUrl: parsed.data.credentialUrl || null,
-            issueDate: parsed.data.issueDate ? new Date(parsed.data.issueDate) : null,
-            expirationDate: parsed.data.expirationDate ? new Date(parsed.data.expirationDate) : null,
-            doesNotExpire: parsed.data.doesNotExpire,
-          },
-        });
-      }
+      const row = parsed.data.id
+        ? await tx.candidateCertification.update({
+            where: { id: parsed.data.id, candidateId: candidate.id },
+            data: {
+              name: parsed.data.name,
+              issuingAuthority: parsed.data.issuingAuthority,
+              credentialId: parsed.data.credentialId,
+              credentialUrl: parsed.data.credentialUrl || null,
+              issueDate: parsed.data.issueDate ? new Date(parsed.data.issueDate) : null,
+              expirationDate: parsed.data.expirationDate
+                ? new Date(parsed.data.expirationDate)
+                : null,
+              doesNotExpire: parsed.data.doesNotExpire,
+            },
+          })
+        : await tx.candidateCertification.create({
+            data: {
+              candidateId: candidate.id,
+              name: parsed.data.name,
+              issuingAuthority: parsed.data.issuingAuthority,
+              credentialId: parsed.data.credentialId,
+              credentialUrl: parsed.data.credentialUrl || null,
+              issueDate: parsed.data.issueDate ? new Date(parsed.data.issueDate) : null,
+              expirationDate: parsed.data.expirationDate
+                ? new Date(parsed.data.expirationDate)
+                : null,
+              doesNotExpire: parsed.data.doesNotExpire,
+            },
+          });
 
-      return tx.candidateCertification.create({
-        data: {
-          candidateId: candidate.id,
-          name: parsed.data.name,
-          issuingAuthority: parsed.data.issuingAuthority,
-          credentialId: parsed.data.credentialId,
-          credentialUrl: parsed.data.credentialUrl || null,
-          issueDate: parsed.data.issueDate ? new Date(parsed.data.issueDate) : null,
-          expirationDate: parsed.data.expirationDate ? new Date(parsed.data.expirationDate) : null,
-          doesNotExpire: parsed.data.doesNotExpire,
-        },
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
+      return row;
     });
 
     await logUserAuditEvent({
@@ -674,6 +734,12 @@ export async function deleteCandidateCertificationAction(
 
       await tx.candidateCertification.delete({
         where: { id: certificationId, candidateId: candidate.id },
+      });
+
+      await invalidateCandidateJobMatchesForCandidate(tx, {
+        organizationId: candidate.organizationId,
+        candidateId: candidate.id,
+        reason: "CANDIDATE_TRUTH_CHANGED",
       });
     });
 
@@ -836,6 +902,19 @@ export async function updateCandidateStatusAction(
         where: { id: candidate.id },
         data: { status: parsed.data.targetStatus },
       });
+
+      // Phase 5E: ACTIVE = Job Intelligence readiness → enqueue missing OPEN jobs.
+      if (
+        parsed.data.targetStatus === CandidateStatus.ACTIVE &&
+        candidate.status !== CandidateStatus.ACTIVE
+      ) {
+        await populateJobMatchWorkForCandidate(tx, {
+          organizationId: ctx.organizationId,
+          candidateId: candidate.id,
+          reason: "CANDIDATE_BECAME_ACTIVE",
+          requestedById: ctx.userId,
+        });
+      }
     });
 
     await logUserAuditEvent({

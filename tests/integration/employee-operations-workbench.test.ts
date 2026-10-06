@@ -16,6 +16,7 @@ import {
   JobStatus,
 } from "@/generated/prisma";
 import { AuthorizationError } from "@/lib/errors";
+import { authoritativeQaTxMocks } from "../helpers/authoritative-qa-mock";
 
 vi.mock("@/lib/auth/context", () => ({
   getAuthenticatedContext: vi.fn(),
@@ -236,6 +237,7 @@ describe("OOS — Employee Operations Workbench & Role Boundary Invariants (test
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({ id: "hist-1" }),
         },
+        ...authoritativeQaTxMocks(),
       };
 
       vi.mocked(withRlsContext).mockImplementation(async (_userId, cb) => cb(mockTx as any));
@@ -387,6 +389,7 @@ describe("OOS — Employee Operations Workbench & Role Boundary Invariants (test
         applicationId: mockApplicationId,
         externalReference: "STRIPE-REF-998822",
         externalUrl: "https://stripe.com/jobs/123",
+        confirmationEvidence: "Portal confirmation captured.",
         submissionNotes: "Completed manual submission on employer portal.",
       });
 

@@ -54,6 +54,10 @@ describe("Phase 8 Strictly Manual Work Reassignment (tests/integration/manual-re
           }),
         },
         application: {
+          findMany: vi.fn().mockResolvedValue([
+            { id: appIds[0], assignedEmployeeId: null },
+            { id: appIds[1], assignedEmployeeId: null },
+          ]),
           updateMany: vi.fn().mockResolvedValue({ count: 2 }),
         },
         task: {

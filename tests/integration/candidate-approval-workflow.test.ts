@@ -13,6 +13,7 @@ import {
   JobStatus,
 } from "@/generated/prisma";
 import { ValidationError, AuthorizationError } from "@/lib/errors";
+import { authoritativeQaTxMocks } from "../helpers/authoritative-qa-mock";
 
 vi.mock("@/lib/auth/context", () => ({
   getAuthenticatedContext: vi.fn(),
@@ -75,6 +76,7 @@ describe("Candidate Approval Workflow Integration (tests/integration/candidate-a
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({ id: "history-1" }),
         },
+        ...authoritativeQaTxMocks(),
       };
       return callback(tx as any);
     });

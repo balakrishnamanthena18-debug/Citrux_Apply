@@ -80,13 +80,20 @@ export function SubmissionForm({ applicationId, isResubmission = false }: Submis
       </div>
 
       <div>
-        <label className="block font-medium text-slate-700">Confirmation Evidence Text</label>
+        <label className="block font-medium text-slate-700">
+          Confirmation Evidence Text{" "}
+          <span className="font-normal text-slate-500">(or upload file below)</span>
+        </label>
         <textarea
           name="confirmationEvidence"
           rows={3}
           className="mt-1 w-full rounded border border-slate-300 p-2 text-xs"
           placeholder="Confirmation email snippet, portal response, or submission timestamp notes..."
         />
+        <p className="mt-1 text-[11px] text-slate-500">
+          Add submission evidence or confirmation before recording submission.
+          {storagePath ? " File evidence attached." : ""}
+        </p>
       </div>
 
       <EvidenceUploader

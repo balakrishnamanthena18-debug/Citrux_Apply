@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useCallback, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ApplicationStatus } from "@/generated/prisma";
 import { formatSalary } from "@/lib/utils/status-presenter";
 import { InstantTabs, TabItem } from "@/components/workbench/InstantTabs";
@@ -10,49 +11,13 @@ import { TablePagination } from "@/components/workbench/TablePagination";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { createApplicationAction } from "@/lib/application/actions";
-import { syncUrlParams } from "@/lib/client/urlSync";
+import type {
+  OperationalApplicationItem,
+  OperationalQueueCounts,
+  OperationalScopeAvailability,
+} from "@/lib/application/operations-types";
 
-export interface ApplicationItem {
-  id: string;
-  status: ApplicationStatus;
-  createdAt: string | Date;
-  updatedAt: string | Date;
-  assignedEmployeeId?: string | null;
-  assignedEmployee?: {
-    id: string;
-    firstName?: string | null;
-    lastName?: string | null;
-    email: string;
-  } | null;
-  candidateId: string;
-  candidate: {
-    id: string;
-    applicationAuthorizationMode: string;
-    user: {
-      firstName?: string | null;
-      lastName?: string | null;
-      email: string;
-    };
-  };
-  jobId: string;
-  job: {
-    id: string;
-    title: string;
-    companyName: string;
-    location?: string | null;
-    isRemote?: boolean;
-    source?: string | null;
-    externalUrl?: string | null;
-    salaryMin?: number | null;
-    salaryMax?: number | null;
-    salaryCurrency?: string | null;
-  };
-  submissions: Array<{
-    id: string;
-    attemptNumber: number;
-    submittedAt: string | Date;
-  }>;
-}
+export type ApplicationItem = OperationalApplicationItem;
 
 export interface CandidateOption {
   id: string;
@@ -68,14 +33,7 @@ export interface JobOption {
   source?: string | null;
 }
 
-export interface ServerQueueCounts {
-  total: number;
-  mine: number;
-  ready: number;
-  inProgress: number;
-  submitted: number;
-  needsAttention: number;
-}
+export type ServerQueueCounts = OperationalQueueCounts;
 
 interface Props {
   currentUserId: string;
@@ -83,8 +41,13 @@ interface Props {
   candidates: CandidateOption[];
   jobs: JobOption[];
   sources: string[];
-  /** Authoritative org-wide queue badges (not derived from the bounded page rows). */
-  serverQueueCounts?: ServerQueueCounts;
+  serverQueueCounts: ServerQueueCounts;
+  scopes: OperationalScopeAvailability;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  asOf: string;
   initialQueue?: string;
   initialStatus?: string;
   initialCandidateId?: string;
@@ -110,6 +73,17 @@ const STATUS_BADGES: Record<string, string> = {
   FAILED: "bg-rose-100 text-rose-900 border-rose-300",
 };
 
+function buildHref(params: Record<string, string | null | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null && value !== undefined && value !== "") {
+      sp.set(key, value);
+    }
+  }
+  const q = sp.toString();
+  return q ? `/employee/applications?${q}` : "/employee/applications";
+}
+
 export function EmployeeApplicationsWorkbench({
   currentUserId,
   applications,
@@ -117,196 +91,143 @@ export function EmployeeApplicationsWorkbench({
   jobs,
   sources,
   serverQueueCounts,
+  scopes,
+  page,
+  pageSize,
+  totalCount,
+  totalPages,
+  asOf,
   initialQueue = "all",
   initialStatus = "",
   initialCandidateId = "",
   initialSource = "",
-  initialSort = "newest",
+  initialSort = "age",
   initialSearch = "",
 }: Props) {
-  const [queue, setQueue] = useState<string>(initialQueue);
-  const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
-  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
-  const [candidateFilter, setCandidateFilter] = useState<string>(initialCandidateId);
-  const [sourceFilter, setSourceFilter] = useState<string>(initialSource);
-  const [sortBy, setSortBy] = useState<string>(initialSort);
-  const [page, setPage] = useState<number>(1);
-  const pageSize = 25;
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [searchDraft, setSearchDraft] = useState(initialSearch);
 
-  // Prefer org-wide server counts; fall back to in-memory when not provided.
-  const queueCounts = useMemo(() => {
-    if (serverQueueCounts) return serverQueueCounts;
+  const queue = initialQueue;
+  const statusFilter = initialStatus;
+  const candidateFilter = initialCandidateId;
+  const sourceFilter = initialSource;
+  const sortBy = initialSort;
 
-    const total = applications.length;
-    let mine = 0;
-    let ready = 0;
-    let inProgress = 0;
-    let submitted = 0;
-    let needsAttention = 0;
+  const navigate = useCallback(
+    (patch: Record<string, string | null | undefined>) => {
+      const next = {
+        queue: queue === "all" ? null : queue,
+        search: initialSearch || null,
+        status: statusFilter || null,
+        candidateId: candidateFilter || null,
+        source: sourceFilter || null,
+        sort: sortBy === "age" ? null : sortBy,
+        page: page > 1 ? String(page) : null,
+        ...patch,
+      };
+      startTransition(() => {
+        router.push(buildHref(next));
+      });
+    },
+    [
+      router,
+      queue,
+      initialSearch,
+      statusFilter,
+      candidateFilter,
+      sourceFilter,
+      sortBy,
+      page,
+    ]
+  );
 
-    for (const app of applications) {
-      if (app.assignedEmployeeId === currentUserId) mine++;
-      if (app.status === "READY") ready++;
-      if (["DISCOVERED", "QUALIFIED", "PREPARING", "REVIEW"].includes(app.status)) inProgress++;
-      if (app.status === "SUBMITTED") submitted++;
-      if (["AWAITING_APPROVAL", "SUBMISSION_ISSUE", "REVIEW_REQUIRED", "CORRECTION_APPROVED", "RESUBMISSION", "FAILED"].includes(app.status)) {
-        needsAttention++;
-      }
-    }
+  const queueCounts = serverQueueCounts;
 
-    return { total, mine, ready, inProgress, submitted, needsAttention };
-  }, [applications, currentUserId, serverQueueCounts]);
-
-  const tabs: TabItem[] = useMemo(
-    () => [
+  const tabs: TabItem[] = useMemo(() => {
+    const base: TabItem[] = [
       { key: "all", label: "All Applications", count: queueCounts.total },
       { key: "mine", label: "My Work", count: queueCounts.mine },
+      { key: "unassigned", label: "Unassigned", count: queueCounts.unassigned },
       { key: "ready", label: "Ready to Apply", count: queueCounts.ready, highlight: true },
       { key: "in_progress", label: "Applying / In Progress", count: queueCounts.inProgress },
       { key: "submitted", label: "Submitted", count: queueCounts.submitted },
       { key: "needs_attention", label: "Needs Attention", count: queueCounts.needsAttention },
-    ],
-    [queueCounts]
-  );
+      { key: "failed", label: "Failed", count: queueCounts.failed },
+    ];
+    let insertAt = 3;
+    if (scopes.team) {
+      base.splice(insertAt, 0, {
+        key: "team",
+        label: "Team",
+        count: queueCounts.team,
+      });
+      insertAt += 1;
+    }
+    if (scopes.manager) {
+      base.splice(insertAt, 0, {
+        key: "manager",
+        label: "Direct Reports",
+        count: queueCounts.manager,
+      });
+      insertAt += 1;
+    }
+    if (scopes.orphaned) {
+      base.splice(insertAt, 0, {
+        key: "orphaned",
+        label: "Inactive Owner",
+        count: queueCounts.orphaned,
+      });
+      insertAt += 1;
+    }
+    if (scopes.continuity) {
+      base.splice(insertAt, 0, {
+        key: "continuity",
+        label: "Out of Scope",
+        count: queueCounts.continuity,
+      });
+    }
+    return base;
+  }, [queueCounts, scopes.team, scopes.manager, scopes.orphaned, scopes.continuity]);
 
   const handleQueueChange = (newQueue: string) => {
-    setQueue(newQueue);
-    setPage(1);
-    syncUrlParams({ queue: newQueue === "all" ? null : newQueue });
+    navigate({
+      queue: newQueue === "all" ? null : newQueue,
+      page: null,
+      status: null,
+    });
   };
 
-  const handleSearchChange = (term: string) => {
-    setSearchTerm(term);
-    setPage(1);
-    syncUrlParams({ search: term ? term : null });
+  const handleSearchSubmit = () => {
+    navigate({
+      search: searchDraft.trim() || null,
+      page: null,
+    });
   };
 
   const handleFilterChange = (key: string, value: string) => {
-    setPage(1);
     if (key === "status") {
-      setStatusFilter(value);
-      syncUrlParams({ status: value || null });
+      navigate({ status: value || null, page: null });
     } else if (key === "candidateId") {
-      setCandidateFilter(value);
-      syncUrlParams({ candidateId: value || null });
+      navigate({ candidateId: value || null, page: null });
     } else if (key === "source") {
-      setSourceFilter(value);
-      syncUrlParams({ source: value || null });
+      navigate({ source: value || null, page: null });
     } else if (key === "sort") {
-      setSortBy(value);
-      syncUrlParams({ sort: value === "newest" ? null : value });
+      // Empty = default age sort
+      navigate({ sort: value && value !== "age" ? value : null, page: null });
     }
   };
 
   const handleClearAll = () => {
-    setSearchTerm("");
-    setStatusFilter("");
-    setCandidateFilter("");
-    setSourceFilter("");
-    setSortBy("newest");
-    setQueue("all");
-    setPage(1);
-    syncUrlParams({
-      queue: null,
-      search: null,
-      status: null,
-      candidateId: null,
-      source: null,
-      sort: null,
+    setSearchDraft("");
+    startTransition(() => {
+      router.push("/employee/applications");
     });
   };
 
-  // Instant pure in-memory filtering & sorting (<5ms for 500+ records)
-  const filteredApplications = useMemo(() => {
-    let result = applications;
-
-    // 1. Queue Partition Filter
-    if (queue === "mine") {
-      result = result.filter((a) => a.assignedEmployeeId === currentUserId);
-    } else if (queue === "ready") {
-      result = result.filter((a) => a.status === "READY");
-    } else if (queue === "in_progress") {
-      result = result.filter((a) =>
-        ["DISCOVERED", "QUALIFIED", "PREPARING", "REVIEW"].includes(a.status)
-      );
-    } else if (queue === "submitted") {
-      result = result.filter((a) => a.status === "SUBMITTED");
-    } else if (queue === "needs_attention") {
-      result = result.filter((a) =>
-        ["AWAITING_APPROVAL", "SUBMISSION_ISSUE", "REVIEW_REQUIRED", "CORRECTION_APPROVED", "RESUBMISSION", "FAILED"].includes(a.status)
-      );
-    }
-
-    // 2. Status Dropdown Filter
-    if (statusFilter) {
-      result = result.filter((a) => a.status === statusFilter);
-    }
-
-    // 3. Candidate Filter
-    if (candidateFilter) {
-      result = result.filter((a) => a.candidateId === candidateFilter);
-    }
-
-    // 4. Source Filter
-    if (sourceFilter) {
-      result = result.filter((a) => a.job?.source === sourceFilter);
-    }
-
-    // 5. Search Filter
-    const q = searchTerm.trim().toLowerCase();
-    if (q) {
-      result = result.filter((app) => {
-        const candFirst = app.candidate?.user?.firstName || "";
-        const candLast = app.candidate?.user?.lastName || "";
-        const candEmail = app.candidate?.user?.email || "";
-        const title = app.job?.title || "";
-        const company = app.job?.companyName || "";
-        const source = app.job?.source || "";
-        const loc = app.job?.location || "";
-
-        return (
-          `${candFirst} ${candLast}`.toLowerCase().includes(q) ||
-          candEmail.toLowerCase().includes(q) ||
-          title.toLowerCase().includes(q) ||
-          company.toLowerCase().includes(q) ||
-          source.toLowerCase().includes(q) ||
-          loc.toLowerCase().includes(q)
-        );
-      });
-    }
-
-    // 6. In-Memory Sorting
-    return [...result].sort((a, b) => {
-      if (sortBy === "oldest") {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      } else if (sortBy === "updated") {
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      } else if (sortBy === "company") {
-        return (a.job?.companyName || "").localeCompare(b.job?.companyName || "");
-      } else if (sortBy === "candidate") {
-        const nameA = `${a.candidate?.user?.lastName || ""} ${a.candidate?.user?.firstName || ""}`;
-        const nameB = `${b.candidate?.user?.lastName || ""} ${b.candidate?.user?.firstName || ""}`;
-        return nameA.localeCompare(nameB);
-      }
-      // default "newest"
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  }, [
-    applications,
-    queue,
-    currentUserId,
-    statusFilter,
-    candidateFilter,
-    sourceFilter,
-    searchTerm,
-    sortBy,
-  ]);
-
-  const totalPages = Math.ceil(filteredApplications.length / pageSize) || 1;
-  const paginatedApps = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredApplications.slice(start, start + pageSize);
-  }, [filteredApplications, page, pageSize]);
+  const handlePageChange = (nextPage: number) => {
+    navigate({ page: nextPage > 1 ? String(nextPage) : null });
+  };
 
   const filterConfigs: FilterDropdownConfig[] = useMemo(
     () => [
@@ -337,46 +258,43 @@ export function EmployeeApplicationsWorkbench({
         allLabel: "All Candidates",
         options: candidates.map((c) => ({ value: c.id, label: `${c.name} (${c.status})` })),
       },
-      ...(sources.length > 0
-        ? [
-            {
-              key: "source",
-              label: "Source",
-              allLabel: "All Sources",
-              options: sources.map((s) => ({ value: s, label: s })),
-            },
-          ]
-        : []),
+      {
+        key: "source",
+        label: "Source",
+        allLabel: "All Sources",
+        options: sources.map((s) => ({ value: s, label: s })),
+      },
       {
         key: "sort",
         label: "Sort",
-        allLabel: "Sort: Newest First",
+        allLabel: "Age (longest first)",
         options: [
-          { value: "newest", label: "Sort: Newest First" },
-          { value: "oldest", label: "Sort: Oldest First" },
-          { value: "updated", label: "Sort: Last Updated" },
-          { value: "company", label: "Sort: Company A–Z" },
-          { value: "candidate", label: "Sort: Candidate A–Z" },
+          { value: "newest", label: "Newest created" },
+          { value: "oldest", label: "Oldest created" },
+          { value: "updated", label: "Recently updated" },
         ],
       },
     ],
     [candidates, sources]
   );
 
-  const filterValues: Record<string, string> = {
-    status: statusFilter,
-    candidateId: candidateFilter,
-    source: sourceFilter,
-    sort: sortBy === "newest" ? "" : sortBy,
-  };
+  const filterValues = useMemo(
+    () => ({
+      status: statusFilter,
+      candidateId: candidateFilter,
+      source: sourceFilter,
+      // Empty select value maps to default age sort (allLabel).
+      sort: sortBy === "age" ? "" : sortBy,
+    }),
+    [statusFilter, candidateFilter, sourceFilter, sortBy]
+  );
 
   const isFiltered = Boolean(
-    searchTerm.trim() || statusFilter || candidateFilter || sourceFilter || (sortBy && sortBy !== "newest") || queue !== "all"
+    searchDraft || statusFilter || candidateFilter || sourceFilter || sortBy !== "age" || queue !== "all"
   );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16">
-      {/* Console Header */}
+    <div className={`space-y-5 max-w-[1600px] mx-auto pb-16 ${isPending ? "opacity-70" : ""}`}>
       <div className="bg-white p-6 rounded-[16px] border border-[#E5EAE7] shadow-2xs">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -387,16 +305,20 @@ export function EmployeeApplicationsWorkbench({
               </h1>
             </div>
             <p className="text-xs text-[#64748B] mt-1">
-              Authoritative system of record for external candidate job search, preparation, QA verification, and manual employer submissions.
+              Server-authorized queues: owner, status, current-state age, and next action.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-[#64748B]">
-            <span className="font-semibold text-[#0F1720]">{applications.length}</span> total managed records
+          <div className="text-xs text-[#64748B] text-right">
+            <div>
+              <span className="font-semibold text-[#0F1720]">{queueCounts.total}</span> org applications
+            </div>
+            <div className="text-[10px] text-[#94A3B8] mt-0.5" suppressHydrationWarning>
+              Age as of {asOf.slice(0, 16).replace("T", " ")}Z
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Top Metric Strip with Instant 0ms Local Tab Selection */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <button
           type="button"
@@ -407,7 +329,11 @@ export function EmployeeApplicationsWorkbench({
               : "bg-white border-[#E5EAE7]/90 hover:border-[#DDE5E0]"
           }`}
         >
-          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "all" ? "text-slate-300" : "text-[#94A3B8]"}`}>
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              queue === "all" ? "text-slate-300" : "text-[#94A3B8]"
+            }`}
+          >
             Total Pipeline
           </div>
           <div className={`text-2xl font-bold mt-1 ${queue === "all" ? "text-white" : "text-[#0F1720]"}`}>
@@ -417,73 +343,68 @@ export function EmployeeApplicationsWorkbench({
 
         <button
           type="button"
-          onClick={() => handleQueueChange("ready")}
+          onClick={() => handleQueueChange("mine")}
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
-            queue === "ready"
-              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-md shadow-blue-500/20"
-              : "bg-white border-[#E5EAE7]/90 hover:border-blue-300"
+            queue === "mine"
+              ? "bg-slate-800 text-white border-slate-800"
+              : "bg-white border-[#E5EAE7]/90 hover:border-[#DDE5E0]"
           }`}
         >
-          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${queue === "ready" ? "text-blue-100" : "text-blue-600"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${queue === "ready" ? "bg-white" : "bg-blue-600 animate-pulse"}`} />
-            Ready to Apply
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              queue === "mine" ? "text-slate-300" : "text-[#64748B]"
+            }`}
+          >
+            My Work
           </div>
-          <div className={`text-2xl font-bold mt-1 ${queue === "ready" ? "text-white" : "text-blue-950"}`}>
-            {queueCounts.ready}
+          <div className={`text-2xl font-bold mt-1 ${queue === "mine" ? "text-white" : "text-[#0F1720]"}`}>
+            {queueCounts.mine}
           </div>
         </button>
 
         <button
           type="button"
-          onClick={() => handleQueueChange("in_progress")}
+          onClick={() => handleQueueChange("unassigned")}
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
-            queue === "in_progress"
-              ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20"
-              : "bg-white border-[#E5EAE7]/90 hover:border-indigo-300"
-          }`}
-        >
-          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "in_progress" ? "text-indigo-100" : "text-indigo-700"}`}>
-            In Progress
-          </div>
-          <div className={`text-2xl font-bold mt-1 ${queue === "in_progress" ? "text-white" : "text-indigo-950"}`}>
-            {queueCounts.inProgress}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleQueueChange("submitted")}
-          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
-            queue === "submitted"
-              ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20"
-              : "bg-white border-[#E5EAE7]/90 hover:border-emerald-300"
-          }`}
-        >
-          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "submitted" ? "text-emerald-100" : "text-emerald-700"}`}>
-            Submitted
-          </div>
-          <div className={`text-2xl font-bold mt-1 ${queue === "submitted" ? "text-white" : "text-emerald-950"}`}>
-            {queueCounts.submitted}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            handleQueueChange("needs_attention");
-            setStatusFilter("AWAITING_APPROVAL");
-          }}
-          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
-            statusFilter === "AWAITING_APPROVAL"
-              ? "bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20"
+            queue === "unassigned"
+              ? "bg-amber-700 text-white border-amber-700"
               : "bg-white border-[#E5EAE7]/90 hover:border-amber-300"
           }`}
         >
-          <div className={`text-[10px] font-bold uppercase tracking-wider ${statusFilter === "AWAITING_APPROVAL" ? "text-amber-100" : "text-amber-700"}`}>
-            Awaiting Candidate
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              queue === "unassigned" ? "text-amber-100" : "text-amber-800"
+            }`}
+          >
+            Unassigned
           </div>
-          <div className={`text-2xl font-bold mt-1 ${statusFilter === "AWAITING_APPROVAL" ? "text-white" : "text-amber-950"}`}>
-            {applications.filter((a) => a.status === "AWAITING_APPROVAL").length}
+          <div
+            className={`text-2xl font-bold mt-1 ${
+              queue === "unassigned" ? "text-white" : "text-amber-950"
+            }`}
+          >
+            {queueCounts.unassigned}
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleQueueChange("ready")}
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
+            queue === "ready"
+              ? "bg-sky-700 text-white border-sky-700"
+              : "bg-white border-[#E5EAE7]/90 hover:border-sky-300"
+          }`}
+        >
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              queue === "ready" ? "text-sky-100" : "text-sky-700"
+            }`}
+          >
+            Ready
+          </div>
+          <div className={`text-2xl font-bold mt-1 ${queue === "ready" ? "text-white" : "text-sky-950"}`}>
+            {queueCounts.ready}
           </div>
         </button>
 
@@ -491,32 +412,57 @@ export function EmployeeApplicationsWorkbench({
           type="button"
           onClick={() => handleQueueChange("needs_attention")}
           className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
-            queue === "needs_attention" && statusFilter !== "AWAITING_APPROVAL"
-              ? "bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-500/20"
+            queue === "needs_attention"
+              ? "bg-rose-600 text-white border-rose-600"
               : "bg-white border-[#E5EAE7]/90 hover:border-rose-300"
           }`}
         >
-          <div className={`text-[10px] font-bold uppercase tracking-wider ${queue === "needs_attention" ? "text-rose-100" : "text-rose-700"}`}>
-            Submission Issues
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              queue === "needs_attention" ? "text-rose-100" : "text-rose-700"
+            }`}
+          >
+            Needs Attention
           </div>
-          <div className={`text-2xl font-bold mt-1 ${queue === "needs_attention" ? "text-white" : "text-rose-950"}`}>
+          <div
+            className={`text-2xl font-bold mt-1 ${
+              queue === "needs_attention" ? "text-white" : "text-rose-950"
+            }`}
+          >
             {queueCounts.needsAttention}
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleQueueChange("failed")}
+          className={`p-4 rounded-2xl border shadow-xs transition-all text-left cursor-pointer ${
+            queue === "failed"
+              ? "bg-rose-900 text-white border-rose-900"
+              : "bg-white border-[#E5EAE7]/90 hover:border-rose-400"
+          }`}
+        >
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              queue === "failed" ? "text-rose-200" : "text-rose-800"
+            }`}
+          >
+            Failed
+          </div>
+          <div className={`text-2xl font-bold mt-1 ${queue === "failed" ? "text-white" : "text-rose-950"}`}>
+            {queueCounts.failed}
           </div>
         </button>
       </div>
 
-      {/* Operational Queue Tabs (Instant 0ms switching) */}
       <InstantTabs tabs={tabs} activeTab={queue} onChange={handleQueueChange} />
 
-      {/* Create Managed Application Panel */}
       <div className="bg-white p-6 rounded-2xl border border-[#E5EAE7]/90 shadow-xs space-y-3">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
-              Create Managed Application Record
-            </h2>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-600" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
+            Create Managed Application Record
+          </h2>
         </div>
 
         <form
@@ -572,15 +518,23 @@ export function EmployeeApplicationsWorkbench({
         </form>
       </div>
 
-      {/* Advanced Filter, Search & Sort Bar (0ms in-memory response) */}
       <div className="bg-white p-4 rounded-2xl border border-[#E5EAE7]/90 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2 flex-1">
-          <InstantSearch
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Search candidate, company, role, source..."
-            className="min-w-[220px] flex-1 sm:flex-none"
-          />
+          <div className="flex gap-2 min-w-[220px] flex-1 sm:flex-none">
+            <InstantSearch
+              value={searchDraft}
+              onChange={setSearchDraft}
+              placeholder="Search candidate, company, role, source..."
+              className="flex-1"
+            />
+            <button
+              type="button"
+              onClick={handleSearchSubmit}
+              className="px-3 py-2 rounded-[12px] border border-[#DDE5E0] bg-white font-semibold text-[#0F1720] hover:bg-[#F7F9F8]"
+            >
+              Search
+            </button>
+          </div>
 
           <InstantFilterBar
             filters={filterConfigs}
@@ -592,16 +546,26 @@ export function EmployeeApplicationsWorkbench({
         </div>
 
         <div className="text-[11px] text-[#64748B] shrink-0">
-          Showing <span className="font-semibold text-[#0F1720]">{filteredApplications.length}</span> records
+          Showing <span className="font-semibold text-[#0F1720]">{applications.length}</span> of{" "}
+          <span className="font-semibold text-[#0F1720]">{totalCount}</span> (server page)
         </div>
       </div>
 
-      {/* Authoritative Applications Table */}
       <div className="bg-white rounded-2xl border border-[#E5EAE7]/90 shadow-xs overflow-hidden">
-        {filteredApplications.length === 0 ? (
+        {applications.length === 0 ? (
           <div className="p-12 text-center text-xs text-[#64748B]">
             <p className="font-semibold text-[#334155]">No applications match the specified criteria.</p>
-            <p className="mt-1 text-[#94A3B8]">Adjust the filters above or create a new application record.</p>
+            <p className="mt-1 text-[#94A3B8]">
+              {queue === "team" && !scopes.team
+                ? "No authorized team scope for this account."
+                : queue === "manager" && !scopes.manager
+                  ? "No authorized direct-report scope for this account."
+                  : queue === "orphaned"
+                    ? "No Applications with inactive owners in your recovery scope."
+                    : queue === "continuity"
+                      ? "No Applications with active owners outside your current structural scope."
+                      : "Adjust the filters above or create a new application record."}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -610,173 +574,143 @@ export function EmployeeApplicationsWorkbench({
                 <tr>
                   <th className="px-4 py-3">Candidate</th>
                   <th className="px-4 py-3">Company & Role</th>
-                  <th className="px-4 py-3">Location & Comp</th>
-                  <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Assignee</th>
-                  <th className="px-4 py-3">Last Activity</th>
-                  <th className="px-4 py-3">Submission Status</th>
+                  <th className="px-4 py-3">Owner</th>
+                  <th className="px-4 py-3">Age</th>
+                  <th className="px-4 py-3">Next Action</th>
+                  <th className="px-4 py-3">Submission</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EDF1EF]">
-                {paginatedApps.map((app) => {
+                {applications.map((app) => {
                   const candidateName =
-                    [app.candidate.user.firstName, app.candidate.user.lastName].filter(Boolean).join(" ") ||
-                    app.candidate.user.email;
+                    [app.candidate.user.firstName, app.candidate.user.lastName]
+                      .filter(Boolean)
+                      .join(" ") || app.candidate.user.email;
 
                   const latestSub = app.submissions?.[0];
-                  const salaryText = formatSalary(app.job.salaryMin, app.job.salaryMax, app.job.salaryCurrency);
+                  const salaryText = formatSalary(
+                    app.job.salaryMin,
+                    app.job.salaryMax,
+                    app.job.salaryCurrency
+                  );
 
                   return (
                     <tr key={app.id} className="hover:bg-[#F7F9F8]/75 transition">
-                      {/* Candidate Column */}
                       <td className="px-4 py-3">
                         <div className="font-semibold text-[#0F1720]">{candidateName}</div>
                         <div className="text-[11px] text-[#64748B] truncate max-w-[180px]">
                           {app.candidate.user.email}
                         </div>
-                        <div className="mt-0.5">
-                          <span
-                            className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
-                              app.candidate.applicationAuthorizationMode === "MANAGED"
-                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                : "bg-[#EDF1EF] text-[#334155] border border-[#E5EAE7]"
-                            }`}
-                          >
-                            {app.candidate.applicationAuthorizationMode === "MANAGED" ? "MANAGED" : "REVIEW REQ"}
-                          </span>
+                        <div className="text-[10px] text-[#94A3B8] mt-0.5">
+                          {app.job.isRemote ? "Remote" : app.job.location || "On-site"}
+                          {salaryText !== "Salary not disclosed" ? ` · ${salaryText}` : ""}
                         </div>
                       </td>
 
-                      {/* Company & Role Column */}
                       <td className="px-4 py-3">
                         <div className="font-semibold text-[#0F1720]">{app.job.title}</div>
                         <div className="text-[11px] text-[#64748B] font-medium">
                           {app.job.companyName}
                         </div>
-                        {app.job.externalUrl && (
-                          <a
-                            href={app.job.externalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-blue-600 hover:underline inline-flex items-center gap-0.5 mt-0.5"
-                          >
-                            <span>External Posting</span>
-                            <span>↗</span>
-                          </a>
+                        {app.job.source && (
+                          <span className="inline-flex mt-0.5 items-center px-2 py-0.5 rounded text-[10px] font-medium bg-[#EDF1EF] text-[#0F1720] border border-[#E5EAE7]">
+                            {app.job.source}
+                          </span>
                         )}
                       </td>
 
-                      {/* Location & Compensation Column */}
-                      <td className="px-4 py-3">
-                        <div className="text-[#0F1720] font-medium">
-                          {app.job.isRemote ? "🌐 Remote" : app.job.location || "On-site"}
-                        </div>
-                        <div
-                          className={`text-[11px] mt-0.5 ${
-                            salaryText === "Salary not disclosed" ? "text-[#94A3B8]" : "text-emerald-700 font-semibold"
-                          }`}
-                        >
-                          {salaryText}
-                        </div>
-                      </td>
-
-                      {/* Source Column */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {app.job.source ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-[#EDF1EF] text-[#0F1720] border border-[#E5EAE7]">
-                              {app.job.source}
-                            </span>
-                            {app.job.externalUrl && (
-                              <a
-                                href={app.job.externalUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#94A3B8] hover:text-[#334155] text-xs"
-                                title="Open original job posting"
-                              >
-                                ↗
-                              </a>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[#94A3B8] italic">Direct</span>
-                        )}
-                      </td>
-
-                      {/* Application Status Column */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] border ${
-                            STATUS_BADGES[app.status] || "bg-[#EDF1EF] text-[#334155] border-[#E5EAE7]"
+                            STATUS_BADGES[app.status] ||
+                            "bg-[#EDF1EF] text-[#334155] border-[#E5EAE7]"
                           }`}
                         >
                           {app.status.replace(/_/g, " ")}
                         </span>
                       </td>
 
-                      {/* Assignee Column */}
                       <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
-                        {app.assignedEmployee ? (
-                          <span className={app.assignedEmployeeId === currentUserId ? "font-bold text-[#0F1720]" : ""}>
-                            {[app.assignedEmployee.firstName, app.assignedEmployee.lastName].filter(Boolean).join(" ") ||
-                              app.assignedEmployee.email}
-                          </span>
-                        ) : (
-                          <span className="text-[#94A3B8] italic">Unassigned</span>
-                        )}
-                      </td>
-
-                      {/* Last Activity Column — uses updatedAt (slim list; no stateHistory) */}
-                      <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
-                        <div>
-                          <span className="text-[#0F1720] font-medium">
-                            {new Date(app.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
-                          </span>
-                          <div className="text-[10px] text-[#94A3B8]">
-                            Created {new Date(app.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
-                          </div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#94A3B8]">
+                          Owner
                         </div>
-                      </td>
-
-                      {/* Submission Status Column */}
-                      <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
-                        {app.status === "SUBMITTED" && latestSub ? (
-                          <div>
-                            <span className="font-semibold text-emerald-800">
-                              Submitted · Attempt #{latestSub.attemptNumber}
-                            </span>
-                            <div className="text-[10px] text-[#64748B]">
-                              {new Date(latestSub.submittedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                        {app.ownerDisplayName === "Unassigned" ? (
+                          <span className="text-[#94A3B8] italic">Unassigned</span>
+                        ) : app.ownerInactive ? (
+                          <div
+                            aria-label={`Owner inactive. Former owner: ${app.ownerDisplayName}`}
+                          >
+                            <span className="font-bold text-amber-900">Inactive</span>
+                            <div className="text-[10px] text-[#94A3B8] truncate max-w-[140px]">
+                              Former: {app.ownerDisplayName}
                             </div>
                           </div>
-                        ) : app.status === "READY" ? (
-                          <span className="inline-flex items-center gap-1 font-bold text-sky-800">
-                            <span className="w-1.5 h-1.5 rounded-full bg-sky-600 animate-pulse" />
-                            Ready to submit
-                          </span>
-                        ) : app.status === "SUBMISSION_ISSUE" ? (
-                          <span className="font-bold text-rose-700">Issue reported</span>
-                        ) : app.status === "RESUBMISSION" ? (
-                          <span className="font-semibold text-purple-700">Resubmission staged</span>
                         ) : (
-                          <span className="text-[#94A3B8]">Not submitted</span>
+                          <div>
+                            <span
+                              className={
+                                app.assignedEmployeeId === currentUserId
+                                  ? "font-bold text-[#0F1720]"
+                                  : "text-[#0F1720] font-medium"
+                              }
+                            >
+                              {app.ownerDisplayName}
+                            </span>
+                            {app.continuityOutsideScope && (
+                              <div
+                                className="text-[10px] text-amber-800 mt-0.5"
+                                aria-label="Continuity: outside current structural scope"
+                              >
+                                Outside current scope
+                              </div>
+                            )}
+                          </div>
                         )}
                       </td>
 
-                      {/* Action Column */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {app.currentStateAgeKind === "AGE_UNAVAILABLE" ? (
+                          <span className="text-[#94A3B8] italic text-[11px]">AGE_UNAVAILABLE</span>
+                        ) : (
+                          <div>
+                            <span className="font-semibold text-[#0F1720]">
+                              {app.currentStateAgeLabel}
+                            </span>
+                            {app.currentStateEnteredAt && (
+                              <div className="text-[10px] text-[#94A3B8] font-mono">
+                                {app.currentStateEnteredAt.slice(0, 16).replace("T", " ")}Z
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 max-w-[220px]">
+                        <p className="text-[11px] text-[#334155] leading-snug">{app.nextAction}</p>
+                      </td>
+
+                      <td className="px-4 py-3 text-[#64748B] whitespace-nowrap">
+                        {app.status === "SUBMITTED" && latestSub ? (
+                          <span className="font-semibold text-emerald-800">
+                            Attempt #{latestSub.attemptNumber}
+                          </span>
+                        ) : app.status === "READY" ? (
+                          <span className="font-bold text-sky-800">Ready to submit</span>
+                        ) : app.status === "SUBMISSION_ISSUE" ? (
+                          <span className="font-bold text-rose-700">Issue reported</span>
+                        ) : (
+                          <span className="text-[#94A3B8]">—</span>
+                        )}
+                      </td>
+
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <TransitionLink
                           href={`/employee/applications/${app.id}`}
-                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                            app.status === "READY"
-                              ? "bg-sky-600 text-white hover:bg-sky-700 shadow-xs"
-                              : "bg-white text-[#334155] border border-[#DDE5E0] hover:bg-[#F7F9F8]"
-                          }`}
+                          className="inline-flex items-center px-3 py-1.5 rounded-[10px] border border-[#DDE5E0] bg-white text-[11px] font-semibold text-[#0F1720] hover:bg-[#F7F9F8]"
                         >
-                          {app.status === "READY" ? "Open Application →" : "Open Workbench →"}
+                          Open
                         </TransitionLink>
                       </td>
                     </tr>
@@ -790,11 +724,13 @@ export function EmployeeApplicationsWorkbench({
         <TablePagination
           currentPage={page}
           totalPages={totalPages}
-          totalItems={filteredApplications.length}
+          totalItems={totalCount}
           pageSize={pageSize}
-          onPageChange={setPage}
+          onPageChange={handlePageChange}
         />
       </div>
     </div>
   );
 }
+
+export type { ApplicationStatus };

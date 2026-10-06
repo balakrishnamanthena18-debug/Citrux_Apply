@@ -22,6 +22,7 @@ import {
 } from "@/generated/prisma";
 import { QA_CRITERION_KEYS } from "@/lib/validation/qa.schemas";
 import { ValidationError, AuthorizationError } from "@/lib/errors";
+import { authoritativeQaTxMocks } from "../../helpers/authoritative-qa-mock";
 
 vi.mock("@/lib/auth/context", () => ({
   getAuthenticatedContext: vi.fn(),
@@ -218,6 +219,7 @@ describe("Phase 9 Golden Path — QA Review, Candidate Approval & Immutable Subm
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({ id: "hist-approved-ready" }),
         },
+        ...authoritativeQaTxMocks(),
       };
       return callback(tx as any);
     });

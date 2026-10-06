@@ -24,6 +24,7 @@ import {
   type JobDescriptionSource,
 } from "./jd-snapshot";
 import { markJobApplicationIntelligenceStale } from "./runs";
+import { invalidateCandidateJobMatchesForJob } from "@/lib/job-matching/invalidation";
 
 export type PersistRequirementSetInput = {
   organizationId: string;
@@ -117,6 +118,13 @@ export async function persistJobRequirementSet(
       schemaVersion: JOB_REQUIREMENT_SCHEMA_VERSION,
     }),
     tx,
+  });
+
+  // Phase 5C.6: new CURRENT requirement set → Job Match cannot stay falsely CURRENT.
+  await invalidateCandidateJobMatchesForJob(tx, {
+    organizationId: input.organizationId,
+    jobId: input.jobId,
+    reason: "REQUIREMENT_SET_CHANGED",
   });
 
   return {
@@ -355,6 +363,12 @@ export async function syncJobDescriptionSnapshotAfterJobWrite(
       jobId: job.id,
       actorUserId,
       freshness: "RECOMPUTE_REQUIRED",
+    });
+    // Phase 5C.6: JD change invalidates Job Matches (Application Intelligence unchanged).
+    await invalidateCandidateJobMatchesForJob(tx, {
+      organizationId: job.organizationId,
+      jobId: job.id,
+      reason: "JD_SNAPSHOT_CHANGED",
     });
   }
 

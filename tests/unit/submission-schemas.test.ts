@@ -61,9 +61,27 @@ describe("Phase 6 Submission Zod Validation Schemas (tests/unit/submission-schem
       expect(result.success).toBe(true);
     });
 
-    it("accepts minimal submission payload", () => {
+    it("rejects minimal submission payload without evidence (Phase 5I)", () => {
       const valid = {
         applicationId: validUuid,
+      };
+      const result = RecordApplicationSubmissionSchema.safeParse(valid);
+      expect(result.success).toBe(false);
+    });
+
+    it("accepts minimal submission payload with confirmationEvidence", () => {
+      const valid = {
+        applicationId: validUuid,
+        confirmationEvidence: "Portal confirmation recorded",
+      };
+      const result = RecordApplicationSubmissionSchema.safeParse(valid);
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts minimal submission payload with storagePath only", () => {
+      const valid = {
+        applicationId: validUuid,
+        storagePath: "tenants/org/applications/app/submissions/file.png",
       };
       const result = RecordApplicationSubmissionSchema.safeParse(valid);
       expect(result.success).toBe(true);

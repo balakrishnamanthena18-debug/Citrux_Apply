@@ -12,6 +12,8 @@ import {
   createCandidateJobLeadAction,
 } from "@/lib/application/actions";
 import { formatSalary } from "@/lib/utils/status-presenter";
+import { RequestedApplicationIntakePanel } from "@/components/application/RequestedApplicationIntakePanel";
+import type { RequestedApplicationIntakeItem } from "@/lib/application/requested-intake-types";
 
 export interface CandidateOption {
   id: string;
@@ -81,6 +83,10 @@ interface Props {
   initialSelectedCandidateId?: string;
   initialSelectedJobId?: string;
   initialCandidateSummary?: CandidateLogSummary | null;
+  /** Phase 5G — pending candidate application requests. */
+  requestedIntakeItems?: RequestedApplicationIntakeItem[];
+  requestedIntakeNextCursor?: string | null;
+  requestedIntakeTotalPending?: number;
 }
 
 const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
@@ -106,6 +112,9 @@ export function ApplicationLogWorkbench({
   initialSelectedCandidateId = "",
   initialSelectedJobId = "",
   initialCandidateSummary = null,
+  requestedIntakeItems = [],
+  requestedIntakeNextCursor = null,
+  requestedIntakeTotalPending = 0,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -502,6 +511,12 @@ export function ApplicationLogWorkbench({
           </div>
         </div>
       </div>
+
+      <RequestedApplicationIntakePanel
+        initialItems={requestedIntakeItems}
+        initialNextCursor={requestedIntakeNextCursor}
+        initialTotalPending={requestedIntakeTotalPending}
+      />
 
       {successResult && (
         <div className="p-5 bg-emerald-50/80 border border-emerald-200 rounded-[20px] shadow-2xs space-y-3">

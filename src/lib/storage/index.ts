@@ -146,6 +146,26 @@ export async function deleteCandidateDocumentStorage(
   }
 }
 
+/**
+ * Downloads candidate document bytes for server-side processing only.
+ * Caller MUST verify authorization and must NOT log/return bytes to clients.
+ */
+export async function downloadCandidateDocumentBytes(
+  storagePath: string
+): Promise<Buffer | null> {
+  try {
+    const supabase = await getStorageClient();
+    const { data, error } = await supabase.storage
+      .from(CANDIDATE_DOCUMENTS_BUCKET)
+      .download(storagePath);
+    if (error || !data) return null;
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch {
+    return null;
+  }
+}
+
 export const SUBMISSION_EVIDENCE_BUCKET = "submission-evidence";
 
 /**

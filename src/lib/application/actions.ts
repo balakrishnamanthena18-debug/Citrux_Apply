@@ -45,8 +45,13 @@ import {
   Prisma,
 } from "@/generated/prisma";
 import { syncJobDescriptionSnapshotAfterJobWrite } from "@/lib/application-intelligence/requirement-set";
+import { invalidateCandidateJobMatchesForJob } from "@/lib/job-matching/invalidation";
+import { populateJobMatchWorkForJob } from "@/lib/job-matching/population";
 import { markApplicationIntelligenceStale } from "@/lib/application-intelligence/runs";
+import { assertCanAssignApplication } from "@/lib/application/assignment-authority";
+import { buildAssignmentWriteData } from "@/lib/application/assignment-snapshot";
 import { freshnessAfterTrigger } from "@/lib/application-intelligence/stale";
+import { enqueueResumeReview } from "@/lib/resume-intelligence/worker";
 import {
   AuthorizationError,
   ConflictError,
@@ -61,6 +66,8 @@ import {
 } from "@/lib/job/visibility";
 
 import { ALLOWED_APPLICATION_TRANSITIONS } from "./constants";
+import { assertAuthoritativeQaPass } from "@/lib/qa/authority";
+import { assertSubmissionEvidence } from "@/lib/submission/evidence";
 
 export interface ActionResult<T = unknown> {
   success: boolean;
@@ -149,6 +156,14 @@ export async function createJobAction(
         },
         ctx.userId
       );
+
+      // Phase 5E: initial match population (QUEUED only; worker evaluates).
+      await populateJobMatchWorkForJob(tx, {
+        organizationId: created.organizationId,
+        jobId: created.id,
+        reason: "GLOBAL_JOB_CREATED",
+        requestedById: ctx.userId,
+      });
 
       return created;
     });
@@ -244,6 +259,14 @@ export async function createCandidateJobLeadAction(
         },
       });
 
+      // Phase 5E: private lead → match work for owner only.
+      await populateJobMatchWorkForJob(tx, {
+        organizationId: job.organizationId,
+        jobId: job.id,
+        reason: "PRIVATE_JOB_CREATED",
+        requestedById: ctx.userId,
+      });
+
       return { jobId: job.id, opportunityId: opportunity.id, title: job.title, companyName: job.companyName };
     });
 
@@ -291,16 +314,35 @@ export async function shareJobToCatalogAction(
       });
       if (!existing) throw new NotFoundError("Job not found");
       if (existing.visibility === JobVisibility.GLOBAL) {
-        return existing;
+        return { job: existing, visibilityChanged: false };
       }
 
-      return tx.job.update({
+      const updated = await tx.job.update({
         where: { id: existing.id },
         data: {
           visibility: JobVisibility.GLOBAL,
           ownerCandidateId: null,
         },
       });
+
+      // Phase 5C.6: visibility is a matching.v1 Job input — invalidate matches.
+      await invalidateCandidateJobMatchesForJob(tx, {
+        organizationId: updated.organizationId,
+        jobId: updated.id,
+        reason: "JOB_SOURCE_CHANGED",
+      });
+
+      // Phase 5E: newly GLOBAL → populate eligible ACTIVE candidates (owner row skipped if exists).
+      if (updated.status === JobStatus.OPEN) {
+        await populateJobMatchWorkForJob(tx, {
+          organizationId: updated.organizationId,
+          jobId: updated.id,
+          reason: "GLOBAL_JOB_SHARED_TO_CATALOG",
+          requestedById: ctx.userId,
+        });
+      }
+
+      return { job: updated, visibilityChanged: true };
     });
 
     await logUserAuditEvent({
@@ -308,12 +350,12 @@ export async function shareJobToCatalogAction(
       organizationId: ctx.organizationId,
       action: "JOB_UPDATED",
       entityType: "Job",
-      entityId: job.id,
+      entityId: job.job.id,
       details: { sharedToCatalog: true, visibility: JobVisibility.GLOBAL },
     });
 
     revalidateApplicationViews();
-    return { success: true, data: { jobId: job.id } };
+    return { success: true, data: { jobId: job.job.id } };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to share job to catalog" };
   }
@@ -367,6 +409,7 @@ export async function updateJobAction(
       });
       if (!existing) throw new NotFoundError("Job not found");
 
+      const priorStatus = existing.status;
       const updated = await tx.job.update({
         where: { id: existing.id },
         data: {
@@ -398,6 +441,29 @@ export async function updateJobAction(
         },
         ctx.userId
       );
+
+      // Phase 5C.6: Job Intelligence invalidation (title/salary/status/etc).
+      // JD snapshot path may also invalidate when content changes — idempotent.
+      await invalidateCandidateJobMatchesForJob(tx, {
+        organizationId: updated.organizationId,
+        jobId: updated.id,
+        reason: "JOB_SOURCE_CHANGED",
+      });
+
+      // Phase 5E: CLOSED/ARCHIVED → OPEN (GLOBAL) becomes eligible for initial population.
+      const becameOpen =
+        priorStatus !== JobStatus.OPEN && updated.status === JobStatus.OPEN;
+      if (
+        becameOpen &&
+        updated.visibility === JobVisibility.GLOBAL
+      ) {
+        await populateJobMatchWorkForJob(tx, {
+          organizationId: updated.organizationId,
+          jobId: updated.id,
+          reason: "GLOBAL_JOB_OPENED",
+          requestedById: ctx.userId,
+        });
+      }
 
       return updated;
     });
@@ -475,7 +541,10 @@ export async function createApplicationAction(
         );
       }
 
-      // 4. Validate assignee if provided
+      // 4. Phase 5I: every new Application must have an operational assignee.
+      // Prefer explicit assignee; default to authenticated staff creator (Option A).
+      // Creator is already requireEmployeeOrAdmin — only re-validate when assigning someone else.
+      const assigneeId = parsed.data.assignedEmployeeId || ctx.userId;
       if (parsed.data.assignedEmployeeId) {
         const staff = await tx.membership.findFirst({
           where: {
@@ -486,11 +555,19 @@ export async function createApplicationAction(
           },
         });
         if (!staff) {
-          throw new ValidationError("Assigned user must be an active staff member in this organization");
+          throw new ValidationError(
+            "Assigned user must be an active staff member in this organization"
+          );
         }
       }
 
-      // 5. Create application and state history record
+      // 5. Create application with assignment-time structural snapshot (Phase 5R).
+      const assignmentData = await buildAssignmentWriteData(
+        tx,
+        ctx.organizationId,
+        assigneeId
+      );
+
       const app = await tx.application.create({
         data: {
           organizationId: ctx.organizationId,
@@ -498,7 +575,7 @@ export async function createApplicationAction(
           jobId: job.id,
           candidateJobOpportunityId: opportunity.id,
           status: ApplicationStatus.DISCOVERED,
-          assignedEmployeeId: parsed.data.assignedEmployeeId || null,
+          ...assignmentData,
         },
       });
 
@@ -548,38 +625,39 @@ export async function assignApplicationAction(
     requireEmployeeOrAdmin(ctx);
 
     await withRlsContext(ctx.userId, async (tx) => {
-      const application = await tx.application.findUnique({
-        where: { id: parsed.data.applicationId, organizationId: ctx.organizationId },
+      const decision = await assertCanAssignApplication(tx, ctx, {
+        applicationId: parsed.data.applicationId,
+        targetEmployeeId: parsed.data.employeeId,
       });
-      if (!application) throw new NotFoundError("Application not found in organization");
 
-      if (parsed.data.employeeId) {
-        const staff = await tx.membership.findFirst({
-          where: {
-            userId: parsed.data.employeeId,
-            organizationId: ctx.organizationId,
-            role: { in: [Role.EMPLOYEE, Role.ADMIN] },
-            status: "ACTIVE",
-          },
-        });
-        if (!staff) {
-          throw new ValidationError("Target user is not an active staff member in this organization");
-        }
-      }
+      const assignmentData = await buildAssignmentWriteData(
+        tx,
+        decision.organizationId,
+        decision.newAssignedEmployeeId
+      );
 
       await tx.application.update({
-        where: { id: application.id },
-        data: { assignedEmployeeId: parsed.data.employeeId },
+        where: { id: decision.applicationId },
+        data: assignmentData,
       });
-    });
 
-    await logUserAuditEvent({
-      userId: ctx.userId,
-      organizationId: ctx.organizationId,
-      action: "APPLICATION_ASSIGNED",
-      entityType: "Application",
-      entityId: parsed.data.applicationId,
-      details: { assignedEmployeeId: parsed.data.employeeId },
+      // Audit inside the same RLS transaction so assignment never succeeds without audit.
+      await logUserAuditEvent({
+        tx,
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        action: "APPLICATION_ASSIGNED",
+        entityType: "Application",
+        entityId: decision.applicationId,
+        details: {
+          previousAssignedEmployeeId: decision.previousAssignedEmployeeId,
+          newAssignedEmployeeId: decision.newAssignedEmployeeId,
+          // Compatibility alias for pre-5M consumers
+          assignedEmployeeId: decision.newAssignedEmployeeId,
+          reason: parsed.data.reason ?? null,
+          actorKinds: decision.profile.actorKinds,
+        },
+      });
     });
 
     revalidateApplicationViews(parsed.data.applicationId);
@@ -620,12 +698,33 @@ export async function updateApplicationMaterialAction(
         throw new ValidationError(`Cannot update application materials while application is in ${app.status}`);
       }
 
-      // If candidateDocumentId provided, verify it belongs to candidate
+      // Phase 4A: immutable resume binding — never trust browser documentVersion.
+      // Document ID is the authoritative version identity; versionNumber is compatibility metadata.
+      let boundDocumentId: string | null = null;
+      let boundDocumentVersion: number | null = null;
+
       if (parsed.data.candidateDocumentId) {
         const doc = await tx.candidateDocument.findFirst({
-          where: { id: parsed.data.candidateDocumentId, candidateId: app.candidateId },
+          where: {
+            id: parsed.data.candidateDocumentId,
+            candidateId: app.candidateId,
+            candidate: { organizationId: ctx.organizationId },
+          },
+          select: {
+            id: true,
+            documentType: true,
+            versionNumber: true,
+            candidateId: true,
+          },
         });
-        if (!doc) throw new NotFoundError("Referenced candidate document not found for candidate");
+        if (!doc) {
+          throw new NotFoundError("Referenced candidate document not found for candidate");
+        }
+        if (doc.documentType !== "RESUME") {
+          throw new ValidationError("Selected document must be a resume");
+        }
+        boundDocumentId = doc.id;
+        boundDocumentVersion = doc.versionNumber;
       }
 
       // Mark old materials as not current
@@ -637,8 +736,8 @@ export async function updateApplicationMaterialAction(
       const created = await tx.applicationMaterial.create({
         data: {
           applicationId: app.id,
-          candidateDocumentId: parsed.data.candidateDocumentId || null,
-          documentVersion: parsed.data.documentVersion || 1,
+          candidateDocumentId: boundDocumentId,
+          documentVersion: boundDocumentVersion,
           coverLetterText: parsed.data.coverLetterText || null,
           screeningAnswers: parsed.data.screeningAnswers ? (parsed.data.screeningAnswers as any) : Prisma.JsonNull,
           customNotes: parsed.data.customNotes || null,
@@ -654,6 +753,27 @@ export async function updateApplicationMaterialAction(
         actorUserId: ctx.userId,
         freshness: freshnessAfterTrigger("APPLICATION_MATERIAL_CHANGED"),
       });
+
+      // Phase 4: enqueue resume representation review when a resume is bound.
+      if (boundDocumentId) {
+        await enqueueResumeReview(tx, {
+          organizationId: ctx.organizationId,
+          candidateId: app.candidateId,
+          applicationId: app.id,
+          candidateDocumentId: boundDocumentId,
+          requestedById: ctx.userId,
+        });
+      } else {
+        await tx.resumeReview.updateMany({
+          where: {
+            organizationId: ctx.organizationId,
+            applicationId: app.id,
+            freshness: "CURRENT",
+            status: { in: ["QUEUED", "ANALYZING", "READY"] },
+          },
+          data: { freshness: "STALE", status: "STALE" },
+        });
+      }
 
       return created;
     });
@@ -721,6 +841,31 @@ export async function transitionApplicationStatusAction(
         );
       }
 
+      // Phase 5I: QA authority — block lifecycle bypasses on generic transition.
+      if (
+        app.status === ApplicationStatus.REVIEW &&
+        parsed.data.targetStatus === ApplicationStatus.AWAITING_APPROVAL
+      ) {
+        await assertAuthoritativeQaPass(tx, {
+          applicationId: app.id,
+          organizationId: ctx.organizationId,
+        });
+      }
+      if (
+        app.status === ApplicationStatus.AWAITING_APPROVAL &&
+        parsed.data.targetStatus === ApplicationStatus.READY
+      ) {
+        await assertAuthoritativeQaPass(tx, {
+          applicationId: app.id,
+          organizationId: ctx.organizationId,
+        });
+        if (app.approvalStatus !== ApplicationApprovalStatus.APPROVED) {
+          throw new ValidationError(
+            "Candidate approval is required before advancing to READY. Use the candidate approval action."
+          );
+        }
+      }
+
       // Update status
       await tx.application.update({
         where: { id: app.id },
@@ -781,6 +926,12 @@ export async function requestCandidateApprovalAction(
       if (app.materials.length === 0) {
         throw new ValidationError("Application must have current prepared materials before requesting approval");
       }
+
+      // Phase 5I: legacy path must not bypass authoritative QA PASS.
+      await assertAuthoritativeQaPass(tx, {
+        applicationId: app.id,
+        organizationId: ctx.organizationId,
+      });
 
       await tx.application.update({
         where: { id: app.id },
@@ -847,6 +998,12 @@ export async function submitCandidateApprovalAction(
       }
 
       if (parsed.data.approved) {
+        // Phase 5I: legacy approval cannot reach READY without authoritative QA PASS.
+        await assertAuthoritativeQaPass(tx, {
+          applicationId: app.id,
+          organizationId: ctx.organizationId,
+        });
+
         // Candidate Approves -> Transitions to READY
         await tx.application.update({
           where: { id: app.id },
@@ -920,6 +1077,12 @@ export async function recordApplicationSubmissionAction(
   }
 
   try {
+    // Phase 5I: legacy submission path also requires evidence (confirmation text).
+    const evidence = assertSubmissionEvidence({
+      confirmationEvidence: parsed.data.confirmationEvidence,
+      storagePath: null,
+    });
+
     const ctx = await getAuthenticatedContext();
     requireEmployeeOrAdmin(ctx);
 
@@ -947,7 +1110,7 @@ export async function recordApplicationSubmissionAction(
           submittedById: ctx.userId,
           externalReference: parsed.data.externalReference || null,
           externalUrl: parsed.data.externalUrl || null,
-          confirmationEvidence: parsed.data.confirmationEvidence,
+          confirmationEvidence: evidence.confirmationEvidence,
           submissionNotes: parsed.data.submissionNotes || null,
         },
       });
@@ -1214,6 +1377,11 @@ export async function recordApplicationResubmissionAction(
   }
 
   try {
+    const evidence = assertSubmissionEvidence({
+      confirmationEvidence: parsed.data.confirmationEvidence,
+      storagePath: null,
+    });
+
     const ctx = await getAuthenticatedContext();
     requireEmployeeOrAdmin(ctx);
 
@@ -1241,7 +1409,7 @@ export async function recordApplicationResubmissionAction(
           submittedById: ctx.userId,
           externalReference: parsed.data.externalReference || null,
           externalUrl: parsed.data.externalUrl || null,
-          confirmationEvidence: parsed.data.confirmationEvidence,
+          confirmationEvidence: evidence.confirmationEvidence,
           submissionNotes: parsed.data.submissionNotes || null,
         },
       });
@@ -1498,15 +1666,20 @@ export async function startApplicationFromDeskAction(
         );
       }
 
-      // 5. Create canonical Application linked to Job + Opportunity
+      // 5. Create canonical Application + assignment-time structural snapshot (Phase 5R)
+      const assignmentData = await buildAssignmentWriteData(
+        tx,
+        ctx.organizationId,
+        ctx.userId
+      );
       const application = await tx.application.create({
         data: {
           organizationId: ctx.organizationId,
           candidateId: candidate.id,
           jobId: job.id,
           candidateJobOpportunityId: opportunity.id,
-          assignedEmployeeId: ctx.userId,
           status: ApplicationStatus.DISCOVERED,
+          ...assignmentData,
         },
       });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasSubmissionEvidence } from "@/lib/submission/evidence";
 
 export const GenerateSubmissionEvidenceUploadUrlSchema = z.object({
   applicationId: z.string().uuid("Invalid application ID"),
@@ -13,14 +14,29 @@ export const GenerateSubmissionEvidenceUploadUrlSchema = z.object({
     .max(10 * 1024 * 1024, "File size cannot exceed 10 MB"),
 });
 
-export const RecordApplicationSubmissionSchema = z.object({
-  applicationId: z.string().uuid("Invalid application ID"),
-  externalReference: z.string().max(255).optional().nullable(),
-  externalUrl: z.string().url("Invalid external URL").max(1024).optional().nullable().or(z.literal("")),
-  confirmationEvidence: z.string().max(5000).optional().nullable(),
-  storagePath: z.string().max(1024).optional().nullable(),
-  submissionNotes: z.string().max(5000).optional().nullable(),
-});
+const submissionEvidenceRefine = (
+  data: { confirmationEvidence?: string | null; storagePath?: string | null },
+  ctx: z.RefinementCtx
+) => {
+  if (!hasSubmissionEvidence(data)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Add submission evidence or confirmation before recording submission.",
+      path: ["confirmationEvidence"],
+    });
+  }
+};
+
+export const RecordApplicationSubmissionSchema = z
+  .object({
+    applicationId: z.string().uuid("Invalid application ID"),
+    externalReference: z.string().max(255).optional().nullable(),
+    externalUrl: z.string().url("Invalid external URL").max(1024).optional().nullable().or(z.literal("")),
+    confirmationEvidence: z.string().max(5000).optional().nullable(),
+    storagePath: z.string().max(1024).optional().nullable(),
+    submissionNotes: z.string().max(5000).optional().nullable(),
+  })
+  .superRefine(submissionEvidenceRefine);
 
 export const RecordSubmissionIssueSchema = z.object({
   applicationId: z.string().uuid("Invalid application ID"),
@@ -36,14 +52,16 @@ export const StageApplicationResubmissionSchema = z.object({
   applicationId: z.string().uuid("Invalid application ID"),
 });
 
-export const RecordApplicationResubmissionSchema = z.object({
-  applicationId: z.string().uuid("Invalid application ID"),
-  externalReference: z.string().max(255).optional().nullable(),
-  externalUrl: z.string().url("Invalid external URL").max(1024).optional().nullable().or(z.literal("")),
-  confirmationEvidence: z.string().max(5000).optional().nullable(),
-  storagePath: z.string().max(1024).optional().nullable(),
-  submissionNotes: z.string().max(5000).optional().nullable(),
-});
+export const RecordApplicationResubmissionSchema = z
+  .object({
+    applicationId: z.string().uuid("Invalid application ID"),
+    externalReference: z.string().max(255).optional().nullable(),
+    externalUrl: z.string().url("Invalid external URL").max(1024).optional().nullable().or(z.literal("")),
+    confirmationEvidence: z.string().max(5000).optional().nullable(),
+    storagePath: z.string().max(1024).optional().nullable(),
+    submissionNotes: z.string().max(5000).optional().nullable(),
+  })
+  .superRefine(submissionEvidenceRefine);
 
 export const GetSubmissionEvidenceDownloadUrlSchema = z.object({
   submissionId: z.string().uuid("Invalid submission ID"),

@@ -76,6 +76,10 @@ function resolveSection(pathname: string): { breadcrumb: string; section: string
     breadcrumb = "Candidate";
     section = "Applications";
     mobileTitle = "Applications";
+  } else if (pathname.startsWith("/candidate/jobs")) {
+    breadcrumb = "Candidate";
+    section = "Job Intelligence";
+    mobileTitle = "Job Intelligence";
   } else if (pathname === "/candidate" || pathname.startsWith("/candidate")) {
     breadcrumb = "Candidate";
     section = "Portal";

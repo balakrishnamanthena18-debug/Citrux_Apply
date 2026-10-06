@@ -30,8 +30,9 @@ export type MaterialBindingResult =
   | { ok: false; code: string; message: string };
 
 /**
- * Soft validation helper for future write paths.
- * Does not mutate historical materials.
+ * Soft validation helper for write paths.
+ * Phase 4A write path derives documentVersion server-side from CandidateDocument
+ * and ignores browser-supplied version values.
  */
 export function validateMaterialDocumentBinding(
   input: MaterialBindingInput
@@ -69,11 +70,11 @@ export function validateMaterialDocumentBinding(
 
 export const MATERIAL_BINDING_MIGRATION = {
   currentState:
-    "Optional candidateDocumentId; optional documentVersion; no RESUME enforcement on historical rows",
+    "Phase 4A write path loads CandidateDocument server-side, requires RESUME, and persists documentVersion from CandidateDocument.versionNumber",
   targetState:
-    "New bound primary resume materials require DocumentType.RESUME + matching documentVersion",
+    "New bound primary resume materials require DocumentType.RESUME + matching documentVersion (server-derived)",
   strategy:
-    "Validate on new writes only; backfill documentVersion from CandidateDocument where null and FK present; never rewrite historical package semantics",
+    "Validate on new writes only; ignore browser documentVersion; never rewrite historical package semantics",
   backwardCompatibility:
     "Unbound materials remain valid; existing applications continue to load",
 } as const;

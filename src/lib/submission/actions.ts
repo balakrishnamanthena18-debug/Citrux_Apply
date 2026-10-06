@@ -47,6 +47,7 @@ import {
 } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 import crypto from "crypto";
+import { assertSubmissionEvidence } from "@/lib/submission/evidence";
 
 function revalidateSubmissionViews(applicationId?: string) {
   try {
@@ -143,6 +144,12 @@ export async function recordApplicationSubmissionAction(
     throw new ValidationError(parsed.error.issues[0]?.message || "Validation error in submission recording");
   }
 
+  // Phase 5I: evidence required (schema + server assert; trim whitespace-only).
+  const evidence = assertSubmissionEvidence({
+    confirmationEvidence: parsed.data.confirmationEvidence,
+    storagePath: parsed.data.storagePath,
+  });
+
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);
 
@@ -200,8 +207,8 @@ export async function recordApplicationSubmissionAction(
         submittedById: ctx.userId,
         externalReference: parsed.data.externalReference?.trim() || null,
         externalUrl: parsed.data.externalUrl?.trim() || null,
-        confirmationEvidence: parsed.data.confirmationEvidence?.trim() || null,
-        storagePath: parsed.data.storagePath?.trim() || null,
+        confirmationEvidence: evidence.confirmationEvidence,
+        storagePath: evidence.storagePath,
         submissionNotes: parsed.data.submissionNotes?.trim() || null,
       },
     });
@@ -597,6 +604,12 @@ export async function recordApplicationResubmissionAction(
     throw new ValidationError(parsed.error.issues[0]?.message || "Validation error in resubmission recording");
   }
 
+  // Phase 5I: resubmission cannot bypass evidence rule.
+  const evidence = assertSubmissionEvidence({
+    confirmationEvidence: parsed.data.confirmationEvidence,
+    storagePath: parsed.data.storagePath,
+  });
+
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);
 
@@ -649,8 +662,8 @@ export async function recordApplicationResubmissionAction(
         submittedById: ctx.userId,
         externalReference: parsed.data.externalReference?.trim() || null,
         externalUrl: parsed.data.externalUrl?.trim() || null,
-        confirmationEvidence: parsed.data.confirmationEvidence?.trim() || null,
-        storagePath: parsed.data.storagePath?.trim() || null,
+        confirmationEvidence: evidence.confirmationEvidence,
+        storagePath: evidence.storagePath,
         submissionNotes: parsed.data.submissionNotes?.trim() || null,
       },
     });

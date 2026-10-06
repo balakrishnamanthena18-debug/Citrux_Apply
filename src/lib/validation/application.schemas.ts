@@ -164,6 +164,8 @@ export const ApplicationResubmissionSchema = z.object({
 export const ApplicationAssignSchema = z.object({
   applicationId: z.string().uuid("Invalid application ID"),
   employeeId: z.string().uuid("Invalid employee ID").nullable(),
+  /** Optional free-text reason stored in AuditEvent.details only (no schema). */
+  reason: z.string().trim().max(500).optional().nullable(),
 });
 
 export const StartApplicationDeskSchema = z.object({

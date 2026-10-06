@@ -26,6 +26,15 @@ import { TelemetryGauge } from "@/components/ui/TelemetryGauge";
 import { loadStaffApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
 import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
+import { ResumeReviewPanel } from "@/components/resume-intelligence/ResumeReviewPanel";
+import { deriveNextActionGuidance } from "@/lib/application/operations-guidance";
+import {
+  listEligibleAssignees,
+  resolveAssignmentAuthority,
+} from "@/lib/application/assignment-authority";
+import { isAssigneeInactiveInOrganization } from "@/lib/application/orphan-scope";
+import { hasKnownAssignmentSnapshot } from "@/lib/application/assignment-snapshot";
+import { resolveContinuityVisibilityScope } from "@/lib/application/continuity-scope";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -36,7 +45,16 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);
 
-  const { application, employees, candidateDocs, intelligence, intelligenceLoadFailed } =
+  const {
+    application,
+    assigneeOptions,
+    allowUnassigned,
+    ownerInactive,
+    continuityOutsideScope,
+    candidateDocs,
+    intelligence,
+    intelligenceLoadFailed,
+  } =
     await withRlsContext(ctx.userId, async (tx) => {
     const app = await tx.application.findUnique({
       where: { id, organizationId: ctx.organizationId },
@@ -62,17 +80,61 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     if (!app) {
       return {
         application: null,
-        employees: [],
+        assigneeOptions: [] as Awaited<ReturnType<typeof listEligibleAssignees>>["options"],
+        allowUnassigned: false,
+        ownerInactive: false,
+        continuityOutsideScope: false,
         candidateDocs: [],
         intelligence: null as ApplicationIntelligenceViewModel | null,
         intelligenceLoadFailed: false,
       };
     }
 
-    const emps = await tx.membership.findMany({
-      where: { organizationId: ctx.organizationId, role: { in: ["EMPLOYEE", "ADMIN"] }, status: "ACTIVE" },
-      include: { user: true },
-    });
+    // Phase 5M — assignee dropdown reflects structural mutation scope (not org-wide dump).
+    const eligible = await listEligibleAssignees(tx, ctx);
+    const inactive = app.assignedEmployeeId
+      ? await isAssigneeInactiveInOrganization(
+          tx,
+          ctx.organizationId,
+          app.assignedEmployeeId
+        )
+      : false;
+
+    // Phase 5R — continuity indicator (snapshot known + ACTIVE owner outside viewer scope).
+    let continuityOutsideScope = false;
+    if (
+      !inactive &&
+      app.assignedEmployeeId &&
+      hasKnownAssignmentSnapshot(app)
+    ) {
+      const [continuityVis, profile] = await Promise.all([
+        resolveContinuityVisibilityScope(tx, ctx),
+        resolveAssignmentAuthority(tx, ctx),
+      ]);
+      if (continuityVis.canViewContinuity) {
+        const stillInCurrent = profile.eligibleTargetUserIds.includes(
+          app.assignedEmployeeId
+        );
+        if (!stillInCurrent) {
+          if (
+            (continuityVis.kind === "TEAM_LEAD" || continuityVis.kind === "BOTH") &&
+            app.assignedTeamKey &&
+            continuityVis.teamKeys.includes(app.assignedTeamKey)
+          ) {
+            continuityOutsideScope = true;
+          }
+          if (
+            (continuityVis.kind === "MANAGER" || continuityVis.kind === "BOTH") &&
+            app.assignedManagerId === ctx.userId
+          ) {
+            continuityOutsideScope = true;
+          }
+          if (continuityVis.kind === "ADMIN") {
+            continuityOutsideScope = true;
+          }
+        }
+      }
+    }
 
     const docs = await tx.candidateDocument.findMany({
       where: { candidateId: app.candidateId },
@@ -94,7 +156,10 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
 
     return {
       application: app,
-      employees: emps,
+      assigneeOptions: eligible.options,
+      allowUnassigned: eligible.allowUnassigned,
+      ownerInactive: inactive,
+      continuityOutsideScope,
       candidateDocs: docs,
       intelligence: intel,
       intelligenceLoadFailed: intelFailed,
@@ -150,44 +215,14 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     }
   };
 
-  const deriveNextActionGuidance = (status: ApplicationStatus) => {
-    switch (status) {
-      case "DISCOVERED":
-        return "Review job qualifications and advance application to Qualified status.";
-      case "QUALIFIED":
-        return "Begin tailoring candidate resume and cover letter materials.";
-      case "PREPARING":
-        return "Complete tailoring and submit application package for internal QA review.";
-      case "REVIEW":
-        return "Execute the 9-criterion QA checklist and record Pass or Fail decision.";
-      case "AWAITING_APPROVAL":
-        return "Application package is staged for candidate approval. Awaiting candidate sign-off.";
-      case "READY":
-        return "Open the external job posting, complete the application on employer portal, then record submission details below.";
-      case "SUBMITTED":
-        return "Authoritative external submission recorded. Monitor application status or flag defects if encountered.";
-      case "SUBMISSION_ISSUE":
-        return "Submission issue reported. Start operational correction review.";
-      case "REVIEW_REQUIRED":
-        return "Formulate correction resolution and approve correction plan.";
-      case "CORRECTION_APPROVED":
-        return "Stage corrected application for resubmission.";
-      case "RESUBMISSION":
-        return "Perform manual external resubmission and record attempt details below.";
-      case "REJECTED":
-        return "Application was rejected by candidate during approval stage.";
-      case "WITHDRAWN":
-        return "Application was withdrawn.";
-      case "FAILED":
-        return "Application reached a terminal failure state.";
-      default:
-        return "Review current application status.";
-    }
-  };
-
-  const assigneeName = application.assignedEmployee
+  const formerOwnerName = application.assignedEmployee
     ? [application.assignedEmployee.firstName, application.assignedEmployee.lastName].filter(Boolean).join(" ") || application.assignedEmployee.email
-    : "Unassigned";
+    : null;
+  const assigneeName = !application.assignedEmployeeId
+    ? "Unassigned"
+    : ownerInactive
+      ? "Inactive"
+      : formerOwnerName || "Unassigned";
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -236,7 +271,9 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
           },
           {
             label: "Assignee",
-            value: assigneeName,
+            value: ownerInactive && formerOwnerName
+              ? `Inactive · Former: ${formerOwnerName}`
+              : assigneeName,
           },
           {
             label: "Location",
@@ -434,40 +471,109 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
             </div>
           </div>
 
-          {/* Operational Assignment Control */}
+          {/* Operational Assignment Control — Phase 5M scoped targets */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Assigned Specialist
+              Owner
             </h3>
-            <form
-              action={async (formData: FormData) => {
-                "use server";
-                await assignApplicationAction({
-                  applicationId: application.id,
-                  employeeId: (formData.get("employeeId") as string) || null,
-                });
-              }}
-              className="space-y-2 text-xs"
-            >
-              <select
-                name="employeeId"
-                defaultValue={application.assignedEmployeeId || ""}
-                className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
+            <div className="text-xs text-slate-600">
+              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">
+                Current
+              </span>
+              {ownerInactive ? (
+                <div
+                  aria-label={
+                    formerOwnerName
+                      ? `Owner inactive. Former owner: ${formerOwnerName}`
+                      : "Owner inactive"
+                  }
+                >
+                  <span className="font-bold text-amber-900">Inactive</span>
+                  {formerOwnerName && (
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      Former owner: {formerOwnerName}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-amber-800 mt-1">
+                    This Application needs reassignment to an active eligible employee.
+                  </p>
+                </div>
+              ) : assigneeName === "Unassigned" ? (
+                <span className="font-semibold text-slate-500 italic">Unassigned</span>
+              ) : (
+                <div>
+                  <span className="font-semibold text-slate-900">
+                    Active — {assigneeName}
+                  </span>
+                  {continuityOutsideScope && (
+                    <div
+                      className="mt-1"
+                      aria-label="Continuity: outside current structural scope"
+                    >
+                      <div className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
+                        Continuity
+                      </div>
+                      <p className="text-[11px] text-amber-900">
+                        Outside current scope — owner remains active; reassign only if
+                        operational ownership should move.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {assigneeOptions.length === 0 && !allowUnassigned ? (
+              <p className="text-xs text-slate-500 italic">
+                No eligible team members are available for reassignment under your authority.
+              </p>
+            ) : (
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  const raw = formData.get("employeeId") as string;
+                  await assignApplicationAction({
+                    applicationId: application.id,
+                    employeeId: raw ? raw : null,
+                    reason: (formData.get("reason") as string) || null,
+                  });
+                }}
+                className="space-y-2 text-xs"
               >
-                <option value="">Unassigned</option>
-                {employees.map((e) => (
-                  <option key={e.userId} value={e.userId}>
-                    {[e.user.firstName, e.user.lastName].filter(Boolean).join(" ") || e.user.email} ({e.role})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-1.5 rounded-lg text-xs transition"
-              >
-                Save Assignee
-              </button>
-            </form>
+                <label className="block font-semibold text-slate-700">Reassign</label>
+                <select
+                  name="employeeId"
+                  defaultValue={
+                    application.assignedEmployeeId &&
+                    assigneeOptions.some((e) => e.userId === application.assignedEmployeeId)
+                      ? application.assignedEmployeeId
+                      : allowUnassigned
+                        ? ""
+                        : assigneeOptions[0]?.userId || ""
+                  }
+                  className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
+                >
+                  {allowUnassigned && <option value="">Unassigned</option>}
+                  {assigneeOptions.map((e) => (
+                    <option key={e.userId} value={e.userId}>
+                      {[e.firstName, e.lastName].filter(Boolean).join(" ") || e.email}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  name="reason"
+                  maxLength={500}
+                  placeholder="Reason (optional)"
+                  className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-1.5 rounded-lg text-xs transition"
+                >
+                  Save Assignee
+                </button>
+              </form>
+            )}
           </div>
 
           {/* Internal Staff Notes (Candidate Blind) */}
@@ -547,6 +653,8 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
             audience="staff"
             loadFailed={intelligenceLoadFailed}
           />
+
+          <ResumeReviewPanel applicationId={application.id} canRequest />
 
           {/* Application Materials Preparation */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
@@ -654,6 +762,10 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
 
             {application.status === "REVIEW" && (
               <div className="space-y-4">
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                  Authoritative QA PASS with all 9 criteria verified is required before
+                  candidate approval or READY.
+                </p>
                 <form
                   action={async (formData: FormData) => {
                     "use server";

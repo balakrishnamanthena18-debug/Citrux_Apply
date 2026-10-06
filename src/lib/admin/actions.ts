@@ -13,6 +13,7 @@ import {
   buildStaffResentEmailSubject,
 } from "@/lib/email/templates/staffWelcomeActivation";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { buildAssignmentWriteData } from "@/lib/application/assignment-snapshot";
 import {
   AuditAction,
   Role,
@@ -1088,20 +1089,45 @@ export async function reassignOperationalWorkAction(
         throw new ValidationError("Target employee is not an active staff member in this organization");
       }
 
+      // Phase 5R — resolve target structural snapshot once (same target for all apps).
+      const assignmentData = await buildAssignmentWriteData(
+        tx,
+        ctx.organizationId,
+        parsed.data.targetEmployeeId
+      );
+
       let appCount = 0;
       let taskCount = 0;
       let candCount = 0;
 
+      // Phase 5M — Admin-only bulk remains org-scoped; target must be ACTIVE (above).
+      // Capture previous Application owners for audit reconstruction (bounded).
+      let previousApplicationOwners: Array<{
+        applicationId: string;
+        previousAssignedEmployeeId: string | null;
+      }> = [];
+
       if (parsed.data.sourceEmployeeUserId) {
         if (parsed.data.reassignApplications !== false) {
+          const priorApps = await tx.application.findMany({
+            where: {
+              organizationId: ctx.organizationId,
+              assignedEmployeeId: parsed.data.sourceEmployeeUserId,
+            },
+            select: { id: true, assignedEmployeeId: true },
+            take: 500,
+          });
+          previousApplicationOwners = priorApps.map((a) => ({
+            applicationId: a.id,
+            previousAssignedEmployeeId: a.assignedEmployeeId,
+          }));
+
           const appRes = await tx.application.updateMany({
             where: {
               organizationId: ctx.organizationId,
               assignedEmployeeId: parsed.data.sourceEmployeeUserId,
             },
-            data: {
-              assignedEmployeeId: parsed.data.targetEmployeeId,
-            },
+            data: assignmentData,
           });
           appCount = appRes.count;
         }
@@ -1133,14 +1159,26 @@ export async function reassignOperationalWorkAction(
         }
       } else {
         if (parsed.data.applicationIds && parsed.data.applicationIds.length > 0) {
+          const ids = parsed.data.applicationIds.slice(0, 500);
+          const priorApps = await tx.application.findMany({
+            where: {
+              organizationId: ctx.organizationId,
+              id: { in: ids },
+            },
+            select: { id: true, assignedEmployeeId: true },
+            take: 500,
+          });
+          previousApplicationOwners = priorApps.map((a) => ({
+            applicationId: a.id,
+            previousAssignedEmployeeId: a.assignedEmployeeId,
+          }));
+
           const appRes = await tx.application.updateMany({
             where: {
               organizationId: ctx.organizationId,
-              id: { in: parsed.data.applicationIds },
+              id: { in: ids },
             },
-            data: {
-              assignedEmployeeId: parsed.data.targetEmployeeId,
-            },
+            data: assignmentData,
           });
           appCount = appRes.count;
         }
@@ -1149,7 +1187,7 @@ export async function reassignOperationalWorkAction(
           const taskRes = await tx.task.updateMany({
             where: {
               organizationId: ctx.organizationId,
-              id: { in: parsed.data.taskIds },
+              id: { in: parsed.data.taskIds.slice(0, 500) },
             },
             data: {
               assignedEmployeeId: parsed.data.targetEmployeeId,
@@ -1162,7 +1200,7 @@ export async function reassignOperationalWorkAction(
           const candRes = await tx.candidate.updateMany({
             where: {
               organizationId: ctx.organizationId,
-              id: { in: parsed.data.candidateIds },
+              id: { in: parsed.data.candidateIds.slice(0, 500) },
             },
             data: {
               assignedEmployeeId: parsed.data.targetEmployeeId,
@@ -1180,10 +1218,13 @@ export async function reassignOperationalWorkAction(
         entityType: "Organization",
         entityId: ctx.organizationId,
         details: {
+          sourceEmployeeUserId: parsed.data.sourceEmployeeUserId ?? null,
+          newAssignedEmployeeId: parsed.data.targetEmployeeId,
           targetEmployeeId: parsed.data.targetEmployeeId,
           reassignedApplicationsCount: appCount,
           reassignedTasksCount: taskCount,
           reassignedCandidatesCount: candCount,
+          previousApplicationOwners,
         },
       });
 

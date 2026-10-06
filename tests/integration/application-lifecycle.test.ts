@@ -8,8 +8,19 @@ import {
 import { getAuthenticatedContext, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { logUserAuditEvent } from "@/lib/audit";
-import { ApplicationStatus } from "@/generated/prisma";
+import { ApplicationStatus, QaDecision } from "@/generated/prisma";
 import { AuthorizationError } from "@/lib/errors";
+import { QA_CRITERION_KEYS } from "@/lib/validation/qa.schemas";
+
+const mockQaPass = {
+  id: "qa-pass-1",
+  decision: QaDecision.PASS,
+  createdAt: new Date("2026-10-01T12:00:00.000Z"),
+  checklistItems: QA_CRITERION_KEYS.map((criterionKey) => ({
+    criterionKey,
+    isVerified: true,
+  })),
+};
 
 vi.mock("@/lib/auth/context", () => ({
   getAuthenticatedContext: vi.fn(),
@@ -151,12 +162,20 @@ describe("Application Lifecycle & Universal Approval Integration (tests/integrat
             id: mockAppId,
             organizationId: mockOrgId,
             status: ApplicationStatus.REVIEW,
-            materials: [{ id: "mat-1", isCurrent: true }],
+            materials: [{ id: "mat-1", isCurrent: true, createdAt: new Date("2026-09-30T12:00:00.000Z") }],
           }),
           update: vi.fn().mockResolvedValue({}),
         },
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({}),
+        },
+        applicationQaReview: {
+          findFirst: vi.fn().mockResolvedValue(mockQaPass),
+        },
+        applicationMaterial: {
+          findFirst: vi.fn().mockResolvedValue({
+            createdAt: new Date("2026-09-30T12:00:00.000Z"),
+          }),
         },
       };
       return callback(tx as any);
@@ -195,6 +214,14 @@ describe("Application Lifecycle & Universal Approval Integration (tests/integrat
         },
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({}),
+        },
+        applicationQaReview: {
+          findFirst: vi.fn().mockResolvedValue(mockQaPass),
+        },
+        applicationMaterial: {
+          findFirst: vi.fn().mockResolvedValue({
+            createdAt: new Date("2026-09-30T12:00:00.000Z"),
+          }),
         },
       };
       return callback(tx as any);

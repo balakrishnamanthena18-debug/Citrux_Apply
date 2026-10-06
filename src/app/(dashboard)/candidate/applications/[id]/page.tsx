@@ -18,6 +18,7 @@ import {
 import { loadCandidateApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
 import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
+import { ResumeReviewPanel } from "@/components/resume-intelligence/ResumeReviewPanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -365,6 +366,8 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
             audience="candidate"
             loadFailed={intelligenceLoadFailed}
           />
+
+          <ResumeReviewPanel applicationId={application.id} canRequest />
 
           {/* Tailored Application Materials */}
           <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">

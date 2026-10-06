@@ -26,6 +26,7 @@ import {
   AuthorizationError,
   InvalidStateTransitionError,
 } from "@/lib/errors";
+import { assertAuthoritativeQaPass } from "@/lib/qa/authority";
 
 function revalidateQaViews(applicationId?: string) {
   try {
@@ -334,6 +335,12 @@ export async function candidateApproveApplicationAction(input: CandidateApproveA
         `Cannot approve application for a job in status ${application.job.status}. Job must be OPEN.`
       );
     }
+
+    // Phase 5I: candidate approval cannot advance to READY without authoritative QA PASS.
+    await assertAuthoritativeQaPass(tx, {
+      applicationId: application.id,
+      organizationId: application.organizationId,
+    });
 
     const now = new Date();
 

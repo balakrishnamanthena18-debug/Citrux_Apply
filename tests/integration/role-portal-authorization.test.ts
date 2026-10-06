@@ -7,6 +7,7 @@ import { getAuthenticatedContext, requireCandidate, requireEmployeeOrAdmin, requ
 import { withRlsContext } from "@/lib/db/rls";
 import { Role, ApplicationStatus, ApplicationApprovalStatus, JobStatus } from "@/generated/prisma";
 import { AuthorizationError } from "@/lib/errors";
+import { authoritativeQaTxMocks } from "../helpers/authoritative-qa-mock";
 
 vi.mock("@/lib/auth/context", () => ({
   getAuthenticatedContext: vi.fn(),
@@ -87,6 +88,7 @@ describe("Role Isolation & Candidate Approval Authorization (tests/integration/r
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({ id: "hist-1" }),
         },
+        ...authoritativeQaTxMocks(),
       };
       return callback(tx as any);
     });
