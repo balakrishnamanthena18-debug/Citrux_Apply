@@ -22,6 +22,10 @@ import { ResumeReviewPanel } from "@/components/resume-intelligence/ResumeReview
 import { listOutcomesForCandidate } from "@/lib/application/outcome-service";
 import type { OutcomePresentation } from "@/lib/application/outcome-service";
 import { CandidateOutcomesPanel } from "@/components/application/CandidateOutcomesPanel";
+import {
+  CandidateInterviewSection,
+  type CandidateInterviewViewModel,
+} from "@/components/interview/CandidateInterviewSection";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -77,8 +81,56 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
     }
 
     let outcomes: OutcomePresentation[] = [];
+    let interviewData: CandidateInterviewViewModel | null = null;
     if (app) {
       outcomes = await listOutcomesForCandidate(tx, ctx, app.id);
+
+      const dbInterview = tx.interview
+        ? await tx.interview.findUnique({
+            where: { applicationId: app.id },
+            include: {
+              rounds: {
+                where: { voidedAt: null },
+                orderBy: { roundNumber: "asc" },
+                include: { debrief: true },
+              },
+            },
+          })
+        : null;
+
+      if (dbInterview) {
+        interviewData = {
+          id: dbInterview.id,
+          applicationId: dbInterview.applicationId,
+          status: dbInterview.status,
+          rounds: dbInterview.rounds.map((r) => ({
+            id: r.id,
+            roundNumber: r.roundNumber,
+            roundType: r.roundType,
+            roundTitle: r.roundTitle,
+            status: r.status as any,
+            scheduledStartTime: r.scheduledStartTime ? r.scheduledStartTime.toISOString() : null,
+            scheduledEndTime: r.scheduledEndTime ? r.scheduledEndTime.toISOString() : null,
+            timezone: r.timezone,
+            format: r.format as any,
+            meetingUrl: r.meetingUrl,
+            location: r.location,
+            interviewers: (r.interviewers as any) || [],
+            candidatePreparationNotes: r.candidatePreparationNotes,
+            preparationBrief: (r.preparationBrief as any) || null,
+            occurredAt: r.occurredAt ? r.occurredAt.toISOString() : null,
+            outcome: r.outcome as any,
+            outcomeNotes: r.outcomeNotes,
+            debrief: r.debrief
+              ? {
+                  candidateSentiment: r.debrief.candidateSentiment,
+                  questionsAsked: (r.debrief.questionsAsked as any) || [],
+                  candidateFeedbackNotes: r.debrief.candidateFeedbackNotes,
+                }
+              : null,
+          })),
+        };
+      }
     }
 
     return {
@@ -88,6 +140,7 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
       intelligence,
       intelligenceLoadFailed,
       outcomes,
+      interviewData,
     };
   });
 
@@ -102,6 +155,7 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
     intelligence,
     intelligenceLoadFailed,
     outcomes,
+    interviewData,
   } = data;
   const currentMaterial = application.materials[0];
   const presentation = getCandidateStatusPresentation(application.status);
@@ -169,6 +223,14 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
           <ApplicationProgressTracker status={application.status} />
         </div>
       </div>
+
+      {/* Interview Operating System Section */}
+      <CandidateInterviewSection
+        applicationId={application.id}
+        jobTitle={application.job.title}
+        companyName={application.job.companyName}
+        interview={interviewData}
+      />
 
       <CandidateOutcomesPanel
         applicationId={application.id}

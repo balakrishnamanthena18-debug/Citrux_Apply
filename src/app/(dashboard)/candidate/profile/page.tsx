@@ -3,6 +3,7 @@ import { withRlsContext } from "@/lib/db/rls";
 import { CandidateCareerWorkspace } from "@/components/candidate/CandidateCareerWorkspace";
 import { CandidateHistoryItem } from "@/components/candidate/CareerChangeHistory";
 import { isCareerSectionKey } from "@/lib/candidate/career-sections";
+import { getCandidate360 } from "@/lib/candidate-360/service";
 import { AuditAction } from "@/generated/prisma";
 import { redirect } from "next/navigation";
 
@@ -159,6 +160,9 @@ export default async function CandidateProfilePage({ searchParams }: Props) {
     entityType: evt.entityType,
   }));
 
+  // Fetch read-only Candidate 360 Career Intelligence DTO
+  const candidate360 = await getCandidate360(candidate.id, ctx);
+
   const workspaceKey = [
     candidate.id,
     candidate.updatedAt?.toISOString?.() ?? String(candidate.updatedAt ?? ""),
@@ -175,6 +179,7 @@ export default async function CandidateProfilePage({ searchParams }: Props) {
     <CandidateCareerWorkspace
       key={workspaceKey}
       candidate={candidate}
+      candidate360={candidate360}
       userEmail={candidate.user?.email || ctx.email}
       userName={userName}
       changeHistory={changeHistory}

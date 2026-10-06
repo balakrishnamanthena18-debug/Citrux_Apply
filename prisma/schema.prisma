@@ -350,6 +350,18 @@ enum AuditAction {
   JOB_MATCH_SAVED
   JOB_MATCH_DISMISSED
   JOB_APPLICATION_REQUESTED
+
+  // Phase 8 Interview Operating System Actions
+  INTERVIEW_CREATED
+  INTERVIEW_ROUND_CREATED
+  INTERVIEW_ROUND_SCHEDULED
+  INTERVIEW_ROUND_RESCHEDULED
+  INTERVIEW_ROUND_CANCELLED
+  INTERVIEW_ROUND_COMPLETED
+  INTERVIEW_DEBRIEF_RECORDED
+  INTERVIEW_OUTCOME_RECORDED
+  INTERVIEW_ROUND_VOIDED
+  INTERVIEW_ROUND_SUPERSEDED
 }
 
 enum DesignationStatus {
@@ -405,6 +417,9 @@ model Organization {
   resumeReviews               ResumeReview[]
   candidateJobMatches         CandidateJobMatch[]
   applicationOutcomeEvents    ApplicationOutcomeEvent[]
+  interviews                  Interview[]
+  interviewRounds             InterviewRound[]
+  interviewDebriefs           InterviewDebrief[]
 
   @@map("organizations")
 }
@@ -468,6 +483,8 @@ model User {
   jobMatchesRequested       CandidateJobMatch[]          @relation("JobMatchRequester")
   applicationOutcomesActed  ApplicationOutcomeEvent[]    @relation("OutcomeActor")
   applicationOutcomesVoided ApplicationOutcomeEvent[]    @relation("OutcomeVoider")
+  voidedRounds              InterviewRound[]             @relation("RoundVoider")
+  submittedDebriefs         InterviewDebrief[]           @relation("DebriefSubmitter")
 
   @@map("users")
 }
@@ -618,6 +635,7 @@ model Candidate {
   documentExtracts     CandidateDocumentExtract[]
   resumeReviews        ResumeReview[]
   jobMatches           CandidateJobMatch[]
+  interviews           Interview[]
 
   @@index([organizationId, status])
   @@index([assignedEmployeeId, status])
@@ -780,6 +798,7 @@ model Job {
   requirementSets      JobRequirementSet[]
   intelligenceRuns     ApplicationIntelligenceRun[]
   jobMatches           CandidateJobMatch[]
+  interviews           Interview[]
 
   @@index([organizationId, status])
   @@index([organizationId, visibility, status])
@@ -857,6 +876,7 @@ model Application {
   readinessResults     ApplicationReadinessResult[]
   resumeReviews        ResumeReview[]
   outcomeEvents        ApplicationOutcomeEvent[]
+  interview            Interview?
 
   @@index([organizationId, status])
   @@index([assignedEmployeeId, status])
@@ -1679,3 +1699,153 @@ model CandidateJobMatch {
   @@index([status, leaseExpiresAt])
   @@map("candidate_job_matches")
 }
+
+// ==========================================
+// PHASE 8: INTERVIEW OPERATING SYSTEM
+// ==========================================
+
+enum InterviewStatus {
+  ACTIVE
+  CONCLUDED
+  CANCELLED
+  VOIDED
+}
+
+enum InterviewRoundStatus {
+  ROUND_REQUESTED
+  ROUND_SCHEDULED
+  ROUND_COMPLETED
+  DEBRIEF_PENDING
+  DEBRIEF_COMPLETED
+  ROUND_CONCLUDED
+  ROUND_CANCELLED
+}
+
+enum InterviewRoundType {
+  RECRUITER_SCREEN
+  TECHNICAL_SCREEN
+  CODING_ASSESSMENT
+  SYSTEM_DESIGN
+  HIRING_MANAGER
+  BEHAVIORAL_CULTURE
+  PANEL_PRESENTATION
+  EXECUTIVE_FINAL
+  ONSITE_FULL_LOOP
+  OTHER
+}
+
+enum InterviewFormat {
+  VIRTUAL
+  PHONE
+  IN_PERSON
+  ASSESSMENT_TAKE_HOME
+}
+
+enum InterviewRoundOutcome {
+  ADVANCED_TO_NEXT_ROUND
+  OFFER_RECEIVED
+  REJECTED_AFTER_ROUND
+  CANDIDATE_WITHDREW
+  POSITION_CANCELLED
+  AWAITING_EMPLOYER_DECISION
+}
+
+enum InterviewSentiment {
+  VERY_POSITIVE
+  POSITIVE
+  NEUTRAL
+  CONCERNED
+  DIFFICULT
+}
+
+model Interview {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String          @db.Uuid
+  applicationId  String          @unique @db.Uuid
+  candidateId    String          @db.Uuid
+  jobId          String          @db.Uuid
+  status         InterviewStatus @default(ACTIVE)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime        @default(now()) @updatedAt @db.Timestamptz(6)
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  application    Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidate      Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job            Job             @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  rounds         InterviewRound[]
+
+  @@index([organizationId, status])
+  @@index([candidateId, status])
+  @@index([jobId])
+  @@map("interviews")
+}
+
+model InterviewRound {
+  id                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interviewId               String                 @db.Uuid
+  organizationId            String                 @db.Uuid
+  roundNumber               Int                    @default(1)
+  roundType                 InterviewRoundType     @default(RECRUITER_SCREEN)
+  roundTitle                String                 @db.VarChar(200)
+  status                    InterviewRoundStatus   @default(ROUND_REQUESTED)
+  scheduledStartTime        DateTime?              @db.Timestamptz(6)
+  scheduledEndTime          DateTime?              @db.Timestamptz(6)
+  timezone                  String?                @db.VarChar(100)
+  format                    InterviewFormat        @default(VIRTUAL)
+  meetingUrl                String?                @db.VarChar(1024)
+  location                  String?                @db.VarChar(500)
+  interviewers              Json                   @default("[]") @db.JsonB
+  preparationBrief          Json                   @default("{}") @db.JsonB
+  internalStaffNotes        String?                @db.Text
+  candidatePreparationNotes String?                @db.Text
+  occurredAt                DateTime?              @db.Timestamptz(6)
+  outcome                   InterviewRoundOutcome?
+  outcomeNotes              String?                @db.Text
+  rescheduledBy             String?                @db.VarChar(50)
+  rescheduleReason          String?                @db.Text
+  cancelledBy               String?                @db.VarChar(50)
+  cancelReason              String?                @db.Text
+  voidedAt                  DateTime?              @db.Timestamptz(6)
+  voidedById                String?                @db.Uuid
+  voidReason                String?                @db.Text
+  supersededById            String?                @db.Uuid
+  createdAt                 DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime               @default(now()) @updatedAt @db.Timestamptz(6)
+
+  interview                 Interview              @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  organization              Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  voidedBy                  User?                  @relation("RoundVoider", fields: [voidedById], references: [id], onDelete: SetNull)
+  supersededBy              InterviewRound?        @relation("RoundSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes                InterviewRound[]       @relation("RoundSupersession")
+  debrief                   InterviewDebrief?
+
+  @@unique([interviewId, roundNumber])
+  @@index([organizationId, status])
+  @@index([interviewId, status])
+  @@index([scheduledStartTime])
+  @@map("interview_rounds")
+}
+
+model InterviewDebrief {
+  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roundId                String             @unique @db.Uuid
+  organizationId         String             @db.Uuid
+  candidateSentiment     InterviewSentiment @default(NEUTRAL)
+  questionsAsked         Json               @default("[]") @db.JsonB
+  candidateFeedbackNotes String?            @db.Text
+  staffAssessmentNotes   String?            @db.Text
+  followUpItems          String?            @db.Text
+  submittedAt            DateTime           @default(now()) @db.Timestamptz(6)
+  submittedById          String             @db.Uuid
+  createdAt              DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+
+  round                  InterviewRound     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  submittedBy            User               @relation("DebriefSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([roundId])
+  @@map("interview_debriefs")
+}
+

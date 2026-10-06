@@ -46,3 +46,11 @@ export function candidateProvenanceLabel(
   }
   return "Update";
 }
+
+export function staffProvenanceLabel(
+  provenance: "EMPLOYEE_RECORDED" | "CANDIDATE_REPORTED" | "STAFF_VERIFIED"
+): string {
+  if (provenance === "CANDIDATE_REPORTED") return "Candidate reported (unverified)";
+  if (provenance === "STAFF_VERIFIED") return "Staff verified";
+  return "Staff recorded";
+}

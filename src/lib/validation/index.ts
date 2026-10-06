@@ -13,3 +13,4 @@ export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): T {
 }
 
 export * from "./submission.schemas";
+export * from "./interview.schemas";

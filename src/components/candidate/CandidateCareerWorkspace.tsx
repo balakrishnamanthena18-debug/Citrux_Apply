@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CandidateCareerNav, CareerSectionKey } from "./CandidateCareerNav";
 import { ProfileOverviewSection } from "./ProfileOverviewSection";
+import { Candidate360View } from "./Candidate360View";
+import type { Candidate360DTO } from "@/lib/candidate-360/types";
 import { PersonalContactEditor } from "./PersonalContactEditor";
 import { ProfessionalSummaryEditor } from "./ProfessionalSummaryEditor";
 import { ExperienceEditor } from "./ExperienceEditor";
@@ -20,6 +22,7 @@ import { CandidateDocumentVault, CandidateVaultDocument } from "./CandidateDocum
 
 interface Props {
   candidate: any;
+  candidate360?: Candidate360DTO;
   userEmail: string;
   userName: string;
   changeHistory?: CandidateHistoryItem[];
@@ -28,6 +31,7 @@ interface Props {
 
 export function CandidateCareerWorkspace({
   candidate: initialCandidate,
+  candidate360,
   userEmail,
   userName,
   changeHistory = [],
@@ -137,15 +141,28 @@ export function CandidateCareerWorkspace({
           />
         </div>
 
-        {/* CENTER COLUMN: Active Career Section Workspace (6 cols on lg, 9 cols on xl, or full on mobile) */}
-        <div className="lg:col-span-6 xl:col-span-6 space-y-6">
+        {/* CENTER COLUMN: Active Career Section Workspace */}
+        <div
+          className={
+            activeSection === "overview"
+              ? "lg:col-span-9 space-y-6"
+              : "lg:col-span-6 xl:col-span-6 space-y-6"
+          }
+        >
           {activeSection === "overview" && (
-            <ProfileOverviewSection
-              candidate={candidate}
-              userEmail={userEmail}
-              userName={userName}
-              onNavigateSection={setActiveSection}
-            />
+            candidate360 ? (
+              <Candidate360View
+                data={candidate360}
+                onNavigateToSection={(sec) => setActiveSection(sec as CareerSectionKey)}
+              />
+            ) : (
+              <ProfileOverviewSection
+                candidate={candidate}
+                userEmail={userEmail}
+                userName={userName}
+                onNavigateSection={setActiveSection}
+              />
+            )
           )}
 
           {activeSection === "personal" && (
@@ -250,64 +267,66 @@ export function CandidateCareerWorkspace({
           )}
         </div>
 
-        {/* RIGHT COLUMN: Record Context & Source Verification (3 cols on lg) */}
-        <div className="lg:col-span-3 space-y-5 sticky top-20">
-          {/* Record Provenance Context Card */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <span className="font-semibold text-slate-900 uppercase tracking-wider text-[11px]">
-                Record Provenance
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Canonical
-              </span>
-            </div>
-
-            <p className="text-slate-600 leading-relaxed">
-              All records in this workspace represent candidate-confirmed facts. AI and operations specialists never silently fabricate or alter your history.
-            </p>
-
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Authority:</span>
-                <span className="font-medium text-slate-800">Candidate-Owned</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Verification:</span>
-                <span className="font-medium text-slate-800">
-                  {candidate.verificationStatus === "VERIFIED"
-                    ? "✓ Staff Verified"
-                    : "Active Standing"}
+        {/* RIGHT COLUMN: Record Context & Source Verification (3 cols on lg, only on editor sections) */}
+        {activeSection !== "overview" && (
+          <div className="lg:col-span-3 space-y-5 sticky top-20">
+            {/* Record Provenance Context Card */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <span className="font-semibold text-slate-900 uppercase tracking-wider text-[11px]">
+                  Record Provenance
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Canonical
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Service Mode:</span>
-                <span className="font-medium text-slate-800">
-                  {candidate.applicationAuthorizationMode === "MANAGED" ? "Managed" : "Review Req."}
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* Quick Specialist Assistance */}
-          {candidate.assignedEmployee && (
-            <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2 text-xs">
-              <span className="font-semibold text-slate-900 uppercase tracking-wider text-[11px] block">
-                Assigned Specialist
-              </span>
-              <p className="text-slate-600">
-                {[candidate.assignedEmployee.firstName, candidate.assignedEmployee.lastName].filter(Boolean).join(" ") || candidate.assignedEmployee.email}
+              <p className="text-slate-600 leading-relaxed">
+                All records in this workspace represent candidate-confirmed facts. AI and operations specialists never silently fabricate or alter your history.
               </p>
-              <Link
-                href="/candidate/messages"
-                className="text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1 pt-1"
-              >
-                <span>Message Specialist</span>
-                <span>→</span>
-              </Link>
+
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Authority:</span>
+                  <span className="font-medium text-slate-800">Candidate-Owned</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Verification:</span>
+                  <span className="font-medium text-slate-800">
+                    {candidate.verificationStatus === "VERIFIED"
+                      ? "✓ Staff Verified"
+                      : "Active Standing"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Service Mode:</span>
+                  <span className="font-medium text-slate-800">
+                    {candidate.applicationAuthorizationMode === "MANAGED" ? "Managed" : "Review Req."}
+                  </span>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Quick Specialist Assistance */}
+            {candidate.assignedEmployee && (
+              <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2 text-xs">
+                <span className="font-semibold text-slate-900 uppercase tracking-wider text-[11px] block">
+                  Assigned Specialist
+                </span>
+                <p className="text-slate-600">
+                  {[candidate.assignedEmployee.firstName, candidate.assignedEmployee.lastName].filter(Boolean).join(" ") || candidate.assignedEmployee.email}
+                </p>
+                <Link
+                  href="/candidate/messages"
+                  className="text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1 pt-1"
+                >
+                  <span>Message Specialist</span>
+                  <span>→</span>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

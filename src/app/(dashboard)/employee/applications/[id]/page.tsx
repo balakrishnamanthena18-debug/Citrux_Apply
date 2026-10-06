@@ -40,6 +40,10 @@ import { resolveContinuityVisibilityScope } from "@/lib/application/continuity-s
 import { listOutcomesForStaff } from "@/lib/application/outcome-service";
 import type { OutcomePresentation } from "@/lib/application/outcome-service";
 import { StaffOutcomesPanel } from "@/components/application/StaffOutcomesPanel";
+import {
+  StaffInterviewPanel,
+  type StaffInterviewViewModel,
+} from "@/components/interview/StaffInterviewPanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -60,6 +64,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     intelligence,
     intelligenceLoadFailed,
     outcomes,
+    interviewData,
   } =
     await withRlsContext(ctx.userId, async (tx) => {
     const app = await tx.application.findUnique({
@@ -94,6 +99,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
         intelligence: null as ApplicationIntelligenceViewModel | null,
         intelligenceLoadFailed: false,
         outcomes: [] as OutcomePresentation[],
+        interviewData: null as StaffInterviewViewModel | null,
       };
     }
 
@@ -165,6 +171,64 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
       includeInactive: true,
     });
 
+    let interviewData: StaffInterviewViewModel | null = null;
+    const dbInterview = tx.interview
+      ? await tx.interview.findUnique({
+          where: { applicationId: app.id },
+          include: {
+            rounds: {
+              where: { voidedAt: null },
+              orderBy: { roundNumber: "asc" },
+              include: { debrief: true },
+            },
+          },
+        })
+      : null;
+
+    if (dbInterview) {
+      interviewData = {
+        id: dbInterview.id,
+        applicationId: dbInterview.applicationId,
+        candidateId: dbInterview.candidateId,
+        jobId: dbInterview.jobId,
+        status: dbInterview.status,
+        rounds: dbInterview.rounds.map((r) => ({
+          id: r.id,
+          roundNumber: r.roundNumber,
+          roundType: r.roundType,
+          roundTitle: r.roundTitle,
+          status: r.status,
+          scheduledStartTime: r.scheduledStartTime ? r.scheduledStartTime.toISOString() : null,
+          scheduledEndTime: r.scheduledEndTime ? r.scheduledEndTime.toISOString() : null,
+          timezone: r.timezone,
+          format: r.format,
+          meetingUrl: r.meetingUrl,
+          location: r.location,
+          interviewers: (r.interviewers as any) || [],
+          internalStaffNotes: r.internalStaffNotes,
+          candidatePreparationNotes: r.candidatePreparationNotes,
+          preparationBrief: (r.preparationBrief as any) || null,
+          occurredAt: r.occurredAt ? r.occurredAt.toISOString() : null,
+          outcome: r.outcome,
+          outcomeNotes: r.outcomeNotes,
+          rescheduledBy: r.rescheduledBy,
+          rescheduleReason: r.rescheduleReason,
+          cancelledBy: r.cancelledBy,
+          cancelReason: r.cancelReason,
+          voidedAt: r.voidedAt ? r.voidedAt.toISOString() : null,
+          debrief: r.debrief
+            ? {
+                candidateSentiment: r.debrief.candidateSentiment,
+                questionsAsked: (r.debrief.questionsAsked as any) || [],
+                candidateFeedbackNotes: r.debrief.candidateFeedbackNotes,
+                staffAssessmentNotes: r.debrief.staffAssessmentNotes,
+                followUpItems: r.debrief.followUpItems,
+              }
+            : null,
+        })),
+      };
+    }
+
     return {
       application: app,
       assigneeOptions: eligible.options,
@@ -175,6 +239,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
       intelligence: intel,
       intelligenceLoadFailed: intelFailed,
       outcomes: outcomeRows,
+      interviewData,
     };
   });
 
@@ -1028,6 +1093,19 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
               </p>
             )}
           </div>
+
+          <StaffInterviewPanel
+            applicationId={application.id}
+            jobTitle={application.job.title}
+            companyName={application.job.companyName}
+            candidateSkills={application.candidate.skills.map((s) => s.name)}
+            candidateExperiences={application.candidate.experiences.map((e) => ({
+              company: e.companyName,
+              title: e.jobTitle,
+              highlights: e.achievements || [],
+            }))}
+            interview={interviewData}
+          />
 
           <StaffOutcomesPanel
             applicationId={application.id}
