@@ -24,6 +24,8 @@ function StaffActivationForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activatedSuccess, setActivatedSuccess] = useState(false);
 
+  const [retryCount, setRetryCount] = useState(0);
+
   useEffect(() => {
     async function validateToken() {
       if (!token) {
@@ -32,17 +34,25 @@ function StaffActivationForm() {
         return;
       }
 
-      const res = await validateStaffActivationTokenAction(token);
-      if (!res.success || !res.data) {
-        setValidationError(res.error || "This activation link is invalid or has expired.");
-      } else {
-        setTokenData(res.data);
+      setIsValidating(true);
+      setValidationError(null);
+
+      try {
+        const res = await validateStaffActivationTokenAction(token);
+        if (!res.success || !res.data) {
+          setValidationError(res.error || "This activation link is invalid or has expired.");
+        } else {
+          setTokenData(res.data);
+        }
+      } catch {
+        setValidationError("Unable to connect to the activation service. Please check your connection and retry.");
+      } finally {
+        setIsValidating(false);
       }
-      setIsValidating(false);
     }
 
     validateToken();
-  }, [token]);
+  }, [token, retryCount]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,6 +105,9 @@ function StaffActivationForm() {
   }
 
   if (validationError || !tokenData) {
+    const isAlreadyUsed = validationError?.toLowerCase().includes("already been used");
+    const isExpired = validationError?.toLowerCase().includes("expired");
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7] text-center space-y-6">
@@ -104,15 +117,34 @@ function StaffActivationForm() {
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-[#0F1720]">Activation Link Invalid</h2>
+            <h2 className="text-xl font-bold tracking-tight text-[#0F1720]">
+              {isAlreadyUsed
+                ? "Account Already Activated"
+                : isExpired
+                ? "Activation Link Expired"
+                : "Activation Link Invalid"}
+            </h2>
             <p className="mt-2 text-xs text-[#64748B]">{validationError}</p>
           </div>
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
+            {!isAlreadyUsed && !isExpired && (
+              <button
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+                className="inline-flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] transition"
+              >
+                Retry Validation
+              </button>
+            )}
             <Link
               href="/login"
-              className="inline-flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] transition"
+              className={`inline-flex w-full justify-center rounded-[11px] px-4 py-2.5 text-sm font-semibold transition ${
+                isAlreadyUsed || isExpired
+                  ? "bg-[#12A150] text-white shadow-2xs hover:bg-[#0E8541]"
+                  : "bg-white border border-[#DDE5E0] text-[#0F1720] hover:bg-[#F7F9F8]"
+              }`}
             >
-              Return to Sign In
+              {isAlreadyUsed ? "Sign In to Your Account" : "Return to Sign In"}
             </Link>
           </div>
         </div>

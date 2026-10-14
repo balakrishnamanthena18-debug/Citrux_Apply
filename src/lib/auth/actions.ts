@@ -10,6 +10,7 @@ import { getAuthenticatedContext, requireAdmin } from "@/lib/auth/context";
 import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildAppUrl } from "@/lib/url";
+import { logger } from "@/lib/logger";
 import { AuditAction, Role } from "@/generated/prisma";
 import {
   LoginSchema,
@@ -661,11 +662,28 @@ export async function validateStaffActivationTokenAction(
       return { success: false, error: "This activation link has expired. Please contact your administrator for a new invitation." };
     }
 
+    if (!activationToken.membership) {
+      return { success: false, error: "This activation link is invalid or has expired." };
+    }
+
+    if (activationToken.organizationId !== activationToken.membership.organizationId) {
+      logger.security("CROSS_TENANT_ACTIVATION_ATTEMPT", {
+        tokenId: activationToken.id,
+        tokenOrgId: activationToken.organizationId,
+        membershipOrgId: activationToken.membership.organizationId,
+      });
+      return { success: false, error: "Cross-tenant activation is strictly prohibited." };
+    }
+
     if (activationToken.membership.status !== "INVITED") {
       return { success: false, error: "This account has already been activated or is not eligible for activation." };
     }
 
     const { user, organization, designation } = activationToken.membership;
+
+    if (!user || !organization) {
+      return { success: false, error: "Activation account records are incomplete." };
+    }
 
     return {
       success: true,
@@ -680,7 +698,11 @@ export async function validateStaffActivationTokenAction(
         role: activationToken.membership.role,
       },
     };
-  } catch {
+  } catch (err: any) {
+    logger.error("[ACTIVATION_VALIDATION_ERROR] Unexpected error during activation token validation", {
+      errorMessage: err?.message || String(err),
+      errorName: err?.name,
+    });
     return { success: false, error: "An unexpected error occurred while validating the activation link." };
   }
 }
@@ -745,6 +767,10 @@ export async function activateStaffAccountAction(
 
       if (token.membership.status !== "INVITED") {
         throw new ValidationError("This account has already been activated or is not eligible for activation.");
+      }
+
+      if (token.organizationId !== token.membership.organizationId) {
+        throw new ValidationError("Cross-tenant activation is strictly prohibited.");
       }
 
       if (token.reservedUntil && token.reservedUntil > now) {
@@ -820,6 +846,10 @@ export async function activateStaffAccountAction(
 
       if (token.membership.status !== "INVITED") {
         throw new ValidationError("Membership is not in an invitable state.");
+      }
+
+      if (token.organizationId !== token.membership.organizationId) {
+        throw new ValidationError("Cross-tenant activation is strictly prohibited.");
       }
 
       const activationDate = new Date();
