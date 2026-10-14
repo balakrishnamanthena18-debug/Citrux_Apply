@@ -130,21 +130,23 @@ function StaffActivationForm() {
             </span>
           </div>
           <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#0F1720]">
-            Activate Your Staff Account
+            {tokenData.role === "CANDIDATE" ? "Activate Your Candidate Account" : "Activate Your Staff Account"}
           </h2>
           <p className="mt-1 text-center text-xs text-[#64748B]">
-            Complete your employee onboarding to access the Operations Operating System.
+            {tokenData.role === "CANDIDATE"
+              ? "Complete your profile activation to access the Candidate Portal."
+              : "Complete your employee onboarding to access the Operations Operating System."}
           </p>
         </div>
 
-        {/* Employee Identity Summary */}
+        {/* Identity Summary */}
         <div className="rounded-[14px] bg-[#F7F9F8] p-4 border border-[#E5EAE7] space-y-2 text-xs">
           <div className="flex justify-between">
-            <span className="text-[#64748B]">Employee:</span>
+            <span className="text-[#64748B]">{tokenData.role === "CANDIDATE" ? "Candidate:" : "Employee:"}</span>
             <span className="font-semibold text-[#0F1720]">{tokenData.employeeName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[#64748B]">Work Email:</span>
+            <span className="text-[#64748B]">{tokenData.role === "CANDIDATE" ? "Account Email:" : "Work Email:"}</span>
             <span className="font-mono text-[#0F1720] text-xs">{tokenData.email}</span>
           </div>
           {tokenData.employeeId && (

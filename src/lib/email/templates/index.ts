@@ -14,5 +14,6 @@
  */
 
 export * from "./staffWelcomeActivation";
+export * from "./candidateWelcomeActivation";
 export * from "./messaging";
 export * from "./applicationSubmitted";

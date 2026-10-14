@@ -18,11 +18,13 @@ import {
 } from "@/components/workbench";
 import { syncUrlParams } from "@/lib/client/urlSync";
 import { AddCandidateModal, type StaffOption } from "./AddCandidateModal";
+import { resendCandidateInvitationAction } from "@/lib/candidate/actions";
 
 export interface CandidateDirectoryItem {
   id: string;
   status: string;
   verificationStatus?: string | null;
+  membershipStatus?: string | null;
   headline?: string | null;
   assignedEmployeeId?: string | null;
   assignedEmployee?: {
@@ -71,7 +73,11 @@ export function EmployeeCandidatesWorkbench({
   const router = useRouter();
   const [createdCandidates, setCreatedCandidates] = useState<CandidateDirectoryItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    type: "success" | "warning";
+    message: string;
+  } | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const candidateList = useMemo(() => {
     const serverIds = new Set(candidates.map((c) => c.id));
@@ -134,16 +140,64 @@ export function EmployeeCandidatesWorkbench({
     setSortDirection(direction);
   };
 
-  const handleCandidateCreated = (newCandidate: CandidateDirectoryItem) => {
+  const handleCandidateCreated = (
+    newCandidate: CandidateDirectoryItem,
+    invitation?: { attempted: boolean; sent: boolean; error?: string }
+  ) => {
     setCreatedCandidates((prev) => [newCandidate, ...prev]);
     const candidateName =
       [newCandidate.user.firstName, newCandidate.user.lastName].filter(Boolean).join(" ") ||
       newCandidate.user.email;
-    setSuccessMessage(`Candidate "${candidateName}" was successfully added to the directory.`);
+
+    if (invitation?.attempted) {
+      if (invitation.sent) {
+        setNotification({
+          type: "success",
+          message: `Candidate "${candidateName}" was created and an activation invitation was sent to ${newCandidate.user.email}.`,
+        });
+      } else {
+        setNotification({
+          type: "warning",
+          message: `Candidate "${candidateName}" was created, but invitation email delivery failed: ${invitation.error || "Delivery error"}. You can retry sending the invitation below.`,
+        });
+      }
+    } else {
+      setNotification({
+        type: "success",
+        message: `Candidate "${candidateName}" was successfully added to the directory.`,
+      });
+    }
+
     setActiveTab("ALL");
     setPage(1);
     syncUrlParams({ scope: null, status: null });
     router.refresh();
+  };
+
+  const handleResendInvitation = async (candidate: CandidateDirectoryItem) => {
+    if (resendingId) return;
+    setResendingId(candidate.id);
+    try {
+      const res = await resendCandidateInvitationAction({ candidateId: candidate.id });
+      if (res.success) {
+        setNotification({
+          type: "success",
+          message: `Activation invitation email successfully sent to ${candidate.user.email}.`,
+        });
+      } else {
+        setNotification({
+          type: "warning",
+          message: `Failed to send invitation to ${candidate.user.email}: ${res.error || "Email delivery failed"}`,
+        });
+      }
+    } catch (err: any) {
+      setNotification({
+        type: "warning",
+        message: `Failed to resend invitation: ${err?.message || "An unexpected error occurred"}`,
+      });
+    } finally {
+      setResendingId(null);
+    }
   };
 
 
@@ -200,26 +254,35 @@ export function EmployeeCandidatesWorkbench({
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-16">
-      {successMessage && (
+      {notification && (
         <div
           role="status"
-          className="flex items-center justify-between rounded-[12px] border border-emerald-200/80 bg-emerald-50/90 px-4 py-3 text-xs text-emerald-900 shadow-2xs animate-in fade-in-0 duration-150"
+          className={`flex items-center justify-between rounded-[12px] border px-4 py-3 text-xs shadow-2xs animate-in fade-in-0 duration-150 ${
+            notification.type === "warning"
+              ? "border-amber-200/80 bg-amber-50/90 text-amber-900"
+              : "border-emerald-200/80 bg-emerald-50/90 text-emerald-900"
+          }`}
         >
           <div className="flex items-center gap-2">
-            <svg
-              className="h-4 w-4 text-emerald-600 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="font-medium">{successMessage}</span>
+            {notification.type === "warning" ? (
+              <svg className="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            <span className="font-medium">{notification.message}</span>
           </div>
           <button
             type="button"
-            onClick={() => setSuccessMessage(null)}
-            className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline ml-4"
+            onClick={() => setNotification(null)}
+            className={`text-xs font-semibold underline ml-4 ${
+              notification.type === "warning"
+                ? "text-amber-800 hover:text-amber-950"
+                : "text-emerald-800 hover:text-emerald-950"
+            }`}
           >
             Dismiss
           </button>
@@ -329,19 +392,26 @@ export function EmployeeCandidatesWorkbench({
                     </td>
 
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-                          c.status === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : c.status === "ONBOARDING"
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : c.status === "PLACED"
-                            ? "bg-purple-50 text-purple-700 border border-purple-200"
-                            : "bg-[#EDF1EF] text-[#64748B]"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                            c.status === "ACTIVE"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : c.status === "ONBOARDING"
+                              ? "bg-blue-50 text-blue-700 border border-blue-200"
+                              : c.status === "PLACED"
+                              ? "bg-purple-50 text-purple-700 border border-purple-200"
+                              : "bg-[#EDF1EF] text-[#64748B]"
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                        {c.membershipStatus === "INVITED" && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-semibold tracking-wide bg-amber-50 text-amber-700 border border-amber-200">
+                            Invite Pending
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="px-5 py-3.5 whitespace-nowrap">
@@ -377,12 +447,32 @@ export function EmployeeCandidatesWorkbench({
                     </td>
 
                     <td className="px-5 py-3.5 whitespace-nowrap text-right">
-                      <TransitionLink
-                        href={`/employee/candidates/${c.id}`}
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-xs transition-colors"
-                      >
-                        Inspect 360 →
-                      </TransitionLink>
+                      <div className="flex items-center justify-end gap-3">
+                        {canAddCandidate && c.membershipStatus === "INVITED" && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendInvitation(c)}
+                            disabled={resendingId === c.id}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0B3B2C] hover:text-[#12A150] transition-colors disabled:opacity-50"
+                            title="Resend activation invitation email"
+                          >
+                            {resendingId === c.id ? (
+                              <>
+                                <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-[#0B3B2C] border-t-transparent" />
+                                <span>Sending...</span>
+                              </>
+                            ) : (
+                              <span>Resend Invite</span>
+                            )}
+                          </button>
+                        )}
+                        <TransitionLink
+                          href={`/employee/candidates/${c.id}`}
+                          className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-xs transition-colors"
+                        >
+                          Inspect 360 →
+                        </TransitionLink>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -41,6 +41,11 @@ const serverEnvSchema = z.object({
    * Server-only. Never NEXT_PUBLIC_*. Never persist to DB/logs/audit.
    * Adapter registration is gated; absence means NullAIProvider / AI unavailable.
    */
+  /**
+   * Canonical server application URL (e.g., https://portal.careerbutton.in in production).
+   * Takes precedence over NEXT_PUBLIC_APP_URL for server-side URL resolution.
+   */
+  APP_URL: z.string().url("APP_URL must be a valid URL").optional(),
   NVIDIA_API_KEY: z.string().min(1).optional(),
   NVIDIA_API_BASE_URL: z.string().url().optional(),
 });
@@ -52,6 +57,13 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
+  /**
+   * Public canonical application URL (e.g., https://portal.careerbutton.in in production).
+   */
+  NEXT_PUBLIC_APP_URL: z
+    .string()
+    .url("NEXT_PUBLIC_APP_URL must be a valid URL")
+    .optional(),
 });
 
 export const envSchema = serverEnvSchema.merge(publicEnvSchema);

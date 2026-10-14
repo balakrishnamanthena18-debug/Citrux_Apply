@@ -12,6 +12,7 @@ import {
   buildStaffWelcomeEmailSubject,
   buildStaffResentEmailSubject,
 } from "@/lib/email/templates/staffWelcomeActivation";
+import { buildAppUrl } from "@/lib/url";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildAssignmentWriteData } from "@/lib/application/assignment-snapshot";
 import {
@@ -549,10 +550,8 @@ export async function createEmployeeAction(
     }
 
     // 4. Post-Commit: Dispatch Welcome Email with single-use activation link
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const activationUrl = `${appUrl}/auth/activate?token=${rawToken}`;
-
     try {
+      const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
       await emailNotificationService.sendTransactionalNotification({
         organizationId: ctx.organizationId,
         recipientEmail: parsed.data.email,
@@ -662,10 +661,8 @@ export async function resendStaffActivationAction(
     });
 
     // Post-Commit email dispatch
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const activationUrl = `${appUrl}/auth/activate?token=${rawToken}`;
-
     try {
+      const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
       await emailNotificationService.sendTransactionalNotification({
         organizationId: ctx.organizationId,
         recipientEmail: target.user.email,

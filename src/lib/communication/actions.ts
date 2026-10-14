@@ -9,6 +9,7 @@ import {
   AuditAction,
   Role,
 } from "@/generated/prisma";
+import { buildAppUrl } from "@/lib/url";
 import {
   CreateConversationSchema,
   SendMessageSchema,
@@ -225,10 +226,11 @@ export async function createConversationAction(
         : conversation.candidate.user.email;
 
       if (recipientEmail) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        const conversationUrl = isCandidateSender
-          ? `${appUrl}/employee/messages/${conversation.conv.id}`
-          : `${appUrl}/candidate/messages/${conversation.conv.id}`;
+        const conversationUrl = buildAppUrl(
+          isCandidateSender
+            ? `/employee/messages/${conversation.conv.id}`
+            : `/candidate/messages/${conversation.conv.id}`
+        );
         const recipientIsCandidate = !isCandidateSender;
         const messageParams = {
           subject: parsed.data.subject,
@@ -385,10 +387,11 @@ export async function sendMessageAction(
         : result.conv.candidate.user.email;
 
       if (recipientEmail) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        const conversationUrl = isCandidateSender
-          ? `${appUrl}/employee/messages/${result.conv.id}`
-          : `${appUrl}/candidate/messages/${result.conv.id}`;
+        const conversationUrl = buildAppUrl(
+          isCandidateSender
+            ? `/employee/messages/${result.conv.id}`
+            : `/candidate/messages/${result.conv.id}`
+        );
         const recipientIsCandidate = !isCandidateSender;
         const messageParams = {
           subject: result.conv.subject || "Conversation",

@@ -26,7 +26,16 @@ export default async function EmployeeCandidatesListPage({
       },
       include: {
         user: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            memberships: {
+              where: { organizationId: ctx.organizationId },
+              select: { status: true },
+            },
+          },
         },
         assignedEmployee: {
           select: { id: true, firstName: true, lastName: true, email: true },
@@ -42,6 +51,11 @@ export default async function EmployeeCandidatesListPage({
       take: 200,
     });
 
+    const formattedCandidates: CandidateDirectoryItem[] = cands.map((c) => ({
+      ...c,
+      membershipStatus: c.user.memberships?.[0]?.status ?? null,
+    }));
+
     const staff = await tx.membership.findMany({
       where: {
         organizationId: ctx.organizationId,
@@ -56,7 +70,7 @@ export default async function EmployeeCandidatesListPage({
       orderBy: { user: { firstName: "asc" } },
     });
 
-    return { candidates: cands, staffMembers: staff };
+    return { candidates: formattedCandidates, staffMembers: staff };
   });
 
   const availableStaff = staffMembers.map((m) => ({

@@ -14,7 +14,10 @@ export interface StaffOption {
 interface AddCandidateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (candidate: CandidateDirectoryItem) => void;
+  onSuccess: (
+    candidate: CandidateDirectoryItem,
+    invitation?: { attempted: boolean; sent: boolean; error?: string }
+  ) => void;
   availableStaff?: StaffOption[];
 }
 
@@ -129,7 +132,7 @@ export function AddCandidateModal({
 
       setLoading(false);
       resetForm();
-      onSuccess(res.data.candidate as CandidateDirectoryItem);
+      onSuccess(res.data.candidate as CandidateDirectoryItem, res.data.invitation);
       onClose();
     } catch (err: any) {
       setError(err?.message || "An unexpected error occurred while creating candidate");

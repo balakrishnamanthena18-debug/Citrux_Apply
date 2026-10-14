@@ -9,7 +9,8 @@ import { withRlsContext } from "@/lib/db/rls";
 import { getAuthenticatedContext, requireAdmin } from "@/lib/auth/context";
 import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { AuditAction } from "@/generated/prisma";
+import { buildAppUrl } from "@/lib/url";
+import { AuditAction, Role } from "@/generated/prisma";
 import {
   LoginSchema,
   CandidateRegisterSchema,
@@ -588,10 +589,10 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
   try {
     console.info("[AUTH_ACTION] requestPasswordResetAction");
     const supabase = await createServerClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const redirectTo = buildAppUrl("/reset-password");
     // redirectTo is retained for Auth URL allow-list compliance; OTP flow does not require clicking it.
     await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${appUrl}/reset-password`,
+      redirectTo,
     });
   } catch {
     // Non-leaking catch
@@ -609,6 +610,7 @@ export interface ValidatedActivationTokenData {
   designationName?: string | null;
   department?: string | null;
   team?: string | null;
+  role?: string | null;
 }
 
 /**
@@ -668,13 +670,14 @@ export async function validateStaffActivationTokenAction(
     return {
       success: true,
       data: {
-        employeeName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email || "Staff Member",
+        employeeName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email || (activationToken.membership.role === "CANDIDATE" ? "Candidate" : "Staff Member"),
         email: user.email,
         organizationName: organization.name,
         employeeId: activationToken.membership.employeeId,
         designationName: designation?.name ?? null,
         department: activationToken.membership.department,
         team: activationToken.membership.team,
+        role: activationToken.membership.role,
       },
     };
   } catch {
@@ -716,6 +719,7 @@ export async function activateStaffAccountAction(
     membershipId: string;
     userId: string;
     organizationId: string;
+    role?: string;
   };
 
   try {
@@ -761,6 +765,7 @@ export async function activateStaffAccountAction(
         membershipId: token.membership.id,
         userId: token.membership.userId,
         organizationId: token.organizationId,
+        role: token.membership.role,
       };
     });
   } catch (err: any) {
@@ -845,16 +850,18 @@ export async function activateStaffAccountAction(
       });
 
       // Authoritative audit event
+      const isCandidate = reservation.role === Role.CANDIDATE;
       await tx.auditEvent.create({
         data: {
           organizationId: reservation.organizationId,
           actorType: "USER",
           actorId: reservation.userId,
-          action: AuditAction.EMPLOYEE_ACTIVATED,
+          action: isCandidate ? AuditAction.MEMBERSHIP_ACTIVATED : AuditAction.EMPLOYEE_ACTIVATED,
           entityType: "Membership",
           entityId: reservation.membershipId,
           details: {
             activatedAt: activationDate.toISOString(),
+            role: reservation.role,
           },
         },
       });

@@ -170,3 +170,8 @@ export type CandidateDocumentUploadSelfInput = z.input<typeof CandidateDocumentU
 export type UpdateCandidateAuthorizationModeInput = z.input<typeof UpdateCandidateAuthorizationModeSchema>;
 export type CreateCandidateInput = z.input<typeof CreateCandidateSchema>;
 
+export const ResendCandidateInvitationSchema = z.object({
+  candidateId: z.string().uuid("Invalid candidate ID"),
+});
+
+export type ResendCandidateInvitationInput = z.input<typeof ResendCandidateInvitationSchema>;

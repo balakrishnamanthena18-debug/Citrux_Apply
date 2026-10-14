@@ -1,11 +1,20 @@
 "use server";
 
+import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAuthenticatedContext, requireAdmin, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { emailNotificationService } from "@/lib/email";
+import {
+  buildCandidateActivationEmailHtml,
+  buildCandidateActivationEmailText,
+  buildCandidateWelcomeEmailSubject,
+  buildCandidateResentEmailSubject,
+} from "@/lib/email/templates/candidateWelcomeActivation";
+import { buildAppUrl } from "@/lib/url";
 import {
   CandidateProfileSchema,
   CandidateExperienceSchema,
@@ -20,6 +29,7 @@ import {
   CandidateDocumentUploadSelfSchema,
   UpdateCandidateAuthorizationModeSchema,
   CreateCandidateSchema,
+  ResendCandidateInvitationSchema,
   type CandidateProfileInput,
   type CandidateExperienceInput,
   type CandidateEducationInput,
@@ -32,6 +42,7 @@ import {
   type CandidateDocumentUploadSelfInput,
   type UpdateCandidateAuthorizationModeInput,
   type CreateCandidateInput,
+  type ResendCandidateInvitationInput,
 } from "@/lib/validation/candidate.schemas";
 import {
   generateCandidateDocumentPath,
@@ -41,7 +52,14 @@ import {
   createSignedDownloadUrl,
   deleteCandidateDocumentStorage,
 } from "@/lib/storage";
-import { CandidateStatus, Role, MembershipStatus, ApplicationAuthorizationMode, AuditAction } from "@/generated/prisma";
+import {
+  CandidateStatus,
+  Role,
+  MembershipStatus,
+  ApplicationAuthorizationMode,
+  AuditAction,
+  EmailDeliveryStatus,
+} from "@/generated/prisma";
 import { AuthorizationError, InvalidStateTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
 import { markCandidateApplicationIntelligenceStale } from "@/lib/application-intelligence/runs";
 import { freshnessAfterTrigger } from "@/lib/application-intelligence/stale";
@@ -73,9 +91,19 @@ function revalidateCandidateViews() {
  * Enforces strict Admin authorization, tenant isolation, atomic transaction,
  * compensating cleanup for auth users, and audit logging.
  */
+export interface CreateCandidateResult {
+  candidateId: string;
+  candidate: any;
+  invitation?: {
+    attempted: boolean;
+    sent: boolean;
+    error?: string;
+  };
+}
+
 export async function createCandidateAction(
   input: CreateCandidateInput
-): Promise<ActionResult<{ candidateId: string; candidate: any }>> {
+): Promise<ActionResult<CreateCandidateResult>> {
   const parsed = CreateCandidateSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
@@ -118,12 +146,22 @@ export async function createCandidateAction(
     authUserId = authData.user.id;
     isNewAuthUser = true;
 
-    // 2. Open PostgreSQL atomic transaction with compensating catch
-    let createdCandidate: any = null;
-    let createdMembership: any = null;
+    // 2. Generate secure single-use activation token if invitation requested
+    let rawToken: string | null = null;
+    let tokenHash: string | null = null;
+    let tokenExpiresAt: Date | null = null;
+
+    if (parsed.data.sendInvitation) {
+      rawToken = crypto.randomBytes(32).toString("hex");
+      tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      tokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 Hours
+    }
+
+    // 3. Open PostgreSQL atomic transaction with compensating catch
+    let dbResult: any = null;
 
     try {
-      const dbResult = await withRlsContext(ctx.userId, async (tx) => {
+      dbResult = await withRlsContext(ctx.userId, async (tx) => {
         // Verify assigned employee if provided
         let assignedStaff: any = null;
         if (parsed.data.assignedEmployeeId) {
@@ -144,6 +182,12 @@ export async function createCandidateAction(
             throw new ValidationError("Selected specialist is not an active staff member in this organization");
           }
         }
+
+        // Fetch organization name for email personalization
+        const org = await tx.organization.findUnique({
+          where: { id: ctx.organizationId },
+          select: { name: true },
+        });
 
         // Check for existing User record
         let targetUser = await tx.user.findUnique({
@@ -200,6 +244,18 @@ export async function createCandidateAction(
             status: parsed.data.sendInvitation ? MembershipStatus.INVITED : MembershipStatus.ACTIVE,
           },
         });
+
+        // If invitation enabled, persist cryptographic activation token
+        if (parsed.data.sendInvitation && tokenHash && tokenExpiresAt) {
+          await tx.staffActivationToken.create({
+            data: {
+              organizationId: ctx.organizationId,
+              membershipId: membership.id,
+              tokenHash,
+              expiresAt: tokenExpiresAt,
+            },
+          });
+        }
 
         // Create Candidate (enforcing verificationStatus: UNVERIFIED, status: ONBOARDING or ACTIVE)
         const candidate = await tx.candidate.create({
@@ -262,15 +318,23 @@ export async function createCandidateAction(
               targetUserId: targetUser.id,
               recipientEmail: normalizedEmail,
               role: Role.CANDIDATE,
+              expiresAt: tokenExpiresAt?.toISOString(),
             },
           });
         }
 
-        return { candidate, membership };
-      });
+        const specialistName = assignedStaff
+          ? [assignedStaff.user.firstName, assignedStaff.user.lastName].filter(Boolean).join(" ") ||
+            assignedStaff.user.email
+          : null;
 
-      createdCandidate = dbResult.candidate;
-      createdMembership = dbResult.membership;
+        return {
+          candidate,
+          membership,
+          organizationName: org?.name || "Citrux",
+          specialistName,
+        };
+      });
     } catch (dbError: any) {
       // Compensating transaction: Clean up orphaned Supabase Auth user if newly created
       if (authUserId && isNewAuthUser) {
@@ -299,16 +363,213 @@ export async function createCandidateAction(
       throw dbError;
     }
 
+    // 4. Post-Commit: Dispatch Invitation Email via Configured Email Provider
+    const invitationResult = {
+      attempted: Boolean(parsed.data.sendInvitation),
+      sent: false,
+      error: undefined as string | undefined,
+    };
+
+    if (parsed.data.sendInvitation && rawToken) {
+      try {
+        const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
+        const delivery = await emailNotificationService.sendTransactionalNotification({
+          organizationId: ctx.organizationId,
+          recipientEmail: normalizedEmail,
+          templateId: "CANDIDATE_WELCOME_ACTIVATION",
+          subject: buildCandidateWelcomeEmailSubject(),
+          textBody: buildCandidateActivationEmailText({
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            email: normalizedEmail,
+            activationUrl,
+            organizationName: dbResult.organizationName,
+            assignedSpecialistName: dbResult.specialistName,
+            variant: "welcome",
+          }),
+          htmlBody: buildCandidateActivationEmailHtml({
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            email: normalizedEmail,
+            activationUrl,
+            organizationName: dbResult.organizationName,
+            assignedSpecialistName: dbResult.specialistName,
+            variant: "welcome",
+          }),
+        });
+
+        if (delivery.status === EmailDeliveryStatus.SENT) {
+          invitationResult.sent = true;
+        } else {
+          invitationResult.sent = false;
+          invitationResult.error = delivery.failureReason || "Email provider failed to deliver invitation";
+        }
+      } catch (emailErr: any) {
+        invitationResult.sent = false;
+        invitationResult.error = emailErr?.message || "Email dispatch failed";
+      }
+    }
+
     revalidateCandidateViews();
     return {
       success: true,
       data: {
-        candidateId: createdCandidate.id,
-        candidate: createdCandidate,
+        candidateId: dbResult.candidate.id,
+        candidate: {
+          ...dbResult.candidate,
+          membershipStatus: parsed.data.sendInvitation ? MembershipStatus.INVITED : MembershipStatus.ACTIVE,
+        },
+        invitation: invitationResult,
       },
     };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to create candidate" };
+  }
+}
+
+/**
+ * Resends an activation invitation email to an existing candidate whose membership is in INVITED status.
+ * Enforces admin authorization, single-use token expiration, audit logging, and provider dispatch.
+ */
+export async function resendCandidateInvitationAction(
+  input: ResendCandidateInvitationInput
+): Promise<ActionResult<{ sent: boolean; error?: string }>> {
+  const parsed = ResendCandidateInvitationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireAdmin(ctx);
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const tokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+    const target = await withRlsContext(ctx.userId, async (tx) => {
+      const candidate = await tx.candidate.findUnique({
+        where: { id: parsed.data.candidateId },
+        include: {
+          user: true,
+          assignedEmployee: {
+            select: { firstName: true, lastName: true, email: true },
+          },
+        },
+      });
+
+      if (!candidate || candidate.organizationId !== ctx.organizationId) {
+        throw new NotFoundError("Candidate not found in organization");
+      }
+
+      const membership = await tx.membership.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          userId: candidate.userId,
+        },
+      });
+
+      if (!membership) {
+        throw new NotFoundError("Candidate membership not found");
+      }
+
+      if (membership.status !== MembershipStatus.INVITED) {
+        throw new ValidationError("Can only resend activation invitation for candidates with pending invitation status");
+      }
+
+      // Invalidate all previous unused activation tokens for this membership
+      await tx.staffActivationToken.updateMany({
+        where: {
+          membershipId: membership.id,
+          usedAt: null,
+        },
+        data: {
+          expiresAt: new Date(),
+        },
+      });
+
+      // Create new activation token
+      await tx.staffActivationToken.create({
+        data: {
+          organizationId: ctx.organizationId,
+          membershipId: membership.id,
+          tokenHash,
+          expiresAt: tokenExpiresAt,
+        },
+      });
+
+      const org = await tx.organization.findUnique({
+        where: { id: ctx.organizationId },
+        select: { name: true },
+      });
+
+      await logUserAuditEvent({
+        tx,
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        action: AuditAction.USER_INVITED,
+        entityType: "Membership",
+        entityId: membership.id,
+        details: {
+          targetUserId: candidate.userId,
+          recipientEmail: candidate.user.email,
+          role: Role.CANDIDATE,
+          expiresAt: tokenExpiresAt.toISOString(),
+          variant: "resent",
+        },
+      });
+
+      return {
+        candidate,
+        membership,
+        organizationName: org?.name || "Citrux",
+      };
+    });
+
+    // Post-Commit email dispatch
+    const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
+    const specialistName = target.candidate.assignedEmployee
+      ? [target.candidate.assignedEmployee.firstName, target.candidate.assignedEmployee.lastName].filter(Boolean).join(" ") ||
+        target.candidate.assignedEmployee.email
+      : null;
+
+    const delivery = await emailNotificationService.sendTransactionalNotification({
+      organizationId: ctx.organizationId,
+      recipientEmail: target.candidate.user.email,
+      templateId: "CANDIDATE_WELCOME_ACTIVATION",
+      subject: buildCandidateResentEmailSubject(),
+      textBody: buildCandidateActivationEmailText({
+        firstName: target.candidate.user.firstName || "there",
+        lastName: target.candidate.user.lastName,
+        email: target.candidate.user.email,
+        activationUrl,
+        organizationName: target.organizationName,
+        assignedSpecialistName: specialistName,
+        variant: "resent",
+      }),
+      htmlBody: buildCandidateActivationEmailHtml({
+        firstName: target.candidate.user.firstName || "there",
+        lastName: target.candidate.user.lastName,
+        email: target.candidate.user.email,
+        activationUrl,
+        organizationName: target.organizationName,
+        assignedSpecialistName: specialistName,
+        variant: "resent",
+      }),
+    });
+
+    revalidateCandidateViews();
+
+    if (delivery.status === EmailDeliveryStatus.SENT) {
+      return { success: true, data: { sent: true } };
+    } else {
+      return {
+        success: false,
+        error: delivery.failureReason || "Email provider failed to deliver invitation email",
+      };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to resend candidate invitation" };
   }
 }
 
