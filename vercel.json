@@ -9,7 +9,7 @@
     },
     {
       "path": "/api/cron/intelligence-worker",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
