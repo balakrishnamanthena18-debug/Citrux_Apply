@@ -43,38 +43,36 @@ export default async function EmployeeApplicationsPage({ searchParams }: Props) 
       pageSize: resolvedParams.pageSize,
     });
 
-    const [cands, openJobs, uniqueSources] = await Promise.all([
-      tx.candidate.findMany({
-        where: { organizationId: auth.organizationId, status: { not: "ARCHIVED" } },
-        select: {
-          id: true,
-          status: true,
-          user: { select: { firstName: true, lastName: true, email: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      }),
-      tx.job.findMany({
-        where: {
-          organizationId: auth.organizationId,
-          status: "OPEN",
-          visibility: "GLOBAL",
-        },
-        select: { id: true, title: true, companyName: true, source: true },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      }),
-      tx.job.findMany({
-        where: {
-          organizationId: auth.organizationId,
-          visibility: "GLOBAL",
-          source: { not: null },
-        },
-        select: { source: true },
-        distinct: ["source"],
-        take: 50,
-      }),
-    ]);
+    const cands = await tx.candidate.findMany({
+      where: { organizationId: auth.organizationId, status: { not: "ARCHIVED" } },
+      select: {
+        id: true,
+        status: true,
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const openJobs = await tx.job.findMany({
+      where: {
+        organizationId: auth.organizationId,
+        status: "OPEN",
+        visibility: "GLOBAL",
+      },
+      select: { id: true, title: true, companyName: true, source: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const uniqueSources = await tx.job.findMany({
+      where: {
+        organizationId: auth.organizationId,
+        visibility: "GLOBAL",
+        source: { not: null },
+      },
+      select: { source: true },
+      distinct: ["source"],
+      take: 50,
+    });
 
     const candidateOptions: CandidateOption[] = cands.map((c) => ({
       id: c.id,

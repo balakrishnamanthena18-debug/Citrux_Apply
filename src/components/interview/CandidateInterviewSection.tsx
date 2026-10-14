@@ -16,6 +16,7 @@ import {
 } from "@/lib/interview/presenter";
 import { recordDebriefAction } from "@/lib/interview/actions";
 import type { InterviewerInfo, InterviewQuestionItem, PreparationBriefPayload } from "@/lib/interview/types";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export interface CandidateRoundViewModel {
   id: string;
@@ -131,16 +132,18 @@ export function CandidateInterviewSection({
       <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-3">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-800">
+            <span className="w-2 h-2 rounded-full bg-slate-300" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
               Interview Schedule & Preparation
             </h3>
           </div>
-          <span className="text-xs text-slate-400 font-medium">Stage 4 · Interview</span>
+          <span className="text-[11px] text-slate-400 font-medium">
+            No interview scheduled
+          </span>
         </div>
-        <div className="text-center py-6 px-4 bg-slate-50/50 rounded-lg border border-slate-100">
-          <p className="text-sm font-medium text-slate-700">No interview rounds scheduled yet</p>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+        <div className="text-center py-5 px-4 bg-slate-50/50 rounded-lg border border-slate-100">
+          <p className="text-xs font-semibold text-slate-700">No interview scheduled yet</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto leading-relaxed">
             When the employer requests or confirms an interview session for {jobTitle} at {companyName}, your schedule, preparation brief, and meeting coordinates will appear here.
           </p>
         </div>
@@ -189,9 +192,12 @@ export function CandidateInterviewSection({
                     </span>
                     <h4 className="text-sm font-bold text-slate-900">{round.roundTitle}</h4>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {ROUND_TYPE_LABELS[round.roundType] || round.roundType}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-xs text-slate-500">
+                      {ROUND_TYPE_LABELS[round.roundType] || round.roundType}
+                    </p>
+                    <HelpTooltip topic="interview_round_type" label="Interview round type help" />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -265,10 +271,13 @@ export function CandidateInterviewSection({
               {brief && (brief.keyCompetenciesToEmphasize || brief.formatGuidelines || brief.highlightedProjects) && (
                 <div className="bg-blue-50/60 border border-blue-200/80 rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                      <span>🎯</span>
-                      <span>Deterministic Preparation Brief</span>
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                        <span>🎯</span>
+                        <span>Deterministic Preparation Brief</span>
+                      </span>
+                      <HelpTooltip topic="interview_prep_brief" label="Preparation brief guidance" />
+                    </div>
                     <span className="text-[10px] text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded font-medium">
                       Based on Verified Candidate Profile & Job Alignment
                     </span>
@@ -399,9 +408,12 @@ export function CandidateInterviewSection({
             <form onSubmit={handleDebriefSubmit} className="space-y-4 text-xs">
               {/* Sentiment Selector */}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  How was your overall experience in this session?
-                </label>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <label className="block font-semibold text-slate-700">
+                    How was your overall experience in this session?
+                  </label>
+                  <HelpTooltip topic="interview_debrief" label="Interview debrief guidance" />
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {(["VERY_POSITIVE", "POSITIVE", "NEUTRAL", "CONCERNED", "DIFFICULT"] as InterviewSentiment[]).map((sent) => {
                     const pres = SENTIMENT_PRESENTATION[sent];

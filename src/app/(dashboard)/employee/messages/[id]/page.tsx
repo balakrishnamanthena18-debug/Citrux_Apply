@@ -48,32 +48,30 @@ export default async function EmployeeMessageThreadPage({
     }
 
     const candidateId = conversation.candidateId;
-    const [recentApplications, recentTasks] = await Promise.all([
-      tx.application.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          candidateId,
-        },
-        include: { job: true },
-        orderBy: { updatedAt: "desc" },
-        take: 5,
-      }),
-      tx.task.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          candidateId,
-          status: { notIn: ["COMPLETED", "CANCELED"] },
-        },
-        orderBy: { updatedAt: "desc" },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-        },
-      }),
-    ]);
+    const recentApplications = await tx.application.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        candidateId,
+      },
+      include: { job: true },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+    });
+    const recentTasks = await tx.task.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        candidateId,
+        status: { notIn: ["COMPLETED", "CANCELED"] },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+      },
+    });
 
     return {
       conversation,

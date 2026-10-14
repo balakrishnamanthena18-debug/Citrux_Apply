@@ -100,6 +100,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({}),
         },
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            team: "Core",
+            reportingManagerId: null,
+          }),
+        },
       };
       return callback(tx as any);
     });
@@ -142,6 +148,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({}),
         },
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            team: "Core",
+            reportingManagerId: null,
+          }),
+        },
       };
       return callback(tx as any);
     });
@@ -183,6 +195,12 @@ describe("Application Reapplication & Partial Unique Index (tests/integration/ap
         },
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({}),
+        },
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            team: "Core",
+            reportingManagerId: null,
+          }),
         },
       };
       return callback(tx as any);

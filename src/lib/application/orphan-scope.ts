@@ -165,10 +165,8 @@ export async function resolveOrphanVisibilityScope(
     return { kind: "ADMIN", inactiveAssigneeUserIds: null, canViewOrphans: true };
   }
 
-  const [teamScope, managerScope] = await Promise.all([
-    resolveTeamLeadScope(tx, ctx),
-    resolveManagerScope(tx, ctx),
-  ]);
+  const teamScope = await resolveTeamLeadScope(tx, ctx);
+  const managerScope = await resolveManagerScope(tx, ctx);
 
   const ids = new Set<string>();
   let kind: OrphanVisibilityKind = "NONE";

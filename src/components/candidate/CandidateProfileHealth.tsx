@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export interface ProfileHealthItem {
   id: string;
@@ -115,14 +116,17 @@ export function CandidateProfileHealth({ candidate }: Props) {
   const incompleteCount = items.filter((i) => !i.isComplete).length;
 
   return (
-    <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
       <div>
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
-              Career Profile Health
-            </h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
+                Career Profile Health
+              </h2>
+              <HelpTooltip topic="verification_status" label="Profile health and verification help" />
+            </div>
             <p className="text-xs text-[#64748B] mt-0.5">
               What you&apos;ve recorded and what still needs attention
             </p>

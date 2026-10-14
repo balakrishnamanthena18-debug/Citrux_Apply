@@ -20,32 +20,30 @@ export default async function EmployeeMessagesLayout({
   requireEmployeeOrAdmin(ctx);
 
   const { conversations, candidates } = await withRlsContext(ctx.userId, async (tx) => {
-    const [convs, cands] = await Promise.all([
-      tx.conversation.findMany({
-        where: { organizationId: ctx.organizationId },
-        include: {
-          candidate: { include: { user: true } },
-          application: { include: { job: true } },
-          messages: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
+    const convs = await tx.conversation.findMany({
+      where: { organizationId: ctx.organizationId },
+      include: {
+        candidate: { include: { user: true } },
+        application: { include: { job: true } },
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
         },
-        orderBy: { updatedAt: "desc" },
-        take: 200,
-      }),
-      tx.candidate.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          status: { not: "ARCHIVED" },
-        },
-        include: {
-          user: { select: { firstName: true, lastName: true, email: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 200,
-      }),
-    ]);
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+    });
+    const cands = await tx.candidate.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        status: { not: "ARCHIVED" },
+      },
+      include: {
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
     return { conversations: convs, candidates: cands };
   });
 

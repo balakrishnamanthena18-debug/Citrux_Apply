@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { ConversationList } from "./ConversationList";
+import { ConversationPaneSkeleton } from "./ConversationPaneSkeleton";
+import { ConversationPaneError } from "./ConversationPaneError";
 import { MessagingPendingProvider, useMessagingPending } from "./MessagingPendingContext";
 import { NewMessageDialog, type NewMessageCandidateOption } from "./NewMessageDialog";
 import type { MessagingConversationListItem, MessageRoleView } from "./types";
@@ -23,12 +25,13 @@ function MessageWorkspaceFrame({
   children: ReactNode;
 }) {
   const [newOpen, setNewOpen] = useState(false);
-  const { activeId } = useMessagingPending();
+  const { activeId, pending, transitionError, retryLastSelection } = useMessagingPending();
   const showListOnMobile = !activeId;
 
   return (
     <div className="-mx-4 -mb-4 flex h-[calc(100dvh-11.5rem-env(safe-area-inset-bottom,0px))] min-h-[480px] flex-col overflow-hidden border-y border-[#E5EAE7] bg-white sm:-mx-6 sm:h-[calc(100dvh-9rem)] md:min-h-[560px] lg:-mx-8 lg:h-[calc(100dvh-9.5rem)]">
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(260px,28%)_minmax(0,1fr)]">
+        {/* Left Column: Stable Conversation List */}
         <div className={`min-h-0 ${showListOnMobile ? "block" : "hidden lg:block"}`}>
           <ConversationList
             conversations={conversations}
@@ -45,8 +48,15 @@ function MessageWorkspaceFrame({
           />
         </div>
 
+        {/* Center/Right Column: Replaced by opaque skeleton during transition */}
         <div className={`min-h-0 ${showListOnMobile ? "hidden lg:flex" : "flex"}`}>
-          {children}
+          {transitionError ? (
+            <ConversationPaneError onRetry={retryLastSelection} />
+          ) : pending ? (
+            <ConversationPaneSkeleton />
+          ) : (
+            children
+          )}
         </div>
       </div>
 

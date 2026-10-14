@@ -82,10 +82,8 @@ export async function resolveAssignmentAuthority(
   }
 
   // EMPLOYEE (may also hold structural TL / Manager authority)
-  const [teamScope, managerScope] = await Promise.all([
-    resolveTeamLeadScope(tx, ctx),
-    resolveManagerScope(tx, ctx),
-  ]);
+  const teamScope = await resolveTeamLeadScope(tx, ctx);
+  const managerScope = await resolveManagerScope(tx, ctx);
 
   const kinds: AssignmentActorKind[] = ["EMPLOYEE"];
   const targets = new Set<string>([ctx.userId]);

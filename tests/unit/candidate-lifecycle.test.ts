@@ -17,6 +17,10 @@ vi.mock("@/lib/audit", () => ({
   logUserAuditEvent: vi.fn(),
 }));
 
+vi.mock("@/lib/job-matching/population", () => ({
+  populateJobMatchWorkForCandidate: vi.fn().mockResolvedValue({ createdCount: 0, candidateActive: true }),
+}));
+
 const mockTx = {
   candidate: {
     findUnique: vi.fn(),

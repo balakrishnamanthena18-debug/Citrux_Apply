@@ -82,70 +82,59 @@ export async function getCandidateCareerIntelligence(
     }
 
     // 3. Parallel bounded reads of authoritative candidate models
-    const [
-      experiences,
-      educations,
-      skills,
-      projects,
-      certifications,
-      attestations,
-      extracts,
-      outcomeEvents,
-    ] = await Promise.all([
-      tx.candidateExperience.findMany({
-        where: { candidateId: candidate.id },
-        orderBy: { orderIndex: "asc" },
-      }),
-      tx.candidateEducation.findMany({
-        where: { candidateId: candidate.id },
-        orderBy: { orderIndex: "asc" },
-      }),
-      tx.candidateSkill.findMany({
-        where: { candidateId: candidate.id },
-        orderBy: { createdAt: "asc" },
-      }),
-      tx.candidateProject.findMany({
-        where: { candidateId: candidate.id },
-        orderBy: { orderIndex: "asc" },
-      }),
-      tx.candidateCertification.findMany({
-        where: { candidateId: candidate.id },
-        orderBy: { createdAt: "asc" },
-      }),
-      tx.candidateFactAttestation.findMany({
-        where: { candidateId: candidate.id, organizationId: ctx.organizationId },
-        orderBy: { attestedAt: "desc" },
-      }),
-      // Advisory resume extracts: bounded selection (never leak raw extracted text in DTO)
-      tx.candidateDocumentExtract.findMany({
-        where: { candidateId: candidate.id, organizationId: ctx.organizationId },
-        select: {
-          id: true,
-          candidateDocumentId: true,
-          extractedText: true,
-          parsedAt: true,
-          updatedAt: true,
-        },
-        orderBy: { parsedAt: "desc" },
-        take: 5,
-      }),
-      // Outcome events for context summary ONLY (never skill evidence)
-      tx.applicationOutcomeEvent.findMany({
-        where: {
-          application: { candidateId: candidate.id },
-          organizationId: ctx.organizationId,
-          correctionState: "ACTIVE",
-          ...(ctx.role === Role.CANDIDATE ? { candidateVisible: true } : {}),
-        },
-        select: {
-          id: true,
-          outcomeType: true,
-          recordedAt: true,
-          candidateVisible: true,
-        },
-        orderBy: { recordedAt: "desc" },
-      }),
-    ]);
+    const experiences = await tx.candidateExperience.findMany({
+      where: { candidateId: candidate.id },
+      orderBy: { orderIndex: "asc" },
+    });
+    const educations = await tx.candidateEducation.findMany({
+      where: { candidateId: candidate.id },
+      orderBy: { orderIndex: "asc" },
+    });
+    const skills = await tx.candidateSkill.findMany({
+      where: { candidateId: candidate.id },
+      orderBy: { createdAt: "asc" },
+    });
+    const projects = await tx.candidateProject.findMany({
+      where: { candidateId: candidate.id },
+      orderBy: { orderIndex: "asc" },
+    });
+    const certifications = await tx.candidateCertification.findMany({
+      where: { candidateId: candidate.id },
+      orderBy: { createdAt: "asc" },
+    });
+    const attestations = await tx.candidateFactAttestation.findMany({
+      where: { candidateId: candidate.id, organizationId: ctx.organizationId },
+      orderBy: { attestedAt: "desc" },
+    });
+    // Advisory resume extracts: bounded selection (never leak raw extracted text in DTO)
+    const extracts = await tx.candidateDocumentExtract.findMany({
+      where: { candidateId: candidate.id, organizationId: ctx.organizationId },
+      select: {
+        id: true,
+        candidateDocumentId: true,
+        extractedText: true,
+        parsedAt: true,
+        updatedAt: true,
+      },
+      orderBy: { parsedAt: "desc" },
+      take: 5,
+    });
+    // Outcome events for context summary ONLY (never skill evidence)
+    const outcomeEvents = await tx.applicationOutcomeEvent.findMany({
+      where: {
+        application: { candidateId: candidate.id },
+        organizationId: ctx.organizationId,
+        correctionState: "ACTIVE",
+        ...(ctx.role === Role.CANDIDATE ? { candidateVisible: true } : {}),
+      },
+      select: {
+        id: true,
+        outcomeType: true,
+        recordedAt: true,
+        candidateVisible: true,
+      },
+      orderBy: { recordedAt: "desc" },
+    });
 
     // 4. Compute Source Data Version (Freshness fingerprint)
     const versionParts = [

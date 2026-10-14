@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { MessageAvatar } from "./MessageAvatar";
 import { MessageComposer } from "./MessageComposer";
@@ -43,15 +44,15 @@ export function ConversationPane({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#F7F9F8]">
         <header className="flex items-center justify-between gap-3 border-b border-[#E5EAE7] bg-white px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
-            <TransitionLink
+            <Link
               href={backHref}
               prefetch={false}
-              onNavigate={clearPending}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#E5EAE7] text-[#64748B] transition hover:bg-[#F7F9F8] hover:text-[#0F1720] lg:hidden"
+              onClick={() => clearPending()}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#E5EAE7] text-[#64748B] transition hover:bg-[#F7F9F8] hover:text-[#0F1720] lg:hidden cursor-pointer"
               aria-label="Back to conversations"
             >
               ←
-            </TransitionLink>
+            </Link>
             <MessageAvatar name={thread.candidateName} size="sm" />
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold text-[#0F1720]">

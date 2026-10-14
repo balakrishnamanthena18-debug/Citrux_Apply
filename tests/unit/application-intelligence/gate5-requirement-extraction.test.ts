@@ -634,6 +634,7 @@ describe("Gate 5 — pipeline execution", () => {
           create: requirementSetCreate,
         },
         $queryRaw: (...args: unknown[]) => txQueryRaw(...args),
+        $executeRaw: vi.fn().mockResolvedValue(0),
       };
       return fn(tx);
     });

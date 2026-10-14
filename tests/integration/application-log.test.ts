@@ -105,6 +105,12 @@ describe("Application Desk Fast Intake & Canonical Lifecycle Integrity (tests/in
       internalNote: {
         create: vi.fn().mockResolvedValue({}),
       },
+      membership: {
+        findFirst: vi.fn().mockResolvedValue({
+          team: null,
+          reportingManagerId: null,
+        }),
+      },
     };
 
     vi.mocked(withRlsContext).mockImplementation(async (_userId, callback) => {

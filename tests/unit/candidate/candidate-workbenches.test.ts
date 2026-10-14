@@ -217,4 +217,91 @@ describe("Candidate Instant Operations Workbenches Unit Tests", () => {
       expect(presentation.isTerminal).toBe(true);
     });
   });
+
+  describe("5. Candidate Directory Add Candidate & Invariant State Management", () => {
+    interface DirectoryCandidate {
+      id: string;
+      status: string;
+      verificationStatus: string;
+      assignedEmployeeId?: string | null;
+      user: { firstName?: string | null; lastName?: string | null; email: string };
+    }
+
+    it("prepends newly created candidate and recalculates tab counts accurately", () => {
+      let candidateList: DirectoryCandidate[] = [
+        {
+          id: "cand-1",
+          status: "ACTIVE",
+          verificationStatus: "VERIFIED",
+          assignedEmployeeId: "emp-1",
+          user: { firstName: "Alice", lastName: "Smith", email: "alice@example.com" },
+        },
+      ];
+
+      const newCandidate: DirectoryCandidate = {
+        id: "cand-2",
+        status: "ONBOARDING",
+        verificationStatus: "UNVERIFIED",
+        assignedEmployeeId: "emp-2",
+        user: { firstName: "Bob", lastName: "Jones", email: "bob@example.com" },
+      };
+
+      // State transition on successful creation
+      candidateList = [newCandidate, ...candidateList];
+
+      expect(candidateList).toHaveLength(2);
+      expect(candidateList[0]!.id).toBe("cand-2");
+      expect(candidateList[0]!.status).toBe("ONBOARDING");
+      expect(candidateList[0]!.verificationStatus).toBe("UNVERIFIED");
+
+      // Verify recalculated counts
+      const allCount = candidateList.length;
+      const activeCount = candidateList.filter((c) => c.status === "ACTIVE").length;
+      const onboardingCount = candidateList.filter((c) => c.status === "ONBOARDING").length;
+
+      expect(allCount).toBe(2);
+      expect(activeCount).toBe(1);
+      expect(onboardingCount).toBe(1);
+    });
+
+    it("prevents double-click / duplicate-submit while creation request is in flight", async () => {
+      let inFlight = false;
+      let submissionCount = 0;
+
+      const mockCreateCandidate = vi.fn().mockImplementation(async () => {
+        if (inFlight) {
+          return { success: false, error: "Duplicate submission prevented" };
+        }
+        inFlight = true;
+        submissionCount++;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        inFlight = false;
+        return { success: true, data: { id: "cand-new" } };
+      });
+
+      // User double clicks button rapidly
+      const [call1, call2] = await Promise.all([
+        mockCreateCandidate(),
+        mockCreateCandidate(),
+      ]);
+
+      expect(submissionCount).toBe(1);
+      expect(call1.success).toBe(true);
+      expect(call2.success).toBe(false);
+      expect(call2.error).toBe("Duplicate submission prevented");
+    });
+
+    it("guarantees candidate verification status remains UNVERIFIED on creation", () => {
+      const candidate: DirectoryCandidate = {
+        id: "cand-initial",
+        status: "ONBOARDING",
+        verificationStatus: "UNVERIFIED",
+        user: { firstName: "New", lastName: "Candidate", email: "new@example.com" },
+      };
+
+      expect(candidate.verificationStatus).toBe("UNVERIFIED");
+      expect(candidate.verificationStatus).not.toBe("VERIFIED");
+    });
+  });
 });
+

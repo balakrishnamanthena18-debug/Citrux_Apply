@@ -15,7 +15,7 @@ export default async function CandidateInterviewsPage() {
     const candidate = await tx.candidate.findUnique({
       where: { userId: ctx.userId },
     });
-    if (!candidate || !tx.interview) return [];
+    if (!candidate) return [];
 
     const list = await tx.interview.findMany({
       where: {

@@ -221,62 +221,56 @@ async function computeCounts(
     }
   }
 
-  let continuityCountPromise: Promise<number> = Promise.resolve(0);
+  let continuity = 0;
   if (continuityVisibility.canViewContinuity) {
     if (continuityVisibility.kind === "ADMIN") {
-      continuityCountPromise = countAdminContinuityApplications(
+      continuity = await countAdminContinuityApplications(
         tx,
         ctx.organizationId
       );
     } else {
       const where = buildContinuityQueueWhere(ctx, continuityVisibility);
-      continuityCountPromise = where
-        ? tx.application.count({ where })
-        : Promise.resolve(0);
+      continuity = where ? await tx.application.count({ where }) : 0;
     }
   }
 
-  const [
-    statusGroups,
-    mine,
-    unassigned,
-    team,
-    manager,
-    orphaned,
-    continuity,
-  ] = await Promise.all([
-    tx.application.groupBy({
-      by: ["status"],
-      where: orgWhere,
-      _count: { _all: true },
-    }),
-    tx.application.count({
-      where: { ...orgWhere, assignedEmployeeId: ctx.userId },
-    }),
-    tx.application.count({
-      where: { ...orgWhere, assignedEmployeeId: null },
-    }),
+  const statusGroups = await tx.application.groupBy({
+    by: ["status"],
+    where: orgWhere,
+    _count: { _all: true },
+  });
+
+  const mine = await tx.application.count({
+    where: { ...orgWhere, assignedEmployeeId: ctx.userId },
+  });
+
+  const unassigned = await tx.application.count({
+    where: { ...orgWhere, assignedEmployeeId: null },
+  });
+
+  const team =
     teamScope.authorized && teamScope.assigneeUserIds.length > 0
-      ? tx.application.count({
+      ? await tx.application.count({
           where: {
             ...orgWhere,
             assignedEmployeeId: { in: teamScope.assigneeUserIds },
           },
         })
-      : Promise.resolve(0),
+      : 0;
+
+  const manager =
     managerScope.authorized && managerScope.assigneeUserIds.length > 0
-      ? tx.application.count({
+      ? await tx.application.count({
           where: {
             ...orgWhere,
             assignedEmployeeId: { in: managerScope.assigneeUserIds },
           },
         })
-      : Promise.resolve(0),
-    orphanedWhere
-      ? tx.application.count({ where: orphanedWhere })
-      : Promise.resolve(0),
-    continuityCountPromise,
-  ]);
+      : 0;
+
+  const orphaned = orphanedWhere
+    ? await tx.application.count({ where: orphanedWhere })
+    : 0;
 
   const countByStatus = Object.fromEntries(
     statusGroups.map((g) => [g.status, g._count._all])
@@ -345,13 +339,10 @@ export async function listOperationalApplications(
   const page = parsePage(query.page);
   const sort = query.sort || "age";
 
-  const [teamScope, managerScope, orphanVisibility, continuityVisibility] =
-    await Promise.all([
-      resolveTeamLeadScope(tx, ctx),
-      resolveManagerScope(tx, ctx),
-      resolveOrphanVisibilityScope(tx, ctx),
-      resolveContinuityVisibilityScope(tx, ctx),
-    ]);
+  const teamScope = await resolveTeamLeadScope(tx, ctx);
+  const managerScope = await resolveManagerScope(tx, ctx);
+  const orphanVisibility = await resolveOrphanVisibilityScope(tx, ctx);
+  const continuityVisibility = await resolveContinuityVisibilityScope(tx, ctx);
 
   const scopes: OperationalScopeAvailability = {
     team: teamScope.authorized,
@@ -465,16 +456,14 @@ export async function listOperationalApplications(
           : [{ createdAt: "desc" }, { id: "desc" }];
 
     const skip = (page - 1) * pageSize;
-    const [totalCount, rows] = await Promise.all([
-      tx.application.count({ where: listWhere }),
-      tx.application.findMany({
-        where: listWhere,
-        select: APP_SELECT,
-        orderBy,
-        skip,
-        take: pageSize,
-      }),
-    ]);
+    const totalCount = await tx.application.count({ where: listWhere });
+    const rows = await tx.application.findMany({
+      where: listWhere,
+      select: APP_SELECT,
+      orderBy,
+      skip,
+      take: pageSize,
+    });
 
     const items = await hydrateWithAging(
       tx,
@@ -500,15 +489,13 @@ export async function listOperationalApplications(
   // Default / age: bounded fetch of matching rows (cap), attach ages, sort, then page.
   // Cap prevents unbounded loads; document if org exceeds cap (known finding).
   const AGE_SORT_CAP = 500;
-  const [totalCount, rows] = await Promise.all([
-    tx.application.count({ where: listWhere }),
-    tx.application.findMany({
-      where: listWhere,
-      select: APP_SELECT,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: AGE_SORT_CAP,
-    }),
-  ]);
+  const totalCount = await tx.application.count({ where: listWhere });
+  const rows = await tx.application.findMany({
+    where: listWhere,
+    select: APP_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: AGE_SORT_CAP,
+  });
 
   const ages = await loadAges(tx, rows, now);
   const sorted = [...rows].sort((a, b) => {
@@ -681,14 +668,12 @@ async function hydrateWithAging(
   continuityViewer: ContinuityViewer,
   forceContinuityFlag: boolean
 ): Promise<OperationalApplicationItem[]> {
-  const [ages, inactiveIds] = await Promise.all([
-    loadAges(tx, rows, now),
-    loadInactiveAssigneeIds(
-      tx,
-      organizationId,
-      rows.map((r) => r.assignedEmployeeId)
-    ),
-  ]);
+  const ages = await loadAges(tx, rows, now);
+  const inactiveIds = await loadInactiveAssigneeIds(
+    tx,
+    organizationId,
+    rows.map((r) => r.assignedEmployeeId)
+  );
   return rows.map((row) => {
     const ownerInactive = row.assignedEmployeeId
       ? inactiveIds.has(row.assignedEmployeeId)

@@ -186,10 +186,8 @@ export async function resolveContinuityVisibilityScope(
     };
   }
 
-  const [teamScope, managerScope] = await Promise.all([
-    resolveTeamLeadScope(tx, ctx),
-    resolveManagerScope(tx, ctx),
-  ]);
+  const teamScope = await resolveTeamLeadScope(tx, ctx);
+  const managerScope = await resolveManagerScope(tx, ctx);
 
   let kind: ContinuityVisibilityKind = "NONE";
   if (teamScope.authorized && teamScope.teamKeys.length > 0) {

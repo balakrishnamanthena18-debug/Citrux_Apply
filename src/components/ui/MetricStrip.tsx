@@ -1,10 +1,15 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import type { HelpTopicKey } from "@/lib/help/dictionary";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export interface MetricStripItem {
   label: string;
   value: number | string;
   href?: string;
   accent?: boolean;
+  helpTopic?: HelpTopicKey;
+  helpContent?: ReactNode;
 }
 
 interface MetricStripProps {
@@ -30,8 +35,18 @@ export function MetricStrip({ items, className = "" }: MetricStripProps) {
       {items.map((metric) => {
         const content = (
           <>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">
-              {metric.label}
+            <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]">
+              <span>{metric.label}</span>
+              {(metric.helpTopic || metric.helpContent) && (
+                <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+                  <HelpTooltip
+                    topic={metric.helpTopic}
+                    content={metric.helpContent}
+                    label={`Help for ${metric.label}`}
+                    size="sm"
+                  />
+                </span>
+              )}
             </div>
             <div
               className={`mt-2 text-[1.55rem] font-semibold tracking-[-0.04em] tabular-nums sm:mt-3 sm:text-[1.85rem] ${

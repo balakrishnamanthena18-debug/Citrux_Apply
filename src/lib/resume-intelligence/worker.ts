@@ -38,42 +38,39 @@ async function loadCandidateTruth(
   tx: Prisma.TransactionClient | typeof prisma,
   candidateId: string
 ): Promise<CandidateTruthSnapshot> {
-  const [skills, experiences, projects, educations, certifications] =
-    await Promise.all([
-      tx.candidateSkill.findMany({
-        where: { candidateId },
-        select: { id: true, name: true },
-      }),
-      tx.candidateExperience.findMany({
-        where: { candidateId },
-        select: {
-          id: true,
-          companyName: true,
-          jobTitle: true,
-          technologies: true,
-          description: true,
-        },
-        orderBy: { orderIndex: "asc" },
-      }),
-      tx.candidateProject.findMany({
-        where: { candidateId },
-        select: {
-          id: true,
-          title: true,
-          technologies: true,
-          description: true,
-        },
-        orderBy: { orderIndex: "asc" },
-      }),
-      tx.candidateEducation.findMany({
-        where: { candidateId },
-        select: { id: true, institution: true, degree: true },
-      }),
-      tx.candidateCertification.findMany({
-        where: { candidateId },
-        select: { id: true, name: true, issuingAuthority: true },
-      }),
-    ]);
+  const skills = await tx.candidateSkill.findMany({
+    where: { candidateId },
+    select: { id: true, name: true },
+  });
+  const experiences = await tx.candidateExperience.findMany({
+    where: { candidateId },
+    select: {
+      id: true,
+      companyName: true,
+      jobTitle: true,
+      technologies: true,
+      description: true,
+    },
+    orderBy: { orderIndex: "asc" },
+  });
+  const projects = await tx.candidateProject.findMany({
+    where: { candidateId },
+    select: {
+      id: true,
+      title: true,
+      technologies: true,
+      description: true,
+    },
+    orderBy: { orderIndex: "asc" },
+  });
+  const educations = await tx.candidateEducation.findMany({
+    where: { candidateId },
+    select: { id: true, institution: true, degree: true },
+  });
+  const certifications = await tx.candidateCertification.findMany({
+    where: { candidateId },
+    select: { id: true, name: true, issuingAuthority: true },
+  });
 
   return { skills, experiences, projects, educations, certifications };
 }

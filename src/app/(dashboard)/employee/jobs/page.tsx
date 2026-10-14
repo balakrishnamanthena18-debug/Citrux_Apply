@@ -24,28 +24,26 @@ export default async function EmployeeJobsPage({ searchParams }: Props) {
   const initialTab = resolved.tab === "leads" ? "leads" : "catalog";
 
   const { catalogJobs, leadJobs } = await withRlsContext(ctx.userId, async (tx) => {
-    const [catalog, leads] = await Promise.all([
-      tx.job.findMany({
-        where: catalogJobsWhere(ctx.organizationId),
-        orderBy: { createdAt: "desc" },
-        include: { _count: { select: { applications: true } } },
-        take: 200,
-      }),
-      tx.job.findMany({
-        where: privateLeadsWhere(ctx.organizationId, ctx),
-        orderBy: { createdAt: "desc" },
-        include: {
-          _count: { select: { applications: true } },
-          ownerCandidate: {
-            select: {
-              id: true,
-              user: { select: { firstName: true, lastName: true, email: true } },
-            },
+    const catalog = await tx.job.findMany({
+      where: catalogJobsWhere(ctx.organizationId),
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { applications: true } } },
+      take: 200,
+    });
+    const leads = await tx.job.findMany({
+      where: privateLeadsWhere(ctx.organizationId, ctx),
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { applications: true } },
+        ownerCandidate: {
+          select: {
+            id: true,
+            user: { select: { firstName: true, lastName: true, email: true } },
           },
         },
-        take: 200,
-      }),
-    ]);
+      },
+      take: 200,
+    });
     return { catalogJobs: catalog, leadJobs: leads };
   });
 

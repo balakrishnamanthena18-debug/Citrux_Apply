@@ -18,26 +18,21 @@ export function ApplicationProgressTracker({ status }: Props) {
   const currentStage = presentation.progressStage;
 
   return (
-    <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-slate-100">
-        <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Operational Lifecycle Progression
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          Operational Lifecycle
+        </span>
+        {!presentation.isTerminal && (
+          <span className="text-[11px] font-medium text-slate-500">
+            Stage {currentStage} of {STAGES.length}
           </span>
-          <p className="text-sm font-bold text-slate-900 mt-0.5">{presentation.label}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs border ${presentation.badgeClass}`}>
-            {presentation.label}
-          </span>
-        </div>
+        )}
       </div>
 
-      <p className="text-xs text-slate-600">{presentation.description}</p>
-
-      {/* 5-Stage Progress Bar */}
+      {/* 5-Stage Progress Stepper */}
       {!presentation.isTerminal ? (
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
           {STAGES.map((s) => {
             const isCompleted = s.stage < currentStage;
             const isCurrent = s.stage === currentStage;
@@ -45,31 +40,57 @@ export function ApplicationProgressTracker({ status }: Props) {
             return (
               <div
                 key={s.stage}
-                className={`p-2.5 rounded-md border text-xs transition ${
+                className={`p-2.5 rounded-lg border text-xs transition ${
                   isCurrent
-                    ? "bg-blue-50/70 border-blue-300 ring-1 ring-blue-300"
+                    ? "bg-blue-50/80 border-blue-300 ring-1 ring-blue-300/80 shadow-2xs"
                     : isCompleted
-                    ? "bg-slate-50 border-slate-200 text-slate-700"
-                    : "bg-white border-slate-100 text-slate-400"
+                    ? "bg-slate-50 border-slate-200/80 text-slate-700"
+                    : "bg-white border-slate-150 text-slate-400"
                 }`}
               >
-                <div className="flex items-center gap-1.5 font-semibold text-[11px]">
-                  <span>
-                    {isCompleted ? "✓" : s.stage}.
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span
+                    className={`font-bold ${
+                      isCurrent
+                        ? "text-blue-600"
+                        : isCompleted
+                        ? "text-emerald-700"
+                        : "text-slate-300"
+                    }`}
+                  >
+                    {isCompleted ? "✓" : isCurrent ? "●" : "○"}
                   </span>
-                  <span className={isCurrent ? "text-blue-900" : isCompleted ? "text-slate-800" : "text-slate-400"}>
+                  <span
+                    className={`font-semibold truncate ${
+                      isCurrent
+                        ? "text-blue-950 font-bold"
+                        : isCompleted
+                        ? "text-slate-800"
+                        : "text-slate-400"
+                    }`}
+                  >
                     {s.title}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5 truncate">{s.desc}</div>
+                <div
+                  className={`text-[10px] mt-0.5 truncate ${
+                    isCurrent
+                      ? "text-blue-700 font-medium"
+                      : isCompleted
+                      ? "text-slate-500"
+                      : "text-slate-400"
+                  }`}
+                >
+                  {s.desc}
+                </div>
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="p-3 bg-slate-50 rounded-md border border-slate-200 text-xs text-slate-700 flex items-center gap-2">
-          <span className="font-semibold">Application Closed:</span>
-          <span>This application has concluded in the {presentation.label} state.</span>
+        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 flex items-center gap-2">
+          <span className="font-semibold text-slate-900">Application Concluded:</span>
+          <span>This application has reached a terminal state ({presentation.label}).</span>
         </div>
       )}
     </div>

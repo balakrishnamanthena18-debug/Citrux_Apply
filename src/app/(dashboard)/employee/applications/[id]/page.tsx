@@ -44,6 +44,7 @@ import {
   StaffInterviewPanel,
   type StaffInterviewViewModel,
 } from "@/components/interview/StaffInterviewPanel";
+import { ApplicationWorkbenchTabs } from "@/components/application/ApplicationWorkbenchTabs";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -120,10 +121,8 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
       app.assignedEmployeeId &&
       hasKnownAssignmentSnapshot(app)
     ) {
-      const [continuityVis, profile] = await Promise.all([
-        resolveContinuityVisibilityScope(tx, ctx),
-        resolveAssignmentAuthority(tx, ctx),
-      ]);
+      const continuityVis = await resolveContinuityVisibilityScope(tx, ctx);
+      const profile = await resolveAssignmentAuthority(tx, ctx);
       if (continuityVis.canViewContinuity) {
         const stillInCurrent = profile.eligibleTargetUserIds.includes(
           app.assignedEmployeeId
@@ -172,18 +171,16 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     });
 
     let interviewData: StaffInterviewViewModel | null = null;
-    const dbInterview = tx.interview
-      ? await tx.interview.findUnique({
-          where: { applicationId: app.id },
-          include: {
-            rounds: {
-              where: { voidedAt: null },
-              orderBy: { roundNumber: "asc" },
-              include: { debrief: true },
-            },
-          },
-        })
-      : null;
+    const dbInterview = await tx.interview.findUnique({
+      where: { applicationId: app.id },
+      include: {
+        rounds: {
+          where: { voidedAt: null },
+          orderBy: { roundNumber: "asc" },
+          include: { debrief: true },
+        },
+      },
+    });
 
     if (dbInterview) {
       interviewData = {
@@ -312,6 +309,15 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     : ownerInactive
       ? "Inactive"
       : formerOwnerName || "Unassigned";
+
+  const defaultTab =
+    application.status === "READY" || application.status === "RESUBMISSION"
+      ? "submission"
+      : application.status === "PREPARING" || application.status === "REVIEW"
+        ? "materials"
+        : (interviewData?.rounds?.length || 0) > 0
+          ? "interviews"
+          : "overview";
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -511,739 +517,816 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
         </div>
       )}
 
-      {/* 3-Column Execution Workbench Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT COLUMN: Candidate Context */}
-        <div className="space-y-6">
-          {/* Candidate Profile Card */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Candidate Context
-            </h3>
-            <div className="text-xs space-y-2">
-              <div>
-                <div className="font-semibold text-slate-900 text-sm">{candidateName}</div>
-                <div className="text-slate-500">{application.candidate.user.email}</div>
-              </div>
+      {/* Tabbed Operational Workbench Layout */}
+      <ApplicationWorkbenchTabs
+        initialTab={defaultTab}
+        roundsCount={interviewData?.rounds?.length || 0}
+        submissionsCount={application.submissions.length}
+        status={application.status}
+        overviewSlot={
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Main Column: Job Information & Candidate Context (7 cols) */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Job Details Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Target Role & Opportunity
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Authoritative employment criteria and requirements</p>
+                  </div>
+                  {application.job.source && (
+                    <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 text-[10px] font-semibold border border-slate-200">
+                      Source: {application.job.source}
+                    </span>
+                  )}
+                </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-[11px]">
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Status</span>
-                  <span className="font-medium text-slate-800">{application.candidate.status}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Auth Mode</span>
-                  <span className="font-medium text-indigo-700">{application.candidate.applicationAuthorizationMode}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Work Auth</span>
-                  <span className="font-medium text-slate-800">{application.candidate.workAuthorization.replace(/_/g, " ")}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Remote Pref</span>
-                  <span className="font-medium text-slate-800">{application.candidate.remotePreference.replace(/_/g, " ")}</span>
-                </div>
-              </div>
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-base">{application.job.title}</h4>
+                      <div className="text-slate-600 font-medium text-sm">{application.job.companyName}</div>
+                    </div>
+                    {application.job.externalUrl && (
+                      <a
+                        href={application.job.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 hover:underline"
+                      >
+                        <span>Employer Listing</span>
+                        <span>↗</span>
+                      </a>
+                    )}
+                  </div>
 
-              {application.candidate.headline && (
-                <div className="pt-1 border-t border-slate-100">
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Headline</span>
-                  <p className="text-slate-700 font-medium text-[11px] mt-0.5">{application.candidate.headline}</p>
-                </div>
-              )}
-
-              {application.candidate.targetRoles.length > 0 && (
-                <div className="pt-1 border-t border-slate-100">
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Target Roles</span>
-                  <p className="text-slate-700 text-[11px] mt-0.5">{application.candidate.targetRoles.join(", ")}</p>
-                </div>
-              )}
-
-              {application.candidate.skills.length > 0 && (
-                <div className="pt-1 border-t border-slate-100">
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Skills</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {application.candidate.skills.map((s) => (
-                      <span key={s.id} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]">
-                        {s.name}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 text-xs">
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Location</span>
+                      <span className="font-semibold text-slate-800">
+                        {application.job.isRemote ? "🌐 Remote" : application.job.location || "On-site"}
                       </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {application.candidate.experiences.length > 0 && (
-                <div className="pt-1 border-t border-slate-100">
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Recent Experience</span>
-                  <div className="space-y-1 mt-1">
-                    {application.candidate.experiences.slice(0, 2).map((exp) => (
-                      <div key={exp.id} className="text-[11px] text-slate-700">
-                        <strong className="font-medium">{exp.jobTitle}</strong> at {exp.companyName}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Operational Assignment Control — Phase 5M scoped targets */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Owner
-            </h3>
-            <div className="text-xs text-slate-600">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">
-                Current
-              </span>
-              {ownerInactive ? (
-                <div
-                  aria-label={
-                    formerOwnerName
-                      ? `Owner inactive. Former owner: ${formerOwnerName}`
-                      : "Owner inactive"
-                  }
-                >
-                  <span className="font-bold text-amber-900">Inactive</span>
-                  {formerOwnerName && (
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      Former owner: {formerOwnerName}
                     </div>
-                  )}
-                  <p className="text-[11px] text-amber-800 mt-1">
-                    This Application needs reassignment to an active eligible employee.
-                  </p>
-                </div>
-              ) : assigneeName === "Unassigned" ? (
-                <span className="font-semibold text-slate-500 italic">Unassigned</span>
-              ) : (
-                <div>
-                  <span className="font-semibold text-slate-900">
-                    Active — {assigneeName}
-                  </span>
-                  {continuityOutsideScope && (
-                    <div
-                      className="mt-1"
-                      aria-label="Continuity: outside current structural scope"
-                    >
-                      <div className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
-                        Continuity
-                      </div>
-                      <p className="text-[11px] text-amber-900">
-                        Outside current scope — owner remains active; reassign only if
-                        operational ownership should move.
-                      </p>
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Type</span>
+                      <span className="font-semibold text-slate-800">{application.job.employmentType.replace(/_/g, " ")}</span>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-            {assigneeOptions.length === 0 && !allowUnassigned ? (
-              <p className="text-xs text-slate-500 italic">
-                No eligible team members are available for reassignment under your authority.
-              </p>
-            ) : (
-              <form
-                action={async (formData: FormData) => {
-                  "use server";
-                  const raw = formData.get("employeeId") as string;
-                  await assignApplicationAction({
-                    applicationId: application.id,
-                    employeeId: raw ? raw : null,
-                    reason: (formData.get("reason") as string) || null,
-                  });
-                }}
-                className="space-y-2 text-xs"
-              >
-                <label className="block font-semibold text-slate-700">Reassign</label>
-                <select
-                  name="employeeId"
-                  defaultValue={
-                    application.assignedEmployeeId &&
-                    assigneeOptions.some((e) => e.userId === application.assignedEmployeeId)
-                      ? application.assignedEmployeeId
-                      : allowUnassigned
-                        ? ""
-                        : assigneeOptions[0]?.userId || ""
-                  }
-                  className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
-                >
-                  {allowUnassigned && <option value="">Unassigned</option>}
-                  {assigneeOptions.map((e) => (
-                    <option key={e.userId} value={e.userId}>
-                      {[e.firstName, e.lastName].filter(Boolean).join(" ") || e.email}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  name="reason"
-                  maxLength={500}
-                  placeholder="Reason (optional)"
-                  className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
-                />
-                <button
-                  type="submit"
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-1.5 rounded-lg text-xs transition"
-                >
-                  Save Assignee
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Internal Staff Notes (Candidate Blind) */}
-          <InternalNotesWidget
-            candidateId={application.candidateId}
-            applicationId={application.id}
-          />
-        </div>
-
-        {/* CENTER COLUMN: Job Details & Preparation / QA Workflow */}
-        <div className="space-y-6">
-          {/* Job Details Card */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-            <div className="flex justify-between items-start border-b pb-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Job Information
-              </h3>
-              {application.job.source && (
-                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] font-semibold border border-slate-200">
-                  Source: {application.job.source}
-                </span>
-              )}
-            </div>
-
-            <div className="text-xs space-y-2">
-              <div>
-                <div className="font-semibold text-slate-900 text-sm">{application.job.title}</div>
-                <div className="text-slate-600 font-medium">{application.job.companyName}</div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-100">
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Location</span>
-                  <span className="font-medium text-slate-800">
-                    {application.job.isRemote ? "🌐 Remote" : application.job.location || "On-site"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Employment Type</span>
-                  <span className="font-medium text-slate-800">{application.job.employmentType.replace(/_/g, " ")}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Compensation</span>
-                  <span className={salaryText === "Salary not disclosed" ? "text-slate-400 font-normal" : "font-semibold text-emerald-700"}>
-                    {salaryText}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase font-semibold text-[10px]">Source URL</span>
-                  {application.job.externalUrl ? (
-                    <a
-                      href={application.job.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline font-medium inline-flex items-center gap-0.5"
-                    >
-                      <span>Open Link</span>
-                      <span>↗</span>
-                    </a>
-                  ) : (
-                    <span className="text-slate-400 italic">None</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100">
-                <span className="text-slate-400 block uppercase font-semibold text-[10px] mb-1">Job Description</span>
-                <div className="max-h-56 overflow-y-auto whitespace-pre-wrap p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] leading-relaxed text-slate-700">
-                  {application.job.jobDescription}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <ApplicationIntelligencePanel
-            view={intelligence}
-            audience="staff"
-            loadFailed={intelligenceLoadFailed}
-          />
-
-          <ResumeReviewPanel applicationId={application.id} canRequest />
-
-          {/* Application Materials Preparation */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Application Materials Preparation
-            </h3>
-
-            <form
-              action={async (formData: FormData) => {
-                "use server";
-                await updateApplicationMaterialAction({
-                  applicationId: application.id,
-                  candidateDocumentId: (formData.get("documentId") as string) || null,
-                  coverLetterText: (formData.get("coverLetter") as string) || null,
-                });
-              }}
-              className="space-y-3 text-xs"
-            >
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Candidate Resume Version</label>
-                <select
-                  name="documentId"
-                  defaultValue={currentMaterial?.candidateDocumentId || ""}
-                  className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
-                >
-                  <option value="">Select Resume...</option>
-                  {candidateDocs.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.title} (v{d.versionNumber}) - {d.documentType}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Tailored Cover Letter</label>
-                <textarea
-                  name="coverLetter"
-                  defaultValue={currentMaterial?.coverLetterText || ""}
-                  rows={6}
-                  className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-500 font-sans"
-                  placeholder="Tailored cover letter text..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-slate-900 text-white font-semibold py-2 rounded-lg text-xs hover:bg-slate-800 transition"
-              >
-                Save Tailored Materials
-              </button>
-            </form>
-          </div>
-
-          {/* Review & Approval Gate / QA Controls */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Operational Review & Approval Gate
-            </h3>
-
-            {application.status === "DISCOVERED" && (
-              <form
-                action={async () => {
-                  "use server";
-                  await transitionApplicationStatusAction({
-                    applicationId: application.id,
-                    targetStatus: "QUALIFIED",
-                  });
-                }}
-              >
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition">
-                  ✓ Qualify Application
-                </button>
-              </form>
-            )}
-
-            {application.status === "QUALIFIED" && (
-              <form
-                action={async () => {
-                  "use server";
-                  await transitionApplicationStatusAction({
-                    applicationId: application.id,
-                    targetStatus: "PREPARING",
-                  });
-                }}
-              >
-                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-xs font-bold transition">
-                  Begin Material Preparation
-                </button>
-              </form>
-            )}
-
-            {application.status === "PREPARING" && (
-              <form
-                action={async () => {
-                  "use server";
-                  await submitApplicationForQaAction(application.id);
-                }}
-              >
-                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 rounded-lg text-xs font-bold transition">
-                  Submit for QA Review
-                </button>
-              </form>
-            )}
-
-            {application.status === "REVIEW" && (
-              <div className="space-y-4">
-                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
-                  Authoritative QA PASS with all 9 criteria verified is required before
-                  candidate approval or READY.
-                </p>
-                <form
-                  action={async (formData: FormData) => {
-                    "use server";
-                    const isPass = formData.get("decision") === "PASS";
-                    const notes = formData.get("notes") as string;
-                    await completeQaReviewAction({
-                      applicationId: application.id,
-                      decision: isPass ? "PASS" : "FAIL",
-                      notes: notes || null,
-                      checklistItems: QA_CRITERION_KEYS.map((k) => ({
-                        criterionKey: k,
-                        isVerified: isPass ? true : formData.get(`check_${k}`) === "on",
-                      })),
-                    });
-                  }}
-                  className="space-y-3"
-                >
-                  <div className="space-y-1.5 border rounded-lg p-2.5 bg-slate-50">
-                    <p className="text-[11px] font-bold text-slate-700">9-Criterion QA Verification:</p>
-                    {QA_CRITERION_KEYS.map((key) => (
-                      <label key={key} className="flex items-center gap-2 text-[11px] text-slate-600">
-                        <input type="checkbox" name={`check_${key}`} defaultChecked className="rounded border-slate-300 text-slate-900" />
-                        <span>{key.replace(/_/g, " ")}</span>
-                      </label>
-                    ))}
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Compensation</span>
+                      <span className={salaryText === "Salary not disclosed" ? "text-slate-500 font-normal" : "font-bold text-emerald-700"}>
+                        {salaryText}
+                      </span>
+                    </div>
                   </div>
 
                   <div>
+                    <span className="text-slate-500 block uppercase font-bold text-[10px] tracking-wide mb-1.5">
+                      Job Description & Scope
+                    </span>
+                    <div className="whitespace-pre-wrap p-4 bg-slate-50/90 rounded-xl border border-slate-200 text-xs leading-relaxed text-slate-700 max-h-80 overflow-y-auto">
+                      {application.job.jobDescription}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Candidate Profile Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Candidate Profile & Qualifications
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Verified candidate context and preferences</p>
+                  </div>
+                  <Link
+                    href={`/employee/candidates/${application.candidateId}`}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                  >
+                    View Full 360 Profile →
+                  </Link>
+                </div>
+
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <div className="font-bold text-slate-900 text-base">{candidateName}</div>
+                    <div className="text-slate-500">{application.candidate.user.email}</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 text-xs">
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Candidate Status</span>
+                      <span className="font-semibold text-slate-800">{application.candidate.status}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Auth Mode</span>
+                      <span className="font-semibold text-indigo-700">{application.candidate.applicationAuthorizationMode}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Work Auth</span>
+                      <span className="font-semibold text-slate-800">{application.candidate.workAuthorization.replace(/_/g, " ")}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Remote Pref</span>
+                      <span className="font-semibold text-slate-800">{application.candidate.remotePreference.replace(/_/g, " ")}</span>
+                    </div>
+                  </div>
+
+                  {application.candidate.headline && (
+                    <div className="pt-2">
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Headline</span>
+                      <p className="text-slate-800 font-medium text-xs mt-0.5">{application.candidate.headline}</p>
+                    </div>
+                  )}
+
+                  {application.candidate.targetRoles.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide">Target Roles</span>
+                      <p className="text-slate-700 text-xs mt-0.5">{application.candidate.targetRoles.join(", ")}</p>
+                    </div>
+                  )}
+
+                  {application.candidate.skills.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide mb-1.5">Technical & Professional Skills</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {application.candidate.skills.map((s) => (
+                          <span key={s.id} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60">
+                            {s.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {application.candidate.experiences.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-slate-400 block uppercase font-bold text-[10px] tracking-wide mb-1.5">Recent Experience</span>
+                      <div className="space-y-1.5">
+                        {application.candidate.experiences.slice(0, 3).map((exp) => (
+                          <div key={exp.id} className="text-xs text-slate-700 flex items-baseline justify-between">
+                            <span>
+                              <strong className="font-semibold text-slate-900">{exp.jobTitle}</strong> at {exp.companyName}
+                            </span>
+                            {exp.startDate && (
+                              <span className="text-[11px] text-slate-400">
+                                {new Date(exp.startDate).getFullYear()} - {exp.isCurrent ? "Present" : exp.endDate ? new Date(exp.endDate).getFullYear() : ""}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar Column: Assignment & Notes (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Operational Assignment Control */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Application Ownership
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Authoritative specialist assignment</p>
+                </div>
+
+                <div className="text-xs text-slate-600">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                    Current Assignee
+                  </span>
+                  {ownerInactive ? (
+                    <div
+                      aria-label={
+                        formerOwnerName
+                          ? `Owner inactive. Former owner: ${formerOwnerName}`
+                          : "Owner inactive"
+                      }
+                      className="p-3 bg-amber-50 rounded-xl border border-amber-200/80"
+                    >
+                      <span className="font-bold text-amber-900">Inactive</span>
+                      {formerOwnerName && (
+                        <div className="text-[11px] text-slate-600 mt-0.5">
+                          Former owner: {formerOwnerName}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-amber-800 mt-1">
+                        This application needs reassignment to an active eligible employee.
+                      </p>
+                    </div>
+                  ) : assigneeName === "Unassigned" ? (
+                    <span className="font-semibold text-slate-500 italic">Unassigned</span>
+                  ) : (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70">
+                      <span className="font-bold text-slate-900 text-sm">
+                        {assigneeName}
+                      </span>
+                      {continuityOutsideScope && (
+                        <div
+                          className="mt-1.5"
+                          aria-label="Continuity: outside current structural scope"
+                        >
+                          <div className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">
+                            Continuity Indicator
+                          </div>
+                          <p className="text-[11px] text-amber-900 mt-0.5">
+                            Outside current scope — owner remains active; reassign only if operational ownership should move.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {assigneeOptions.length === 0 && !allowUnassigned ? (
+                  <p className="text-xs text-slate-500 italic">
+                    No eligible team members are available for reassignment under your authority.
+                  </p>
+                ) : (
+                  <form
+                    action={async (formData: FormData) => {
+                      "use server";
+                      const raw = formData.get("employeeId") as string;
+                      await assignApplicationAction({
+                        applicationId: application.id,
+                        employeeId: raw ? raw : null,
+                        reason: (formData.get("reason") as string) || null,
+                      });
+                    }}
+                    className="space-y-3 pt-2 text-xs"
+                  >
+                    <label className="block font-semibold text-slate-800">Reassign Specialist</label>
+                    <select
+                      name="employeeId"
+                      defaultValue={
+                        application.assignedEmployeeId &&
+                        assigneeOptions.some((e) => e.userId === application.assignedEmployeeId)
+                          ? application.assignedEmployeeId
+                          : allowUnassigned
+                            ? ""
+                            : assigneeOptions[0]?.userId || ""
+                      }
+                      className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      {allowUnassigned && <option value="">Unassigned</option>}
+                      {assigneeOptions.map((e) => (
+                        <option key={e.userId} value={e.userId}>
+                          {[e.firstName, e.lastName].filter(Boolean).join(" ") || e.email}
+                        </option>
+                      ))}
+                    </select>
                     <input
                       type="text"
-                      name="notes"
-                      placeholder="Reviewer notes (mandatory if Fail)..."
-                      className="w-full text-xs rounded-lg border border-slate-300 p-2"
+                      name="reason"
+                      maxLength={500}
+                      placeholder="Reassignment reason (optional)..."
+                      className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
-                  </div>
-
-                  <div className="flex gap-2">
                     <button
                       type="submit"
-                      name="decision"
-                      value="PASS"
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition"
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 rounded-xl text-xs transition shadow-xs"
                     >
-                      ✓ Pass QA Review
+                      Save Assignee
                     </button>
-                    <button
-                      type="submit"
-                      name="decision"
-                      value="FAIL"
-                      className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg text-xs font-bold transition"
-                    >
-                      ✕ Fail QA Review
-                    </button>
-                  </div>
-                </form>
+                  </form>
+                )}
               </div>
-            )}
 
-            {application.status === "AWAITING_APPROVAL" && (
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
-                <div className="font-semibold flex items-center gap-1.5">
-                  <span>⏳</span>
-                  <span>Awaiting Candidate Authorization</span>
-                </div>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  Application is staged awaiting candidate review and authorization in their candidate portal before submission.
-                </p>
-              </div>
-            )}
-
-            {!["DISCOVERED", "QUALIFIED", "PREPARING", "REVIEW", "AWAITING_APPROVAL"].includes(application.status) && (
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
-                Review and preparation phase completed. Application is in <strong className="text-slate-900">{application.status.replace(/_/g, " ")}</strong>.
-              </div>
-            )}
+              {/* Internal Staff Notes (Candidate Blind) */}
+              <InternalNotesWidget
+                candidateId={application.candidateId}
+                applicationId={application.id}
+              />
+            </div>
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: Operational Action & Submission Management */}
-        <div className="space-y-6">
-          {/* Submission Action Box */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Submission Operations
-            </h3>
-
-            {application.status === "READY" && (
-              <div className="space-y-3">
-                <div className="p-3.5 bg-sky-50 rounded-lg border border-sky-200 text-xs text-sky-950 space-y-1">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-sky-600" />
-                    Record External Submission
-                  </p>
-                  <p className="text-[11px] text-sky-800">
-                    After actually submitting on the external employer site, enter the confirmation reference and optional evidence below to record authoritative submission.
-                  </p>
-                </div>
-                <SubmissionForm applicationId={application.id} isResubmission={false} />
-              </div>
-            )}
-
-            {application.status === "SUBMITTED" && (
-              <div className="space-y-3 text-xs">
-                <div className="p-3.5 bg-emerald-50 text-emerald-950 rounded-lg border border-emerald-200 font-medium space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-emerald-900">
-                    <span>✓</span>
-                    <span>Application Authoritatively Submitted</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-800">
-                    External employer submission record is active and immutable.
-                  </p>
+        }
+        materialsSlot={
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Preparation & Intelligence (7 cols) */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Application Materials Preparation */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Application Materials Preparation
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Attach the candidate resume version and tailored cover letter</p>
                 </div>
 
                 <form
                   action={async (formData: FormData) => {
                     "use server";
-                    await recordSubmissionIssueAction({
+                    await updateApplicationMaterialAction({
                       applicationId: application.id,
-                      issueDescription: formData.get("issueDescription") as string,
+                      candidateDocumentId: (formData.get("documentId") as string) || null,
+                      coverLetterText: (formData.get("coverLetter") as string) || null,
                     });
                   }}
-                  className="space-y-2 border-t pt-3"
+                  className="space-y-4 text-xs"
                 >
-                  <label className="block font-medium text-slate-700">Flag Submission Defect / Issue</label>
-                  <textarea
-                    name="issueDescription"
-                    required
-                    minLength={5}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 p-2 text-xs"
-                    placeholder="Describe defect, rejection, or external listing issue..."
-                  />
-                  <button type="submit" className="w-full bg-rose-600 text-white font-semibold py-1.5 rounded-lg text-xs hover:bg-rose-700 transition">
-                    Report Submission Issue
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1.5">Candidate Resume Version</label>
+                    <select
+                      name="documentId"
+                      defaultValue={currentMaterial?.candidateDocumentId || ""}
+                      className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="">Select Resume Version...</option>
+                      {candidateDocs.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title} (v{d.versionNumber}) — {d.documentType}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1.5">Tailored Cover Letter</label>
+                    <textarea
+                      name="coverLetter"
+                      defaultValue={currentMaterial?.coverLetterText || ""}
+                      rows={8}
+                      className="w-full rounded-xl border border-slate-300 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 font-sans leading-relaxed"
+                      placeholder="Write or paste tailored cover letter text..."
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-slate-900 text-white font-semibold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow-xs"
+                  >
+                    Save Tailored Materials
                   </button>
                 </form>
               </div>
-            )}
 
-            {application.status === "SUBMISSION_ISSUE" && (
-              <form
-                action={async () => {
-                  "use server";
-                  await startCorrectionReviewAction(application.id);
-                }}
-              >
-                <button type="submit" className="w-full bg-amber-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-amber-700 transition">
-                  Start Incident Review
-                </button>
-              </form>
-            )}
+              <ApplicationIntelligencePanel
+                view={intelligence}
+                audience="staff"
+                loadFailed={intelligenceLoadFailed}
+              />
 
-            {application.status === "REVIEW_REQUIRED" && (
-              <form
-                action={async (formData: FormData) => {
-                  "use server";
-                  await approveSubmissionCorrectionAction({
-                    applicationId: application.id,
-                    correctionNotes: formData.get("correctionNotes") as string,
-                  });
-                }}
-                className="space-y-2 text-xs"
-              >
-                <label className="block font-medium text-slate-700">Correction Approval Notes (Mandatory) *</label>
-                <textarea
-                  name="correctionNotes"
-                  required
-                  minLength={5}
-                  rows={2}
-                  className="w-full rounded-lg border border-slate-300 p-2 text-xs"
-                  placeholder="Describe resolution strategy and corrections made..."
-                />
-                <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-indigo-700 transition">
-                  Approve Correction Plan
-                </button>
-              </form>
-            )}
+              <ResumeReviewPanel applicationId={application.id} canRequest />
+            </div>
 
-            {application.status === "CORRECTION_APPROVED" && (
-              <form
-                action={async () => {
-                  "use server";
-                  await stageApplicationResubmissionAction({
-                    applicationId: application.id,
-                  });
-                }}
-              >
-                <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-blue-700 transition">
-                  Stage Resubmission
-                </button>
-              </form>
-            )}
+            {/* Right Column: QA Verification & Approval Gate (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Operational Review & Approval Gate
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Enforce authoritative QA verification and candidate sign-off</p>
+                </div>
 
-            {application.status === "RESUBMISSION" && (
-              <div className="space-y-3">
-                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-xs text-purple-900">
-                  <p className="font-semibold">Resubmission Staged</p>
-                  <p className="text-[11px] text-purple-800 mt-0.5">
-                    Perform the manual resubmission on the external portal and record the updated attempt details below.
+                {application.status === "DISCOVERED" && (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await transitionApplicationStatusAction({
+                        applicationId: application.id,
+                        targetStatus: "QUALIFIED",
+                      });
+                    }}
+                  >
+                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-xs">
+                      ✓ Qualify Application
+                    </button>
+                  </form>
+                )}
+
+                {application.status === "QUALIFIED" && (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await transitionApplicationStatusAction({
+                        applicationId: application.id,
+                        targetStatus: "PREPARING",
+                      });
+                    }}
+                  >
+                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-xs">
+                      Begin Material Preparation
+                    </button>
+                  </form>
+                )}
+
+                {application.status === "PREPARING" && (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await submitApplicationForQaAction(application.id);
+                    }}
+                  >
+                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-xs">
+                      Submit for QA Review
+                    </button>
+                  </form>
+                )}
+
+                {application.status === "REVIEW" && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                      Authoritative QA PASS with all 9 criteria verified is required before candidate approval or READY.
+                    </p>
+                    <form
+                      action={async (formData: FormData) => {
+                        "use server";
+                        const isPass = formData.get("decision") === "PASS";
+                        const notes = formData.get("notes") as string;
+                        await completeQaReviewAction({
+                          applicationId: application.id,
+                          decision: isPass ? "PASS" : "FAIL",
+                          notes: notes || null,
+                          checklistItems: QA_CRITERION_KEYS.map((k) => ({
+                            criterionKey: k,
+                            isVerified: isPass ? true : formData.get(`check_${k}`) === "on",
+                          })),
+                        });
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50/70">
+                        <p className="text-xs font-bold text-slate-800">9-Criterion QA Checklist:</p>
+                        <div className="space-y-1.5">
+                          {QA_CRITERION_KEYS.map((key) => (
+                            <label key={key} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                              <input type="checkbox" name={`check_${key}`} defaultChecked className="rounded border-slate-300 text-slate-900" />
+                              <span>{key.replace(/_/g, " ")}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          name="notes"
+                          placeholder="Reviewer notes (mandatory if Fail)..."
+                          className="w-full text-xs rounded-xl border border-slate-300 p-2.5 bg-white"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          name="decision"
+                          value="PASS"
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-xs"
+                        >
+                          ✓ Pass QA Review
+                        </button>
+                        <button
+                          type="submit"
+                          name="decision"
+                          value="FAIL"
+                          className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-xs"
+                        >
+                          ✕ Fail QA Review
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {application.status === "AWAITING_APPROVAL" && (
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1.5">
+                    <div className="font-bold flex items-center gap-1.5 text-sm">
+                      <span>⏳</span>
+                      <span>Awaiting Candidate Authorization</span>
+                    </div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Application materials passed QA review and are staged awaiting candidate sign-off in their candidate portal before submission unlocks.
+                    </p>
+                  </div>
+                )}
+
+                {!["DISCOVERED", "QUALIFIED", "PREPARING", "REVIEW", "AWAITING_APPROVAL"].includes(application.status) && (
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                    <div className="font-bold text-sm flex items-center gap-1.5">
+                      <span>✓</span>
+                      <span>Review & Approval Phase Completed</span>
+                    </div>
+                    <p className="text-xs text-emerald-800">
+                      Application progressed past QA & approval gate and is currently in <strong className="font-semibold text-emerald-950">{application.status.replace(/_/g, " ")}</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        }
+        submissionSlot={
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Submission Operations & Incident Desk
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Authoritatively record employer site submissions and manage correction workflows</p>
+              </div>
+
+              {application.status === "READY" && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-sky-50 rounded-xl border border-sky-200 text-xs text-sky-950 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-sm">
+                      <span className="w-2 h-2 rounded-full bg-sky-600" />
+                      Record External Submission
+                    </p>
+                    <p className="text-xs text-sky-800 leading-relaxed">
+                      After submitting directly on the external employer site, enter the confirmation reference and optional evidence below to record authoritative submission.
+                    </p>
+                  </div>
+                  <SubmissionForm applicationId={application.id} isResubmission={false} />
+                </div>
+              )}
+
+              {application.status === "SUBMITTED" && (
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 bg-emerald-50 text-emerald-950 rounded-xl border border-emerald-200 font-medium space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-sm text-emerald-900">
+                      <span>✓</span>
+                      <span>Application Authoritatively Submitted</span>
+                    </div>
+                    <p className="text-xs text-emerald-800">
+                      External employer submission record is active, verified, and immutable.
+                    </p>
+                  </div>
+
+                  <form
+                    action={async (formData: FormData) => {
+                      "use server";
+                      await recordSubmissionIssueAction({
+                        applicationId: application.id,
+                        issueDescription: formData.get("issueDescription") as string,
+                      });
+                    }}
+                    className="space-y-3 border-t border-slate-100 pt-4"
+                  >
+                    <label className="block font-semibold text-slate-800">Flag Submission Defect / External Incident</label>
+                    <textarea
+                      name="issueDescription"
+                      required
+                      minLength={5}
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-300 p-3 text-xs"
+                      placeholder="Describe defect, rejection notice, or external listing incident..."
+                    />
+                    <button type="submit" className="w-full sm:w-auto px-5 py-2.5 bg-rose-600 text-white font-semibold rounded-xl text-xs hover:bg-rose-700 transition shadow-xs">
+                      Report Submission Issue
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {application.status === "SUBMISSION_ISSUE" && (
+                <form
+                  action={async () => {
+                    "use server";
+                    await startCorrectionReviewAction(application.id);
+                  }}
+                >
+                  <button type="submit" className="w-full bg-amber-600 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-amber-700 transition shadow-xs">
+                    Start Incident Review
+                  </button>
+                </form>
+              )}
+
+              {application.status === "REVIEW_REQUIRED" && (
+                <form
+                  action={async (formData: FormData) => {
+                    "use server";
+                    await approveSubmissionCorrectionAction({
+                      applicationId: application.id,
+                      correctionNotes: formData.get("correctionNotes") as string,
+                    });
+                  }}
+                  className="space-y-3 text-xs"
+                >
+                  <label className="block font-semibold text-slate-800">Correction Approval Notes (Mandatory) *</label>
+                  <textarea
+                    name="correctionNotes"
+                    required
+                    minLength={5}
+                    rows={3}
+                    className="w-full rounded-xl border border-slate-300 p-3 text-xs"
+                    placeholder="Describe resolution strategy and corrections made..."
+                  />
+                  <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-indigo-700 transition shadow-xs">
+                    Approve Correction Plan
+                  </button>
+                </form>
+              )}
+
+              {application.status === "CORRECTION_APPROVED" && (
+                <form
+                  action={async () => {
+                    "use server";
+                    await stageApplicationResubmissionAction({
+                      applicationId: application.id,
+                    });
+                  }}
+                >
+                  <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-blue-700 transition shadow-xs">
+                    Stage Resubmission
+                  </button>
+                </form>
+              )}
+
+              {application.status === "RESUBMISSION" && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-200 text-xs text-purple-900">
+                    <p className="font-semibold text-sm">Resubmission Staged</p>
+                    <p className="text-xs text-purple-800 mt-0.5 leading-relaxed">
+                      Perform the manual resubmission on the external portal and record the updated attempt details below.
+                    </p>
+                  </div>
+                  <SubmissionForm applicationId={application.id} isResubmission={true} />
+                </div>
+              )}
+
+              {!["READY", "SUBMITTED", "SUBMISSION_ISSUE", "REVIEW_REQUIRED", "CORRECTION_APPROVED", "RESUBMISSION"].includes(application.status) && (
+                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <p className="text-xs font-medium">
+                    External submission actions will unlock when application reaches <strong className="text-slate-800">READY</strong> status.
                   </p>
                 </div>
-                <SubmissionForm applicationId={application.id} isResubmission={true} />
-              </div>
-            )}
+              )}
+            </div>
 
-            {!["READY", "SUBMITTED", "SUBMISSION_ISSUE", "REVIEW_REQUIRED", "CORRECTION_APPROVED", "RESUBMISSION"].includes(application.status) && (
-              <p className="text-xs text-slate-500 italic text-center py-2">
-                External submission will be unlocked when application reaches READY status.
-              </p>
-            )}
-          </div>
-
-          <StaffInterviewPanel
-            applicationId={application.id}
-            jobTitle={application.job.title}
-            companyName={application.job.companyName}
-            candidateSkills={application.candidate.skills.map((s) => s.name)}
-            candidateExperiences={application.candidate.experiences.map((e) => ({
-              company: e.companyName,
-              title: e.jobTitle,
-              highlights: e.achievements || [],
-            }))}
-            interview={interviewData}
-          />
-
-          <StaffOutcomesPanel
-            applicationId={application.id}
-            outcomes={outcomes}
-            canRecord={application.submissions.length > 0}
-          />
-
-          {/* Immutable Submission History & Evidence */}
-          {application.submissions.length > 0 && (
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-                Authoritative Submission History ({application.submissions.length} {application.submissions.length === 1 ? "attempt" : "attempts"})
-              </h3>
-              <div className="space-y-3 max-h-80 overflow-y-auto text-xs">
-                {application.submissions.map((sub) => (
-                  <div key={sub.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
-                    <div className="flex justify-between items-center font-bold text-slate-900 border-b pb-1">
-                      <span className="inline-flex px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                        Attempt #{sub.attemptNumber}
-                      </span>
-                      <span className="text-slate-500 text-[10px]">
-                        {new Date(sub.submittedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                    {sub.submittedBy && (
-                      <div className="text-slate-500 text-[11px]">
-                        Submitted By:{" "}
-                        <span className="text-slate-800 font-medium">
-                          {[sub.submittedBy.firstName, sub.submittedBy.lastName].filter(Boolean).join(" ") || sub.submittedBy.email}
+            {/* Authoritative Submission History & Evidence */}
+            {application.submissions.length > 0 && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Authoritative Submission History
+                  </h3>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {application.submissions.length} {application.submissions.length === 1 ? "attempt" : "attempts"}
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {application.submissions.map((sub) => (
+                    <div key={sub.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                      <div className="flex justify-between items-center font-bold text-slate-900 border-b border-slate-200/70 pb-2">
+                        <span className="inline-flex px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                          Attempt #{sub.attemptNumber}
+                        </span>
+                        <span className="text-slate-500 text-xs font-normal">
+                          {new Date(sub.submittedAt).toLocaleString([], { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
-                    )}
-                    {sub.externalReference && (
-                      <div className="text-slate-700">
-                        <span className="font-semibold text-slate-600">Reference:</span> <span className="font-mono text-xs">{sub.externalReference}</span>
-                      </div>
-                    )}
-                    {sub.externalUrl && (
-                      <div>
-                        <a href={sub.externalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-[11px]">
-                          View Submitted URL ↗
-                        </a>
-                      </div>
-                    )}
-                    {sub.confirmationEvidence && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200 text-[11px] text-slate-700 whitespace-pre-wrap font-mono">
-                        {sub.confirmationEvidence}
-                      </div>
-                    )}
-                    {sub.storagePath && (
-                      <div className="pt-1">
-                        <EvidenceDownloadButton submissionId={sub.id} />
-                      </div>
-                    )}
-                    {sub.submissionNotes && (
-                      <div className="text-[11px] text-slate-500 italic">
-                        Notes: {sub.submissionNotes}
-                      </div>
-                    )}
+                      {sub.submittedBy && (
+                        <div className="text-slate-600 text-xs">
+                          Submitted By:{" "}
+                          <span className="text-slate-900 font-semibold">
+                            {[sub.submittedBy.firstName, sub.submittedBy.lastName].filter(Boolean).join(" ") || sub.submittedBy.email}
+                          </span>
+                        </div>
+                      )}
+                      {sub.externalReference && (
+                        <div className="text-slate-700">
+                          <span className="font-semibold text-slate-600">Confirmation Reference:</span>{" "}
+                          <span className="font-mono text-xs bg-white px-2 py-0.5 rounded border border-slate-200">{sub.externalReference}</span>
+                        </div>
+                      )}
+                      {sub.externalUrl && (
+                        <div>
+                          <a href={sub.externalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs inline-flex items-center gap-1">
+                            <span>Open Submitted URL</span>
+                            <span>↗</span>
+                          </a>
+                        </div>
+                      )}
+                      {sub.confirmationEvidence && (
+                        <div className="bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed">
+                          {sub.confirmationEvidence}
+                        </div>
+                      )}
+                      {sub.storagePath && (
+                        <div className="pt-1">
+                          <EvidenceDownloadButton submissionId={sub.id} />
+                        </div>
+                      )}
+                      {sub.submissionNotes && (
+                        <div className="text-xs text-slate-500 italic">
+                          Notes: {sub.submissionNotes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        }
+        interviewsSlot={
+          <div className="space-y-6">
+            <StaffInterviewPanel
+              applicationId={application.id}
+              jobTitle={application.job.title}
+              companyName={application.job.companyName}
+              candidateSkills={application.candidate.skills.map((s) => s.name)}
+              candidateExperiences={application.candidate.experiences.map((e) => ({
+                company: e.companyName,
+                title: e.jobTitle,
+                highlights: e.achievements || [],
+              }))}
+              interview={interviewData}
+            />
+
+            <StaffOutcomesPanel
+              applicationId={application.id}
+              outcomes={outcomes}
+              canRecord={application.submissions.length > 0}
+            />
+          </div>
+        }
+        timelineSlot={
+          <div className="space-y-6">
+            {/* Operational Quality & Audit Telemetry Strip */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                    Operational Quality & Audit Telemetry
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">Authoritative Database Record</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <TelemetryGauge
+                  displayValue={currentMaterial ? "Materials Staged" : "Materials Pending"}
+                  title="Candidate Materials Status"
+                  subtitle="Authoritative link to candidate resume document and tailored cover letter."
+                  category="Materials Status"
+                  color={currentMaterial ? "emerald" : "amber"}
+                  metrics={[
+                    { label: "Document Staged", value: currentMaterial?.candidateDocument ? `${currentMaterial.candidateDocument.title} (v${currentMaterial.candidateDocument.versionNumber})` : "None" },
+                    { label: "Cover Letter", value: currentMaterial?.coverLetterText ? "Tailored" : "Not Provided" },
+                  ]}
+                />
+
+                <TelemetryGauge
+                  displayValue={application.candidate.applicationAuthorizationMode}
+                  title="Candidate Governance & Policy"
+                  subtitle="Authorization mode governing whether manual sign-off is mandatory before submission."
+                  category="Candidate Policy"
+                  color={application.candidate.applicationAuthorizationMode === "MANAGED" ? "indigo" : "amber"}
+                  metrics={[
+                    { label: "Authorization Mode", value: application.candidate.applicationAuthorizationMode },
+                    { label: "Candidate Status", value: application.candidate.status },
+                  ]}
+                />
+
+                <TelemetryGauge
+                  displayValue={`${application.submissions.length} ${application.submissions.length === 1 ? "Attempt" : "Attempts"}`}
+                  title="Submission Audit Trail"
+                  subtitle="Immutable operational record of external job portal submissions."
+                  category="Submission Record"
+                  color={application.submissions.length > 0 ? "blue" : "slate" as any}
+                  metrics={[
+                    { label: "Attempts Recorded", value: `${application.submissions.length}` },
+                    { label: "Assigned Specialist", value: assigneeName },
+                  ]}
+                />
+              </div>
+            </div>
+
+            {/* Authoritative State Transition History Timeline */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+              <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Application State Lifecycle Timeline
+                </h3>
+                <span className="text-xs font-semibold text-slate-500">
+                  {application.stateHistory.length} {application.stateHistory.length === 1 ? "transition" : "transitions"}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {application.stateHistory.map((h) => (
+                  <div key={h.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+                    <div className="flex justify-between items-center font-bold text-slate-900">
+                      <span className="font-mono text-xs">{h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : h.toStatus}</span>
+                      <span className="text-slate-400 font-normal text-xs">{new Date(h.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                    {h.reason && <div className="text-slate-600 mt-1.5 leading-relaxed">{h.reason}</div>}
+                    <div className="text-slate-400 text-[11px] mt-1">
+                      By: {[h.changedBy?.firstName, h.changedBy?.lastName].filter(Boolean).join(" ") || h.changedBy?.email || "System"} on {new Date(h.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Authoritative State Transition History Timeline */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-              Application State Timeline
-            </h3>
-            <div className="space-y-2 max-h-72 overflow-y-auto text-xs">
-              {application.stateHistory.map((h) => (
-                <div key={h.id} className="p-2.5 bg-slate-50/80 rounded-lg border border-slate-200/60 text-[11px]">
-                  <div className="flex justify-between font-semibold text-slate-800">
-                    <span>{h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : h.toStatus}</span>
-                    <span className="text-slate-400 font-normal">{new Date(h.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                  </div>
-                  {h.reason && <div className="text-slate-600 mt-1">{h.reason}</div>}
-                  <div className="text-slate-400 mt-0.5">
-                    By: {[h.changedBy?.firstName, h.changedBy?.lastName].filter(Boolean).join(" ") || h.changedBy?.email || "System"} on {new Date(h.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
-      </div>
-
-      {/* 4. Authoritative Operational Telemetry Strip */}
-      <div className="border-t border-slate-200/80 pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-              Operational Quality & Audit Telemetry
-            </h3>
-          </div>
-          <span className="text-[11px] text-slate-400 font-medium">Authoritative Database Record</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <TelemetryGauge
-            displayValue={currentMaterial ? "Materials Staged" : "Materials Pending"}
-            title="Candidate Materials Status"
-            subtitle="Authoritative link to candidate resume document and tailored cover letter."
-            category="Materials Status"
-            color={currentMaterial ? "emerald" : "amber"}
-            metrics={[
-              { label: "Document Staged", value: currentMaterial?.candidateDocument ? `${currentMaterial.candidateDocument.title} (v${currentMaterial.candidateDocument.versionNumber})` : "None" },
-              { label: "Cover Letter", value: currentMaterial?.coverLetterText ? "Tailored" : "Not Provided" },
-            ]}
-          />
-
-          <TelemetryGauge
-            displayValue={application.candidate.applicationAuthorizationMode}
-            title="Candidate Governance & Policy"
-            subtitle="Authorization mode governing whether manual sign-off is mandatory before submission."
-            category="Candidate Policy"
-            color={application.candidate.applicationAuthorizationMode === "MANAGED" ? "indigo" : "amber"}
-            metrics={[
-              { label: "Authorization Mode", value: application.candidate.applicationAuthorizationMode },
-              { label: "Candidate Status", value: application.candidate.status },
-            ]}
-          />
-
-          <TelemetryGauge
-            displayValue={`${application.submissions.length} ${application.submissions.length === 1 ? "Attempt" : "Attempts"}`}
-            title="Submission Audit Trail"
-            subtitle="Immutable operational record of external job portal submissions."
-            category="Submission Record"
-            color={application.submissions.length > 0 ? "blue" : "slate" as any}
-            metrics={[
-              { label: "Attempts Recorded", value: `${application.submissions.length}` },
-              { label: "Assigned Specialist", value: assigneeName },
-            ]}
-          />
-        </div>
-      </div>
+        }
+      />
     </div>
   );
 }

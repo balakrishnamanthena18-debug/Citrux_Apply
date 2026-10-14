@@ -73,112 +73,104 @@ export async function getCandidate360(
     const isStaff = ctx.role === Role.EMPLOYEE || ctx.role === Role.ADMIN;
 
     // 3. Parallel bounded reads of supporting subsystem summaries
-    const [
-      defaultResumeDoc,
-      latestResumeReview,
-      recentApplications,
-      recentMatches,
-      staffMetrics,
-    ] = await Promise.all([
-      // Phase 4: Default Resume Document
-      tx.candidateDocument.findFirst({
-        where: {
-          candidateId: candidate.id,
-          documentType: "RESUME",
-          isDefault: true,
-        },
-        select: {
-          id: true,
-          title: true,
-        },
-      }),
+    // Phase 4: Default Resume Document
+    const defaultResumeDoc = await tx.candidateDocument.findFirst({
+      where: {
+        candidateId: candidate.id,
+        documentType: "RESUME",
+        isDefault: true,
+      },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
 
-      // Phase 4: Latest Resume Review (Summary only)
-      tx.resumeReview.findFirst({
+    // Phase 4: Latest Resume Review (Summary only)
+    const latestResumeReview = await tx.resumeReview.findFirst({
+      where: {
+        candidateId: candidate.id,
+        organizationId: ctx.organizationId,
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        overallLabel: true,
+        atsReadability: true,
+        completedAt: true,
+      },
+    });
+
+    // Phase 2: Recent Applications and Readiness Results (Bounded to 10)
+    const recentApplications = await tx.application.findMany({
+      where: {
+        candidateId: candidate.id,
+        organizationId: ctx.organizationId,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        job: {
+          select: {
+            title: true,
+            companyName: true,
+          },
+        },
+        readinessResults: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            readinessState: true,
+            blockers: true,
+            warnings: true,
+          },
+        },
+      },
+    });
+
+    // Phase 5: Job Matches (Bounded to 10)
+    const recentMatches = await tx.candidateJobMatch.findMany({
+      where: {
+        candidateId: candidate.id,
+        organizationId: ctx.organizationId,
+        status: { in: [CandidateJobMatchStatus.SUCCEEDED, CandidateJobMatchStatus.QUEUED, CandidateJobMatchStatus.RUNNING, CandidateJobMatchStatus.STALE] },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: {
+        job: {
+          select: {
+            title: true,
+            companyName: true,
+            location: true,
+            isRemote: true,
+          },
+        },
+      },
+    });
+
+    // Operational Staff Context (Counts only, zero sensitive internals)
+    let staffMetrics: number[] = [0, 0, 0];
+    if (isStaff) {
+      const notesCount = await tx.internalNote.count({
+        where: { candidateId: candidate.id, organizationId: ctx.organizationId },
+      });
+      const openTasksCount = await tx.task.count({
         where: {
           candidateId: candidate.id,
           organizationId: ctx.organizationId,
+          status: { notIn: ["COMPLETED", "CANCELED"] },
         },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          status: true,
-          overallLabel: true,
-          atsReadability: true,
-          completedAt: true,
-        },
-      }),
-
-      // Phase 2: Recent Applications and Readiness Results (Bounded to 10)
-      tx.application.findMany({
-        where: {
-          candidateId: candidate.id,
-          organizationId: ctx.organizationId,
-        },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          job: {
-            select: {
-              title: true,
-              companyName: true,
-            },
-          },
-          readinessResults: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: {
-              readinessState: true,
-              blockers: true,
-              warnings: true,
-            },
-          },
-        },
-      }),
-
-      // Phase 5: Job Matches (Bounded to 10)
-      tx.candidateJobMatch.findMany({
-        where: {
-          candidateId: candidate.id,
-          organizationId: ctx.organizationId,
-          status: { in: [CandidateJobMatchStatus.SUCCEEDED, CandidateJobMatchStatus.QUEUED, CandidateJobMatchStatus.RUNNING, CandidateJobMatchStatus.STALE] },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        include: {
-          job: {
-            select: {
-              title: true,
-              companyName: true,
-              location: true,
-              isRemote: true,
-            },
-          },
-        },
-      }),
-
-      // Operational Staff Context (Counts only, zero sensitive internals)
-      isStaff
-        ? Promise.all([
-            tx.internalNote.count({
-              where: { candidateId: candidate.id, organizationId: ctx.organizationId },
-            }),
-            tx.task.count({
-              where: {
-                candidateId: candidate.id,
-                organizationId: ctx.organizationId,
-                status: { notIn: ["COMPLETED", "CANCELED"] },
-              },
-            }),
-            tx.candidateFactAttestation.count({
-              where: { candidateId: candidate.id, organizationId: ctx.organizationId },
-            }),
-          ])
-        : Promise.resolve([0, 0, 0]),
-    ]);
+      });
+      const attestationsCount = await tx.candidateFactAttestation.count({
+        where: { candidateId: candidate.id, organizationId: ctx.organizationId },
+      });
+      staffMetrics = [notesCount, openTasksCount, attestationsCount];
+    }
 
     // 4. Construct Overview DTO
     const candidateName =

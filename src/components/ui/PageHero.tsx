@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { HelpTopicKey } from "@/lib/help/dictionary";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 type AttentionTone = "amber" | "rose" | "blue" | "neutral";
 
@@ -15,6 +17,8 @@ export interface PageHeroTile {
   href: string;
   description?: string;
   tone?: AttentionTone;
+  helpTopic?: HelpTopicKey;
+  helpContent?: ReactNode;
 }
 
 interface PageHeroProps {
@@ -113,8 +117,19 @@ export function PageHero({
                 >
                   <div className="flex items-start justify-between gap-2 sm:gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/45 sm:text-[11px]">
-                        {tile.label}
+                      <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/45 sm:text-[11px]">
+                        <span>{tile.label}</span>
+                        {(tile.helpTopic || tile.helpContent) && (
+                          <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+                            <HelpTooltip
+                              topic={tile.helpTopic}
+                              content={tile.helpContent}
+                              label={`Help for ${tile.label}`}
+                              tone="light"
+                              size="sm"
+                            />
+                          </span>
+                        )}
                       </div>
                       <div className="mt-1.5 text-[1.45rem] font-semibold leading-none tracking-[-0.04em] tabular-nums sm:mt-2 sm:text-[1.65rem]">
                         {tile.count}

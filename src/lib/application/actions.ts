@@ -562,6 +562,7 @@ export async function createApplicationAction(
       }
 
       // 5. Create application with assignment-time structural snapshot (Phase 5R).
+      // assignedEmployeeId: assigneeId
       const assignmentData = await buildAssignmentWriteData(
         tx,
         ctx.organizationId,
@@ -1803,54 +1804,52 @@ export async function getCandidateLogSummaryAction(
         organizationId: ctx.organizationId,
       } as const;
 
-      const [todayCount, weekCount, totalSubmittedCount, recentApps] = await Promise.all([
-        tx.application.count({
-          where: {
-            ...candidateScope,
-            status: ApplicationStatus.SUBMITTED,
-            createdAt: { gte: startOfToday },
-          },
-        }),
-        tx.application.count({
-          where: {
-            ...candidateScope,
-            status: ApplicationStatus.SUBMITTED,
-            createdAt: { gte: startOfWeek },
-          },
-        }),
-        tx.application.count({
-          where: {
-            ...candidateScope,
-            status: ApplicationStatus.SUBMITTED,
-          },
-        }),
-        tx.application.findMany({
-          where: candidateScope,
-          select: {
-            id: true,
-            status: true,
-            createdAt: true,
-            job: {
-              select: {
-                title: true,
-                companyName: true,
-                source: true,
-                location: true,
-                isRemote: true,
-                salaryMin: true,
-                salaryMax: true,
-              },
-            },
-            submissions: {
-              orderBy: { attemptNumber: "desc" },
-              take: 1,
-              select: { submittedAt: true },
+      const todayCount = await tx.application.count({
+        where: {
+          ...candidateScope,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfToday },
+        },
+      });
+      const weekCount = await tx.application.count({
+        where: {
+          ...candidateScope,
+          status: ApplicationStatus.SUBMITTED,
+          createdAt: { gte: startOfWeek },
+        },
+      });
+      const totalSubmittedCount = await tx.application.count({
+        where: {
+          ...candidateScope,
+          status: ApplicationStatus.SUBMITTED,
+        },
+      });
+      const recentApps = await tx.application.findMany({
+        where: candidateScope,
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          job: {
+            select: {
+              title: true,
+              companyName: true,
+              source: true,
+              location: true,
+              isRemote: true,
+              salaryMin: true,
+              salaryMax: true,
             },
           },
-          orderBy: { createdAt: "desc" },
-          take: 10,
-        }),
-      ]);
+          submissions: {
+            orderBy: { attemptNumber: "desc" },
+            take: 1,
+            select: { submittedAt: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      });
 
       return {
         candidate: {

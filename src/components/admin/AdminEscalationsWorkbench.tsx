@@ -14,6 +14,7 @@ import {
 import { PendingButton } from "@/components/ui/PendingButton";
 import { syncUrlParams } from "@/lib/client/urlSync";
 import type { TaskPriority, TaskStatus } from "@/generated/prisma";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export interface EscalatedTaskItem {
   id: string;
@@ -163,9 +164,12 @@ export function AdminEscalationsWorkbench({
                 {/* Task Details & Context */}
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1.5">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider">
-                      ESCALATED
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider">
+                        ESCALATED
+                      </span>
+                      <HelpTooltip topic="task_escalation" label="Escalated task policy help" />
+                    </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#EDF1EF] text-[#334155] uppercase tracking-wider">
                       {task.priority}
                     </span>

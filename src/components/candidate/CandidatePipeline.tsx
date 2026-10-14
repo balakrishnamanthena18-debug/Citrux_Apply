@@ -2,6 +2,18 @@
 
 import React, { useId } from "react";
 import type { ApplicationStatus } from "@/generated/prisma";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import type { HelpTopicKey } from "@/lib/help/dictionary";
+
+const STAGE_HELP_TOPIC_MAP: Record<PipelineStageKey, HelpTopicKey> = {
+  ALL: "active_pipeline",
+  PREPARING: "preparing_applications",
+  UNDER_REVIEW: "under_review_applications",
+  AWAITING_APPROVAL: "awaiting_approval",
+  READY: "ready_applications",
+  SUBMITTED: "submitted_applications",
+  EMPLOYER_RESPONSE: "closed_applications",
+};
 
 export type PipelineStageKey =
   | "ALL"
@@ -159,12 +171,15 @@ export function CandidatePipeline({
       {/* Section header */}
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#EDF1EF] bg-[#F7F9F8] px-4 py-3.5 sm:px-5">
         <div className="min-w-0">
-          <h2
-            id={headingId}
-            className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0B3B2C]"
-          >
-            Application Pipeline
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2
+              id={headingId}
+              className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0B3B2C]"
+            >
+              Application Pipeline
+            </h2>
+            <HelpTooltip topic="active_pipeline" label="Application pipeline help" />
+          </div>
           <p className="mt-0.5 text-xs text-[#66756E]">
             Track every application from preparation to outcome
           </p>
@@ -333,15 +348,21 @@ export function CandidatePipeline({
 
       {/* Continuity strip — selected stage summary for list relationship */}
       <div className="flex items-center justify-between gap-3 border-t border-[#EDF1EF] bg-white px-4 py-2.5 sm:px-5">
-        <p className="min-w-0 truncate text-xs text-[#66756E]">
-          <span className="font-semibold text-[#10201A]">
-            {getPipelineListTitle(activeStage)}
-          </span>
-          <span className="mx-1.5 text-[#DDE5E1]" aria-hidden>
-            ·
-          </span>
-          <span className="tabular-nums">{activeCount}</span>
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="min-w-0 truncate text-xs text-[#66756E]">
+            <span className="font-semibold text-[#10201A]">
+              {getPipelineListTitle(activeStage)}
+            </span>
+            <span className="mx-1.5 text-[#DDE5E1]" aria-hidden>
+              ·
+            </span>
+            <span className="tabular-nums">{activeCount}</span>
+          </p>
+          <HelpTooltip
+            topic={STAGE_HELP_TOPIC_MAP[activeStage] || "active_pipeline"}
+            label={`${getPipelineListTitle(activeStage)} help`}
+          />
+        </div>
         {activeStage !== "ALL" && (
           <button
             type="button"

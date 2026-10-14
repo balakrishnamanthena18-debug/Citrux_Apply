@@ -18,6 +18,7 @@ import { getAuthenticatedContext } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { logUserAuditEvent } from "@/lib/audit";
 import { createServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AuditAction } from "@/generated/prisma";
 
 vi.mock("@/lib/auth/context", () => ({
@@ -38,6 +39,10 @@ vi.mock("@/lib/supabase/server", () => ({
   createServerClient: vi.fn(),
 }));
 
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdminClient: vi.fn(),
+}));
+
 describe("Candidate Document Storage Integration & Forensic Path Boundaries (tests/integration/candidate-storage.test.ts)", () => {
   const mockOrgId = "11111111-1111-1111-1111-111111111111";
   const mockUserId = "22222222-2222-2222-2222-222222222222";
@@ -54,6 +59,7 @@ describe("Candidate Document Storage Integration & Forensic Path Boundaries (tes
       status: "ACTIVE" as any,
       membershipStatus: "ACTIVE" as any,
     });
+    vi.mocked(getSupabaseAdminClient).mockImplementation(() => (createServerClient as any)());
   });
 
   it("1. Generates deterministic storage path adhering to tenant isolation format", () => {

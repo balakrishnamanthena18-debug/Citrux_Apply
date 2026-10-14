@@ -37,20 +37,18 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
       whereClause.actorId = selectedActor;
     }
 
-    const [events, count] = await Promise.all([
-      tx.auditEvent.findMany({
-        where: whereClause,
-        include: {
-          actor: {
-            select: { id: true, firstName: true, lastName: true, email: true },
-          },
+    const events = await tx.auditEvent.findMany({
+      where: whereClause,
+      include: {
+        actor: {
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      tx.auditEvent.count({ where: whereClause }),
-    ]);
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    });
+    const count = await tx.auditEvent.count({ where: whereClause });
 
     return { auditEvents: events, totalCount: count };
   });

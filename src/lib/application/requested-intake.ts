@@ -174,16 +174,14 @@ export async function listRequestedApplicationIntake(
   const offset = decodeCursor(query.cursor);
   const where = buildRequestedIntakeWhere(organizationId);
 
-  const [rows, totalPending] = await Promise.all([
-    tx.candidateJobMatch.findMany({
-      where,
-      select: INTAKE_SELECT,
-      orderBy: [{ applicationRequestedAt: "asc" }, { id: "asc" }],
-      skip: offset,
-      take: pageSize + 1,
-    }),
-    tx.candidateJobMatch.count({ where }),
-  ]);
+  const rows = await tx.candidateJobMatch.findMany({
+    where,
+    select: INTAKE_SELECT,
+    orderBy: [{ applicationRequestedAt: "asc" }, { id: "asc" }],
+    skip: offset,
+    take: pageSize + 1,
+  });
+  const totalPending = await tx.candidateJobMatch.count({ where });
 
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, pageSize) : rows;

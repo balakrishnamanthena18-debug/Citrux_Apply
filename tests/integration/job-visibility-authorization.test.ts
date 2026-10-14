@@ -74,10 +74,34 @@ describe("Job visibility authorization (integration)", () => {
     vi.mocked(withRlsContext).mockImplementation(async (_uid, fn) =>
       fn({
         candidate: {
-          findFirst: vi.fn().mockResolvedValue({ id: candA }),
+          findFirst: vi.fn().mockResolvedValue({
+            id: candA,
+            organizationId: orgId,
+            updatedAt: new Date("2026-10-04T00:00:00.000Z"),
+            skills: [],
+            experiences: [],
+            educations: [],
+            certifications: [],
+            projects: [],
+            targetLocations: [],
+            targetRoles: [],
+          }),
         },
-        job: { create: jobCreate },
+        job: {
+          create: jobCreate,
+          findFirst: vi.fn().mockResolvedValue({
+            id: privateJobId,
+            organizationId: orgId,
+            status: JobStatus.OPEN,
+            visibility: JobVisibility.CANDIDATE_PRIVATE,
+            ownerCandidateId: candA,
+          }),
+        },
         candidateJobOpportunity: { create: oppCreate },
+        candidateJobMatch: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "99999999-9999-4999-8999-999999999999" }),
+        },
         ...jobSnapshotSyncTxStubs({ organizationId: orgId, jobId: privateJobId }),
       } as any)
     );
@@ -384,6 +408,12 @@ describe("Job visibility authorization (integration)", () => {
           create: appCreate,
         },
         applicationStateHistory: { create: vi.fn() },
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            team: "Core",
+            reportingManagerId: null,
+          }),
+        },
       } as any)
     );
 

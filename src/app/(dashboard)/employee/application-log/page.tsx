@@ -104,63 +104,53 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
       status: ApplicationStatus.SUBMITTED,
     } as const;
 
-    const [
-      candRecords,
-      openJobs,
-      openJobsCount,
-      todayCount,
-      weekCount,
-      monthCount,
-      activeCandidateCountRows,
-    ] = await Promise.all([
-      tx.candidate.findMany({
-        where: {
-          organizationId: auth.organizationId,
-          status: { not: "ARCHIVED" },
+    const candRecords = await tx.candidate.findMany({
+      where: {
+        organizationId: auth.organizationId,
+        status: { not: "ARCHIVED" },
+      },
+      select: {
+        id: true,
+        status: true,
+        applicationAuthorizationMode: true,
+        user: {
+          select: { firstName: true, lastName: true, email: true },
         },
-        select: {
-          id: true,
-          status: true,
-          applicationAuthorizationMode: true,
-          user: {
-            select: { firstName: true, lastName: true, email: true },
-          },
-        },
-        orderBy: [{ user: { firstName: "asc" } }, { user: { lastName: "asc" } }],
-        take: DESK_SELECTOR_LIMIT,
-      }),
-      // Initial catalog page: GLOBAL reusable jobs only (never private leads).
-      tx.job.findMany({
-        where: {
-          ...catalogJobsWhere(auth.organizationId),
-          status: JobStatus.OPEN,
-        },
-        select: { ...jobListSelect, visibility: true },
-        orderBy: { createdAt: "desc" },
-        take: DESK_SELECTOR_LIMIT,
-      }),
-      tx.job.count({
-        where: {
-          ...catalogJobsWhere(auth.organizationId),
-          status: JobStatus.OPEN,
-        },
-      }),
-      tx.application.count({
-        where: { ...submittedWhere, createdAt: { gte: startOfToday } },
-      }),
-      tx.application.count({
-        where: { ...submittedWhere, createdAt: { gte: startOfWeek } },
-      }),
-      tx.application.count({
-        where: { ...submittedWhere, createdAt: { gte: startOfMonth } },
-      }),
-      tx.$queryRaw<Array<{ count: bigint }>>`
-        SELECT COUNT(DISTINCT "candidateId")::bigint AS count
-        FROM applications
-        WHERE "organizationId" = ${auth.organizationId}::uuid
-          AND status = 'SUBMITTED'
-      `,
-    ]);
+      },
+      orderBy: [{ user: { firstName: "asc" } }, { user: { lastName: "asc" } }],
+      take: DESK_SELECTOR_LIMIT,
+    });
+    // Initial catalog page: GLOBAL reusable jobs only (never private leads).
+    const openJobs = await tx.job.findMany({
+      where: {
+        ...catalogJobsWhere(auth.organizationId),
+        status: JobStatus.OPEN,
+      },
+      select: { ...jobListSelect, visibility: true },
+      orderBy: { createdAt: "desc" },
+      take: DESK_SELECTOR_LIMIT,
+    });
+    const openJobsCount = await tx.job.count({
+      where: {
+        ...catalogJobsWhere(auth.organizationId),
+        status: JobStatus.OPEN,
+      },
+    });
+    const todayCount = await tx.application.count({
+      where: { ...submittedWhere, createdAt: { gte: startOfToday } },
+    });
+    const weekCount = await tx.application.count({
+      where: { ...submittedWhere, createdAt: { gte: startOfWeek } },
+    });
+    const monthCount = await tx.application.count({
+      where: { ...submittedWhere, createdAt: { gte: startOfMonth } },
+    });
+    const activeCandidateCountRows = await tx.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(DISTINCT "candidateId")::bigint AS count
+      FROM applications
+      WHERE "organizationId" = ${auth.organizationId}::uuid
+        AND status = 'SUBMITTED'
+    `;
 
     let candidatesList = candRecords.map(mapCandidate);
     let jobsList = openJobs.map((j) => mapJob(j));
@@ -247,54 +237,52 @@ export default async function EmployeeApplicationLogPage({ searchParams }: Props
           organizationId: auth.organizationId,
         } as const;
 
-        const [cToday, cWeek, cTotal, cRecent] = await Promise.all([
-          tx.application.count({
-            where: {
-              ...candidateScope,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfToday },
-            },
-          }),
-          tx.application.count({
-            where: {
-              ...candidateScope,
-              status: ApplicationStatus.SUBMITTED,
-              createdAt: { gte: startOfWeek },
-            },
-          }),
-          tx.application.count({
-            where: {
-              ...candidateScope,
-              status: ApplicationStatus.SUBMITTED,
-            },
-          }),
-          tx.application.findMany({
-            where: candidateScope,
-            select: {
-              id: true,
-              status: true,
-              createdAt: true,
-              job: {
-                select: {
-                  title: true,
-                  companyName: true,
-                  source: true,
-                  location: true,
-                  isRemote: true,
-                  salaryMin: true,
-                  salaryMax: true,
-                },
-              },
-              submissions: {
-                orderBy: { attemptNumber: "desc" },
-                take: 1,
-                select: { submittedAt: true },
+        const cToday = await tx.application.count({
+          where: {
+            ...candidateScope,
+            status: ApplicationStatus.SUBMITTED,
+            createdAt: { gte: startOfToday },
+          },
+        });
+        const cWeek = await tx.application.count({
+          where: {
+            ...candidateScope,
+            status: ApplicationStatus.SUBMITTED,
+            createdAt: { gte: startOfWeek },
+          },
+        });
+        const cTotal = await tx.application.count({
+          where: {
+            ...candidateScope,
+            status: ApplicationStatus.SUBMITTED,
+          },
+        });
+        const cRecent = await tx.application.findMany({
+          where: candidateScope,
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            job: {
+              select: {
+                title: true,
+                companyName: true,
+                source: true,
+                location: true,
+                isRemote: true,
+                salaryMin: true,
+                salaryMax: true,
               },
             },
-            orderBy: { createdAt: "desc" },
-            take: 10,
-          }),
-        ]);
+            submissions: {
+              orderBy: { attemptNumber: "desc" },
+              take: 1,
+              select: { submittedAt: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        });
 
         candSummary = {
           candidate: {

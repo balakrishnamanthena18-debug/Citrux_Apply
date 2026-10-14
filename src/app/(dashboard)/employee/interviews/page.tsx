@@ -15,8 +15,6 @@ export default async function EmployeeInterviewsWorkbenchPage() {
   requireEmployeeOrAdmin(ctx);
 
   const data = await withRlsContext(ctx.userId, async (tx) => {
-    if (!tx.interview) return [];
-
     const interviews = await tx.interview.findMany({
       where: {
         organizationId: ctx.organizationId,

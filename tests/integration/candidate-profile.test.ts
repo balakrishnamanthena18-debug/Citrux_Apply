@@ -88,6 +88,7 @@ describe("Candidate Profile Management Integration (tests/integration/candidate-
             headline: "Staff Software Engineer",
           }),
         },
+        $queryRaw: vi.fn().mockResolvedValue([]),
         // Gate 12: profile update marks intelligence stale when present
         application: { findMany: vi.fn().mockResolvedValue([]) },
         applicationIntelligenceRun: {

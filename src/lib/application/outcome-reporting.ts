@@ -101,11 +101,9 @@ export async function buildReportingApplicationWhere(
   }
 
   // Employee, Team Lead, or Manager
-  const [teamScope, managerScope, authProfile] = await Promise.all([
-    resolveTeamLeadScope(tx, ctx),
-    resolveManagerScope(tx, ctx),
-    resolveAssignmentAuthority(tx, ctx),
-  ]);
+  const teamScope = await resolveTeamLeadScope(tx, ctx);
+  const managerScope = await resolveManagerScope(tx, ctx);
+  const authProfile = await resolveAssignmentAuthority(tx, ctx);
 
   const isTeamLead = authProfile.actorKinds.includes("TEAM_LEAD") && teamScope.authorized;
   const isManager = authProfile.actorKinds.includes("MANAGER") || managerScope.authorized;

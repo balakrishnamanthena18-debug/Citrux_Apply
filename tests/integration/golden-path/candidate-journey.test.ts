@@ -194,6 +194,7 @@ describe("Phase 9 Golden Path — Candidate Journey Integration (tests/integrati
         applicationReadinessResult: {
           updateMany: vi.fn().mockResolvedValue({ count: 0 }),
         },
+        $queryRaw: vi.fn().mockResolvedValue([]),
       };
       return callback(tx as any);
     });
@@ -203,6 +204,9 @@ describe("Phase 9 Golden Path — Candidate Journey Integration (tests/integrati
       professionalSummary: "10+ years building scalable distributed systems",
       city: "San Francisco",
     });
+    if (!updateResult.success) {
+      console.log("updateCandidateProfileSelfAction error:", updateResult.error);
+    }
     expect(updateResult.success).toBe(true);
     expect(updateResult.data?.candidateId).toBe(mockCandidateId);
 
@@ -227,6 +231,11 @@ describe("Phase 9 Golden Path — Candidate Journey Integration (tests/integrati
             isCurrent: true,
           }),
         },
+        application: { findMany: vi.fn().mockResolvedValue([]) },
+        applicationIntelligenceRun: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        applicationAlignmentResult: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        applicationReadinessResult: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        $queryRaw: vi.fn().mockResolvedValue([]),
       };
       return callback(tx as any);
     });
@@ -259,6 +268,11 @@ describe("Phase 9 Golden Path — Candidate Journey Integration (tests/integrati
             fieldOfStudy: "Computer Science",
           }),
         },
+        application: { findMany: vi.fn().mockResolvedValue([]) },
+        applicationIntelligenceRun: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        applicationAlignmentResult: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        applicationReadinessResult: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        $queryRaw: vi.fn().mockResolvedValue([]),
       };
       return callback(tx as any);
     });
@@ -285,6 +299,11 @@ describe("Phase 9 Golden Path — Candidate Journey Integration (tests/integrati
           deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
           createMany: vi.fn().mockResolvedValue({ count: 3 }),
         },
+        application: { findMany: vi.fn().mockResolvedValue([]) },
+        applicationIntelligenceRun: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        applicationAlignmentResult: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        applicationReadinessResult: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        $queryRaw: vi.fn().mockResolvedValue([]),
       };
       return callback(tx as any);
     });

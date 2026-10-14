@@ -11,6 +11,7 @@ import { PendingButton } from "@/components/ui/PendingButton";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { createTaskAction } from "@/lib/task/actions";
 import { syncUrlParams } from "@/lib/client/urlSync";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export interface TaskItem {
   id: string;
@@ -458,7 +459,10 @@ export function EmployeeTasksWorkbench({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Priority</label>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <label className="block font-semibold text-[#334155]">Priority</label>
+                  <HelpTooltip topic="task_priority" label="Task priority policy help" />
+                </div>
                 <select
                   name="priority"
                   defaultValue="NORMAL"
@@ -472,7 +476,10 @@ export function EmployeeTasksWorkbench({
               </div>
 
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Due Date</label>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <label className="block font-semibold text-[#334155]">Due Date</label>
+                  <HelpTooltip topic="task_sla_deadline" label="Task SLA deadline help" />
+                </div>
                 <input
                   type="date"
                   name="dueDate"
@@ -481,7 +488,10 @@ export function EmployeeTasksWorkbench({
               </div>
 
               <div>
-                <label className="block font-semibold text-[#334155] mb-1">Assignee</label>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <label className="block font-semibold text-[#334155]">Assignee</label>
+                  <HelpTooltip topic="capacity_units" label="Capacity units and assignment help" />
+                </div>
                 <select
                   name="assignedEmployeeId"
                   defaultValue={currentUserId}

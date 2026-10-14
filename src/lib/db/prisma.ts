@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
@@ -29,7 +30,11 @@ function getAdapter(): PrismaPg {
 
 function createPrismaClient(): PrismaClient {
   if (globalForPrisma.prisma) {
-    return globalForPrisma.prisma;
+    if (!("interview" in globalForPrisma.prisma)) {
+      globalForPrisma.prisma = undefined;
+    } else {
+      return globalForPrisma.prisma;
+    }
   }
   const client = new PrismaClient({
     adapter: getAdapter(),
@@ -39,5 +44,21 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+export function getPrismaClient(): PrismaClient {
+  if (globalForPrisma.prisma && !("interview" in globalForPrisma.prisma)) {
+    globalForPrisma.prisma = undefined;
+  }
+  return globalForPrisma.prisma ?? createPrismaClient();
+}
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
+  },
+});
 

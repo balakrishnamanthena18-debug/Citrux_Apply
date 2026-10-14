@@ -10,7 +10,9 @@ export function jobSnapshotSyncTxStubs(input?: {
   const jobId = input?.jobId ?? "77777777-7777-4777-8777-777777777777";
 
   return {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     jobDescriptionSnapshot: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({
         id: "99999999-9999-4999-8999-999999999999",
@@ -21,6 +23,7 @@ export function jobSnapshotSyncTxStubs(input?: {
       }),
     },
     jobRequirementSet: {
+      findFirst: vi.fn().mockResolvedValue(null),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     // Gate 11: JD snapshot change marks application intelligence stale.

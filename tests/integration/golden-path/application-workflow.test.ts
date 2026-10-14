@@ -18,6 +18,7 @@ import {
   CandidateStatus,
   JobStatus,
   TaskStatus,
+  Role,
 } from "@/generated/prisma";
 import {
   jobSnapshotSyncTxStubs,
@@ -63,6 +64,7 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
     vi.mocked(withRlsContext).mockImplementation(async (_userId, callback) => {
       const tx = {
         job: {
+          findFirst: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue(
             withJobWriteFields(
               {
@@ -83,6 +85,7 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
           organizationId: mockOrgId,
           jobId: mockJobAId,
         }),
+        $queryRaw: vi.fn().mockResolvedValue([]),
       };
       return callback(tx as any);
     });
@@ -94,7 +97,6 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
       location: "San Francisco, CA (Remote)",
       externalUrl: "https://stripe.com/jobs/123",
     });
-
     expect(jobRes.success).toBe(true);
     expect(jobRes.data?.jobId).toBe(mockJobAId);
   });
@@ -125,8 +127,24 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
             ownerCandidateId: null,
           }),
         },
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: "mem-1",
+            userId: mockEmployeeId,
+            organizationId: mockOrgId,
+            role: Role.EMPLOYEE,
+            status: "ACTIVE",
+          }),
+        },
+        designation: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+        employeeProfile: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
         candidateJobOpportunity: {
           findUnique: vi.fn().mockResolvedValue(null),
+          findFirst: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
         },
         application: {
@@ -142,6 +160,7 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({ id: "hist-1" }),
         },
+        $queryRaw: vi.fn().mockResolvedValue([]),
       };
       return callback(tx as any);
     });
@@ -150,6 +169,9 @@ describe("Phase 9 Golden Path — Application Workflow & Task Preparation (tests
       candidateId: mockCandidateId,
       jobId: mockJobAId,
     });
+    if (!appARes.success) {
+      console.log("createApplicationAction error:", appARes.error);
+    }
 
     expect(appARes.success).toBe(true);
     expect(appARes.data?.applicationId).toBe(mockAppAId);

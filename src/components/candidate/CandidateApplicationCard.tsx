@@ -9,6 +9,33 @@ import {
   formatSalary,
 } from "@/lib/utils/status-presenter";
 import { formatApplicationCardDate } from "@/lib/utils/format-application-date";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import type { HelpTopicKey } from "@/lib/help/dictionary";
+
+function getStatusHelpTopic(status: ApplicationStatus): HelpTopicKey {
+  switch (status) {
+    case "AWAITING_APPROVAL":
+      return "awaiting_approval";
+    case "SUBMITTED":
+    case "RESUBMISSION":
+      return "submitted_applications";
+    case "READY":
+      return "ready_applications";
+    case "REVIEW":
+    case "REVIEW_REQUIRED":
+    case "CORRECTION_APPROVED":
+      return "under_review_applications";
+    case "REJECTED":
+    case "WITHDRAWN":
+    case "FAILED":
+      return "closed_applications";
+    case "DISCOVERED":
+    case "QUALIFIED":
+    case "PREPARING":
+    default:
+      return "preparing_applications";
+  }
+}
 
 export interface CandidateApplicationData {
   id: string;
@@ -55,11 +82,17 @@ export function CandidateApplicationCard({ application }: Props) {
       {/* Left Details */}
       <div className="space-y-1.5 flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${presentation.badgeClass}`}
-          >
-            {presentation.label}
-          </span>
+          <div className="flex items-center gap-1">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${presentation.badgeClass}`}
+            >
+              {presentation.label}
+            </span>
+            <HelpTooltip
+              topic={getStatusHelpTopic(application.status)}
+              label={`${presentation.label} status help`}
+            />
+          </div>
 
           {actionReq.isActionRequired && (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">

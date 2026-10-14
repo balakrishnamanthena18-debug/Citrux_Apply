@@ -278,7 +278,24 @@ AS $$
   );
 $$;
 REVOKE ALL ON FUNCTION public.is_interview_round_candidate_owner(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_interview_round_candidate_owner(uuid) TO oos_app_runtime, authenticated;
+-- Helper check for organization membership using session variables
+CREATE OR REPLACE FUNCTION public.is_org_member(lookup_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.memberships m
+    WHERE m."organizationId" = lookup_org_id
+      AND m."userId" = (SELECT NULLIF(current_setting('app.current_user_id', true), '')::uuid)
+      AND m.status = 'ACTIVE'
+      AND m.role IN ('EMPLOYEE', 'ADMIN')
+  );
+$$;
+REVOKE ALL ON FUNCTION public.is_org_member(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_org_member(uuid) TO oos_app_runtime, authenticated;
 
 -- Policies for interviews
 DO $$ BEGIN

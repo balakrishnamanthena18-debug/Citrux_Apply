@@ -18,8 +18,8 @@ export default async function EmployeeCandidatesListPage({
   const scopeFilter = resolvedParams.scope || "";
   const searchQuery = resolvedParams.search || "";
 
-  const candidates = await withRlsContext(ctx.userId, async (tx) => {
-    return tx.candidate.findMany({
+  const { candidates, staffMembers } = await withRlsContext(ctx.userId, async (tx) => {
+    const cands = await tx.candidate.findMany({
       where: {
         organizationId: ctx.organizationId,
         status: { not: "ARCHIVED" },
@@ -41,15 +41,42 @@ export default async function EmployeeCandidatesListPage({
       orderBy: { createdAt: "desc" },
       take: 200,
     });
+
+    const staff = await tx.membership.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        role: { in: ["EMPLOYEE", "ADMIN"] },
+        status: "ACTIVE",
+      },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+      orderBy: { user: { firstName: "asc" } },
+    });
+
+    return { candidates: cands, staffMembers: staff };
   });
+
+  const availableStaff = staffMembers.map((m) => ({
+    id: m.userId,
+    name: [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") || m.user.email,
+    email: m.user.email,
+    role: m.role,
+  }));
 
   return (
     <EmployeeCandidatesWorkbench
       currentUserId={ctx.userId}
+      currentUserRole={ctx.role}
+      canAddCandidate={ctx.role === "ADMIN"}
       candidates={candidates as unknown as CandidateDirectoryItem[]}
+      availableStaff={availableStaff}
       initialScope={scopeFilter}
       initialStatus={statusFilter}
       initialSearch={searchQuery}
     />
   );
 }
+

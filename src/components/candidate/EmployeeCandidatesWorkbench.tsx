@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import {
   WorkbenchShell,
@@ -16,6 +17,7 @@ import {
   TablePagination,
 } from "@/components/workbench";
 import { syncUrlParams } from "@/lib/client/urlSync";
+import { AddCandidateModal, type StaffOption } from "./AddCandidateModal";
 
 export interface CandidateDirectoryItem {
   id: string;
@@ -41,7 +43,10 @@ export interface CandidateDirectoryItem {
 
 interface Props {
   currentUserId: string;
+  currentUserRole?: string;
+  canAddCandidate?: boolean;
   candidates: CandidateDirectoryItem[];
+  availableStaff?: StaffOption[];
   initialScope?: string;
   initialStatus?: string;
   initialSearch?: string;
@@ -55,11 +60,25 @@ const SORT_OPTIONS: SortOption[] = [
 
 export function EmployeeCandidatesWorkbench({
   currentUserId,
+  currentUserRole,
+  canAddCandidate = currentUserRole ? currentUserRole === "ADMIN" : true,
   candidates,
+  availableStaff = [],
   initialScope = "",
   initialStatus = "ALL",
   initialSearch = "",
 }: Props) {
+  const router = useRouter();
+  const [createdCandidates, setCreatedCandidates] = useState<CandidateDirectoryItem[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const candidateList = useMemo(() => {
+    const serverIds = new Set(candidates.map((c) => c.id));
+    const newItems = createdCandidates.filter((c) => !serverIds.has(c.id));
+    return [...newItems, ...candidates];
+  }, [createdCandidates, candidates]);
+
   const [activeTab, setActiveTab] = useState<string>(initialScope === "mine" ? "mine" : initialStatus !== "ALL" ? initialStatus : "ALL");
   const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
   const [sortField, setSortField] = useState<string>("name");
@@ -68,28 +87,28 @@ export function EmployeeCandidatesWorkbench({
   const pageSize = 25;
 
   const myCount = useMemo(
-    () => candidates.filter((c) => c.assignedEmployeeId === currentUserId).length,
-    [candidates, currentUserId]
+    () => candidateList.filter((c) => c.assignedEmployeeId === currentUserId).length,
+    [candidateList, currentUserId]
   );
 
   const activeCount = useMemo(
-    () => candidates.filter((c) => c.status === "ACTIVE").length,
-    [candidates]
+    () => candidateList.filter((c) => c.status === "ACTIVE").length,
+    [candidateList]
   );
 
   const onboardingCount = useMemo(
-    () => candidates.filter((c) => c.status === "ONBOARDING").length,
-    [candidates]
+    () => candidateList.filter((c) => c.status === "ONBOARDING").length,
+    [candidateList]
   );
 
   const tabs: TabItem[] = useMemo(
     () => [
-      { key: "ALL", label: "All Candidates", count: candidates.length },
+      { key: "ALL", label: "All Candidates", count: candidateList.length },
       { key: "mine", label: "My Assigned", count: myCount, highlight: true },
       { key: "ACTIVE", label: "Active", count: activeCount },
       { key: "ONBOARDING", label: "Onboarding", count: onboardingCount },
     ],
-    [candidates.length, myCount, activeCount, onboardingCount]
+    [candidateList.length, myCount, activeCount, onboardingCount]
   );
 
   const handleTabChange = (newTab: string) => {
@@ -115,9 +134,22 @@ export function EmployeeCandidatesWorkbench({
     setSortDirection(direction);
   };
 
+  const handleCandidateCreated = (newCandidate: CandidateDirectoryItem) => {
+    setCreatedCandidates((prev) => [newCandidate, ...prev]);
+    const candidateName =
+      [newCandidate.user.firstName, newCandidate.user.lastName].filter(Boolean).join(" ") ||
+      newCandidate.user.email;
+    setSuccessMessage(`Candidate "${candidateName}" was successfully added to the directory.`);
+    setActiveTab("ALL");
+    setPage(1);
+    syncUrlParams({ scope: null, status: null });
+    router.refresh();
+  };
+
+
   // Instant pure in-memory filtering & sorting (<2ms)
   const filteredCandidates = useMemo(() => {
-    let result = candidates;
+    let result = candidateList;
 
     if (activeTab === "mine") {
       result = result.filter((c) => c.assignedEmployeeId === currentUserId);
@@ -158,7 +190,7 @@ export function EmployeeCandidatesWorkbench({
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
     });
-  }, [candidates, activeTab, currentUserId, searchTerm, sortField, sortDirection]);
+  }, [candidateList, activeTab, currentUserId, searchTerm, sortField, sortDirection]);
 
   const totalPages = Math.ceil(filteredCandidates.length / pageSize) || 1;
   const paginatedCandidates = useMemo(() => {
@@ -168,12 +200,62 @@ export function EmployeeCandidatesWorkbench({
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-16">
+      {successMessage && (
+        <div
+          role="status"
+          className="flex items-center justify-between rounded-[12px] border border-emerald-200/80 bg-emerald-50/90 px-4 py-3 text-xs text-emerald-900 shadow-2xs animate-in fade-in-0 duration-150"
+        >
+          <div className="flex items-center gap-2">
+            <svg
+              className="h-4 w-4 text-emerald-600 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <WorkbenchShell ariaLabel="Candidate Directory Workbench">
         <WorkbenchHeader
           title="Candidate Directory"
           description="Candidate 360 overview, qualification status, active applications, and operational assignment."
-          badge={`${candidates.length} Roster`}
+          badge={`${candidateList.length} Roster`}
           badgeVariant="indigo"
+          actions={
+            canAddCandidate ? (
+              <button
+                type="button"
+                id="add-candidate-button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-[#0B3B2C] px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-[#0a3226] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12A150]/50 active:scale-[0.98]"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>Add Candidate</span>
+              </button>
+            ) : null
+          }
         />
 
         <WorkbenchToolbar>
@@ -317,6 +399,14 @@ export function EmployeeCandidatesWorkbench({
           onPageChange={setPage}
         />
       </WorkbenchShell>
+
+      <AddCandidateModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={handleCandidateCreated}
+        availableStaff={availableStaff}
+      />
     </div>
   );
 }
+

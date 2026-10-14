@@ -10,6 +10,7 @@ import {
   CandidateVerificationSchema,
   CandidateStatusTransitionSchema,
   CandidateDocumentUploadSchema,
+  CreateCandidateSchema,
 } from "@/lib/validation/candidate.schemas";
 
 describe("Candidate Core Validation Schemas (tests/unit/candidate-schemas.test.ts)", () => {
@@ -202,4 +203,84 @@ describe("Candidate Core Validation Schemas (tests/unit/candidate-schemas.test.t
       expect(result.success).toBe(true);
     });
   });
+
+  describe("CreateCandidateSchema", () => {
+    it("validates valid complete candidate creation payload and normalizes email", () => {
+      const result = CreateCandidateSchema.safeParse({
+        firstName: "  Sarah  ",
+        lastName: "  Connor  ",
+        email: "  SARAH.CONNOR@Example.com  ",
+        phone: "+1-555-0192",
+        headline: "Principal Systems Engineer",
+        country: "US",
+        city: "Los Angeles",
+        state: "CA",
+        assignedEmployeeId: "123e4567-e89b-12d3-a456-426614174000",
+        status: "ACTIVE",
+        sendInvitation: true,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.firstName).toBe("Sarah");
+        expect(result.data.lastName).toBe("Connor");
+        expect(result.data.email).toBe("sarah.connor@example.com");
+        expect(result.data.country).toBe("US");
+        expect(result.data.status).toBe("ACTIVE");
+        expect(result.data.sendInvitation).toBe(true);
+      }
+    });
+
+    it("applies secure defaults for mandatory and operational fields", () => {
+      const result = CreateCandidateSchema.safeParse({
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.country).toBe("US");
+        expect(result.data.status).toBe("ONBOARDING");
+        expect(result.data.sendInvitation).toBe(false);
+        expect(result.data.assignedEmployeeId).toBeUndefined();
+      }
+    });
+
+    it("rejects missing first name or empty strings", () => {
+      const result = CreateCandidateSchema.safeParse({
+        firstName: "   ",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects missing last name", () => {
+      const result = CreateCandidateSchema.safeParse({
+        firstName: "John",
+        lastName: "",
+        email: "john.doe@example.com",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects invalid email formats", () => {
+      const result = CreateCandidateSchema.safeParse({
+        firstName: "John",
+        lastName: "Doe",
+        email: "not-an-email",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects invalid assignedEmployeeId uuid", () => {
+      const result = CreateCandidateSchema.safeParse({
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+        assignedEmployeeId: "invalid-uuid",
+      });
+      expect(result.success).toBe(false);
+    });
+  });
 });
+

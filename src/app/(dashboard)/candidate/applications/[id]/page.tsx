@@ -26,6 +26,13 @@ import {
   CandidateInterviewSection,
   type CandidateInterviewViewModel,
 } from "@/components/interview/CandidateInterviewSection";
+import {
+  formatApplicationDateTime,
+  formatApplicationCardDate,
+} from "@/lib/utils/format-application-date";
+
+import { CandidateApplicationHeader } from "@/components/candidate/CandidateApplicationHeader";
+import { CandidateWorkbenchTabs } from "@/components/candidate/CandidateWorkbenchTabs";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -85,18 +92,16 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
     if (app) {
       outcomes = await listOutcomesForCandidate(tx, ctx, app.id);
 
-      const dbInterview = tx.interview
-        ? await tx.interview.findUnique({
-            where: { applicationId: app.id },
-            include: {
-              rounds: {
-                where: { voidedAt: null },
-                orderBy: { roundNumber: "asc" },
-                include: { debrief: true },
-              },
-            },
-          })
-        : null;
+      const dbInterview = await tx.interview.findUnique({
+        where: { applicationId: app.id },
+        include: {
+          rounds: {
+            where: { voidedAt: null },
+            orderBy: { roundNumber: "asc" },
+            include: { debrief: true },
+          },
+        },
+      });
 
       if (dbInterview) {
         interviewData = {
@@ -158,94 +163,39 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
     interviewData,
   } = data;
   const currentMaterial = application.materials[0];
-  const presentation = getCandidateStatusPresentation(application.status);
-  const actionReq = getCandidateActionRequirement(application.status);
   const salaryText = formatSalary(
     application.job.salaryMin,
     application.job.salaryMax,
     application.job.salaryCurrency
   );
 
+  const lastEventDate =
+    application.submissions[0]?.submittedAt ||
+    application.stateHistory[0]?.createdAt ||
+    application.updatedAt;
+
+  const defaultTab =
+    application.status === ApplicationStatus.AWAITING_APPROVAL
+      ? "materials"
+      : interviewData?.rounds && interviewData.rounds.length > 0
+      ? "interviews"
+      : "overview";
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
-      {/* 1. Compact Breadcrumb & Record Identity Header */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-1">
-            <Link
-              href="/candidate/applications"
-              className="text-xs font-semibold text-slate-500 hover:text-slate-900 inline-flex items-center gap-1 transition"
-            >
-              <span>←</span>
-              <span>Back to My Applications</span>
-            </Link>
-
-            <div className="flex flex-wrap items-baseline gap-2 pt-1">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                {application.job.title}
-              </h1>
-              <span className="text-sm font-semibold text-slate-600">
-                at {application.job.companyName}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 pt-0.5">
-              <span>
-                {application.job.location ||
-                  (application.job.isRemote ? "Remote" : "Location unspecified")}
-              </span>
-              <span>•</span>
-              <span className="font-medium text-slate-700">{salaryText}</span>
-              <span>•</span>
-              <span>Type: {application.job.employmentType.replace(/_/g, " ")}</span>
-              {application.job.source && (
-                <>
-                  <span>•</span>
-                  <span className="text-slate-600">
-                    Source: {application.job.source}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${presentation.badgeClass}`}
-            >
-              {presentation.label}
-            </span>
-          </div>
-        </div>
-
-        {/* 5-Stage Progression Tracker */}
-        <div className="mt-5 pt-5 border-t border-slate-100">
-          <ApplicationProgressTracker status={application.status} />
-        </div>
-      </div>
-
-      {/* Interview Operating System Section */}
-      <CandidateInterviewSection
-        applicationId={application.id}
-        jobTitle={application.job.title}
-        companyName={application.job.companyName}
-        interview={interviewData}
-      />
-
-      <CandidateOutcomesPanel
-        applicationId={application.id}
-        outcomes={outcomes}
-        canReport={application.submissions.length > 0}
-        submitted={
-          application.status === ApplicationStatus.SUBMITTED ||
-          application.status === ApplicationStatus.REJECTED ||
-          application.submissions.length > 0
-        }
+      {/* 1. Authoritative Application Header & Current State */}
+      <CandidateApplicationHeader
+        job={application.job}
+        status={application.status}
+        lastEventDate={lastEventDate}
       />
 
       {/* 2. Priority Candidate Action Banner if Awaiting Approval */}
       {application.status === ApplicationStatus.AWAITING_APPROVAL && (
-        <div className="bg-amber-50/70 border border-amber-300 rounded-xl p-5 sm:p-6 shadow-2xs space-y-4">
+        <div
+          id="approval-section"
+          className="bg-amber-50/70 border border-amber-300 rounded-xl p-5 sm:p-6 shadow-2xs space-y-4 scroll-mt-6"
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -314,313 +264,372 @@ export default async function CandidateApplicationDetailPage({ params }: Props) 
         </div>
       )}
 
-      {/* 3. Operational Grid: Specifications & Materials */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Job Specifications & Messaging */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600 border-b border-slate-100 pb-2.5">
-              Job Specifications
-            </h3>
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="text-slate-500 font-medium">Company</span>
-                <p className="font-semibold text-slate-900 mt-0.5">
-                  {application.job.companyName}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-slate-500 font-medium">Location</span>
-                <p className="text-slate-800 font-medium mt-0.5">
-                  {application.job.location ||
-                    (application.job.isRemote ? "Remote" : "Location unspecified")}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-slate-500 font-medium">Employment Type</span>
-                <p className="text-slate-800 font-medium mt-0.5">
-                  {application.job.employmentType.replace(/_/g, " ")}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-slate-500 font-medium">Disclosed Compensation</span>
-                <p className="text-slate-800 font-semibold mt-0.5">{salaryText}</p>
-              </div>
-
-              {application.job.externalUrl && (
-                <div className="pt-2 border-t border-slate-100">
-                  <span className="text-slate-500 font-medium">Original Posting</span>
-                  <p className="mt-1">
-                    <a
-                      href={application.job.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold inline-flex items-center gap-1"
-                    >
-                      <span>Open External Job Link</span>
-                      <span>↗</span>
-                    </a>
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-slate-100">
-              <span className="text-xs text-slate-500 font-medium">Job Overview</span>
-              <p className="text-xs text-slate-700 mt-1 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto p-3 bg-slate-50 rounded-lg border border-slate-100">
-                {application.job.jobDescription || "Job description unavailable"}
-              </p>
-            </div>
-          </div>
-
-          {/* Specialist Communication Desk */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-              Specialist Communication
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Have questions or specific instructions for this application? Message your operations desk directly.
-            </p>
-            {existingConv ? (
-              <Link
-                href={`/candidate/messages/${existingConv.id}`}
-                className="w-full inline-flex justify-center items-center rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-2xs"
-              >
-                Open Application Messages →
-              </Link>
-            ) : (
-              <form
-                action={async () => {
-                  "use server";
-                  const res = await createConversationAction({
-                    candidateId: candidate.id,
-                    applicationId: application.id,
-                    subject: `Inquiry: ${application.job.title} at ${application.job.companyName}`,
-                    initialMessage: `Hello, I have a question regarding my application for ${application.job.title} at ${application.job.companyName}.`,
-                  });
-                  if (res.success && res.data?.conversationId) {
-                    redirect(`/candidate/messages/${res.data.conversationId}`);
-                  }
-                }}
-              >
-                <button
-                  type="submit"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
-                >
-                  Message Desk About Role
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Safe Withdrawal Action */}
-          {application.status !== ApplicationStatus.SUBMITTED &&
-            application.status !== ApplicationStatus.WITHDRAWN &&
-            application.status !== ApplicationStatus.REJECTED &&
-            application.status !== ApplicationStatus.FAILED && (
-              <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs text-center">
-                <form
-                  action={async () => {
-                    "use server";
-                    await withdrawApplicationAction(
-                      application.id,
-                      "Candidate requested withdrawal"
-                    );
-                  }}
-                >
-                  <button
-                    type="submit"
-                    className="text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer"
-                  >
-                    Withdraw Application
-                  </button>
-                </form>
-              </div>
-            )}
-        </div>
-
-        {/* Right Column: Intelligence, Tailored Materials & Submission Receipts */}
-        <div className="lg:col-span-2 space-y-6">
-          <ApplicationIntelligencePanel
-            view={intelligence}
-            audience="candidate"
-            loadFailed={intelligenceLoadFailed}
-          />
-
-          <ResumeReviewPanel applicationId={application.id} canRequest />
-
-          {/* Tailored Application Materials */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Tailored Application Materials
-              </h3>
-              {currentMaterial && (
-                <span className="text-xs text-slate-400">
-                  Version {currentMaterial.documentVersion || 1}
-                </span>
-              )}
-            </div>
-
-            {currentMaterial ? (
-              <div className="space-y-4 text-xs">
-                <div>
-                  <span className="text-slate-500 font-medium">
-                    Selected Base Resume
-                  </span>
-                  <p className="font-semibold text-slate-900 mt-0.5 text-sm">
-                    {currentMaterial.candidateDocument?.title ||
-                      "Authoritative Profile Resume"}{" "}
-                    <span className="text-xs font-normal text-slate-500">
-                      (v{currentMaterial.documentVersion || 1})
+      {/* 3. Spacious Tabbed Candidate Workbench */}
+      <CandidateWorkbenchTabs
+        initialTab={defaultTab}
+        roundsCount={interviewData?.rounds?.length || 0}
+        submissionsCount={application.submissions.length}
+        hasActionRequired={application.status === ApplicationStatus.AWAITING_APPROVAL}
+        status={application.status}
+        roleOverviewSlot={
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Main Column: Job Details & Overview (8 cols) */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Job Specifications Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Target Role & Opportunity
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Authoritative employment criteria and requirements</p>
+                  </div>
+                  {application.job.source && (
+                    <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 text-[10px] font-semibold border border-slate-200">
+                      Source: {application.job.source}
                     </span>
-                  </p>
+                  )}
                 </div>
 
-                {currentMaterial.coverLetterText && (
-                  <div className="border-t border-slate-100 pt-3">
-                    <span className="text-slate-500 font-medium">
-                      Tailored Cover Letter
-                    </span>
-                    <div className="mt-1.5 p-4 bg-slate-50 rounded-lg border border-slate-200/80 text-slate-800 whitespace-pre-wrap leading-relaxed font-sans text-xs">
-                      {currentMaterial.coverLetterText}
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-base">{application.job.title}</h4>
+                      <div className="text-slate-600 font-medium text-sm">{application.job.companyName}</div>
                     </div>
-                  </div>
-                )}
-
-                {currentMaterial.screeningAnswers && (
-                  <div className="border-t border-slate-100 pt-3">
-                    <span className="text-slate-500 font-medium">
-                      Screening Question Responses
-                    </span>
-                    <div className="mt-1.5 p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-slate-800">
-                      <pre className="font-mono text-xs overflow-auto">
-                        {JSON.stringify(currentMaterial.screeningAnswers, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-8 text-center text-slate-500 space-y-1">
-                <div className="text-2xl">📝</div>
-                <h4 className="text-xs font-semibold text-slate-800">
-                  Materials Being Prepared
-                </h4>
-                <p className="text-xs text-slate-400">
-                  Your dedicated specialist is actively assembling and reviewing tailored materials for this listing.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Submission Confirmation Receipts */}
-          {application.submissions.length > 0 && (
-            <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Submission Confirmation Receipt
-                </h3>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  ✓ Verified Submission
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {application.submissions.map((sub) => (
-                  <div
-                    key={sub.id}
-                    className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-2"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-semibold text-slate-900">
-                      <span className="text-emerald-800 font-bold flex items-center gap-1.5">
-                        <span>✓</span>
-                        <span>Official submission completed by operations team</span>
-                        {application.submissions.length > 1 && (
-                          <span className="text-slate-500 font-normal">
-                            (Attempt #{sub.attemptNumber})
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-slate-500 font-normal">
-                        {new Date(sub.submittedAt).toLocaleDateString([], {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-
-                    {sub.externalReference && (
-                      <div className="text-slate-700 pt-1">
-                        <span className="font-medium text-slate-600">
-                          Employer Reference:{" "}
-                        </span>
-                        <span className="font-mono font-semibold text-slate-900">
-                          {sub.externalReference}
-                        </span>
-                      </div>
+                    {application.job.externalUrl && (
+                      <a
+                        href={application.job.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 transition"
+                      >
+                        <span>View Job Posting</span>
+                        <span>↗</span>
+                      </a>
                     )}
                   </div>
-                ))}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100 text-xs">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-slate-500 text-[11px] block font-medium">Location</span>
+                      <span className="font-semibold text-slate-900 mt-0.5 block">
+                        {application.job.location ||
+                          (application.job.isRemote ? "Remote" : "Location unspecified")}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-slate-500 text-[11px] block font-medium">Employment Type</span>
+                      <span className="font-semibold text-slate-900 mt-0.5 block">
+                        {application.job.employmentType.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-slate-500 text-[11px] block font-medium">Compensation</span>
+                      <span className="font-semibold text-slate-900 mt-0.5 block">
+                        {salaryText}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100">
+                    <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block mb-2">
+                      Job Description & Overview
+                    </span>
+                    <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed p-4 bg-slate-50/70 rounded-xl border border-slate-100 font-sans max-h-96 overflow-y-auto">
+                      {application.job.jobDescription || "Job description unavailable."}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
 
-          {/* Authoritative State History Timeline */}
-          {application.stateHistory.length > 0 && (
-            <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600 border-b border-slate-100 pb-2.5">
-                Application History & Milestones
-              </h3>
-              <div className="flow-root">
-                <ul className="-mb-6">
-                  {application.stateHistory.map((event, idx) => (
-                    <li key={event.id}>
-                      <div className="relative pb-6">
-                        {idx !== application.stateHistory.length - 1 && (
-                          <span
-                            className="absolute left-3.5 top-3.5 -ml-px h-full w-0.5 bg-slate-200"
-                            aria-hidden="true"
-                          />
-                        )}
-                        <div className="relative flex space-x-3 items-start">
-                          <div>
-                            <span className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-bold border border-slate-300">
-                              {application.stateHistory.length - idx}
+            {/* Sidebar Column: Specialist Communication & Actions (4 cols) */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Specialist Communication Desk */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-indigo-600 font-bold">💬</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Dedicated Specialist Desk
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Have questions or specific instructions for this application? Message your operations desk directly.
+                </p>
+                {existingConv ? (
+                  <Link
+                    href={`/candidate/messages/${existingConv.id}`}
+                    className="w-full inline-flex justify-center items-center rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-2xs"
+                  >
+                    Open Application Messages →
+                  </Link>
+                ) : (
+                  <form
+                    action={async () => {
+                      "use server";
+                      const res = await createConversationAction({
+                        candidateId: candidate.id,
+                        applicationId: application.id,
+                        subject: `Inquiry: ${application.job.title} at ${application.job.companyName}`,
+                        initialMessage: `Hello, I have a question regarding my application for ${application.job.title} at ${application.job.companyName}.`,
+                      });
+                      if (res.success && res.data?.conversationId) {
+                        redirect(`/candidate/messages/${res.data.conversationId}`);
+                      }
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+                    >
+                      Message Desk About Role
+                    </button>
+                  </form>
+                )}
+              </div>
+
+              {/* Safe Withdrawal Action */}
+              {application.status !== ApplicationStatus.SUBMITTED &&
+                application.status !== ApplicationStatus.WITHDRAWN &&
+                application.status !== ApplicationStatus.REJECTED &&
+                application.status !== ApplicationStatus.FAILED && (
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs text-center">
+                    <form
+                      action={async () => {
+                        "use server";
+                        await withdrawApplicationAction(
+                          application.id,
+                          "Candidate requested withdrawal"
+                        );
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className="text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer"
+                      >
+                        Withdraw Application
+                      </button>
+                    </form>
+                  </div>
+                )}
+            </div>
+          </div>
+        }
+        materialsSlot={
+          <div className="space-y-6">
+            {/* Tailored Application Materials */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Tailored Application Materials
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Documents prepared specifically for this application</p>
+                </div>
+                {currentMaterial && (
+                  <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                    Version {currentMaterial.documentVersion || 1}
+                  </span>
+                )}
+              </div>
+
+              {currentMaterial ? (
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium">
+                      Selected Base Resume
+                    </span>
+                    <p className="font-semibold text-slate-900 mt-0.5 text-sm">
+                      {currentMaterial.candidateDocument?.title ||
+                        "Authoritative Profile Resume"}{" "}
+                      <span className="text-xs font-normal text-slate-500">
+                        (v{currentMaterial.documentVersion || 1})
+                      </span>
+                    </p>
+                  </div>
+
+                  {currentMaterial.coverLetterText && (
+                    <div className="border-t border-slate-100 pt-3">
+                      <span className="text-slate-500 font-medium">
+                        Tailored Cover Letter
+                      </span>
+                      <div className="mt-1.5 p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-slate-800 whitespace-pre-wrap leading-relaxed font-sans text-xs">
+                        {currentMaterial.coverLetterText}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentMaterial.screeningAnswers && (
+                    <div className="border-t border-slate-100 pt-3">
+                      <span className="text-slate-500 font-medium">
+                        Screening Question Responses
+                      </span>
+                      <div className="mt-1.5 p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-slate-800">
+                        <pre className="font-mono text-xs overflow-auto">
+                          {JSON.stringify(currentMaterial.screeningAnswers, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : application.status === ApplicationStatus.SUBMITTED || application.status === ApplicationStatus.READY ? (
+                <div className="p-8 text-center text-slate-500 space-y-1">
+                  <div className="text-2xl">📄</div>
+                  <h4 className="text-xs font-semibold text-slate-800">
+                    Default Profile Materials
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    This application was submitted using your authoritative default candidate resume and profile.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500 space-y-1">
+                  <div className="text-2xl">📝</div>
+                  <h4 className="text-xs font-semibold text-slate-800">
+                    Materials Being Prepared
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Your dedicated specialist is actively assembling and reviewing tailored materials for this listing.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <ResumeReviewPanel applicationId={application.id} canRequest />
+
+            <ApplicationIntelligencePanel
+              view={intelligence}
+              audience="candidate"
+              loadFailed={intelligenceLoadFailed}
+            />
+          </div>
+        }
+        interviewsSlot={
+          <div className="space-y-6">
+            <CandidateInterviewSection
+              applicationId={application.id}
+              jobTitle={application.job.title}
+              companyName={application.job.companyName}
+              interview={interviewData}
+            />
+
+            <CandidateOutcomesPanel
+              applicationId={application.id}
+              outcomes={outcomes}
+              canReport={application.submissions.length > 0}
+              submitted={
+                application.status === ApplicationStatus.SUBMITTED ||
+                application.status === ApplicationStatus.REJECTED ||
+                application.submissions.length > 0
+              }
+            />
+          </div>
+        }
+        timelineSlot={
+          <div className="space-y-6">
+            {/* Submission Confirmation Receipts */}
+            {application.submissions.length > 0 && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Verified Submission Evidence
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Proof of verified application delivery</p>
+                  </div>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    ✓ Verified Submission
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {application.submissions.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-semibold text-slate-900">
+                        <span className="text-emerald-800 font-bold flex items-center gap-1.5">
+                          <span>✓</span>
+                          <span>Official submission completed by operations team</span>
+                          {application.submissions.length > 1 && (
+                            <span className="text-slate-500 font-normal">
+                              (Attempt #{sub.attemptNumber})
                             </span>
-                          </div>
-                          <div className="flex-1 min-w-0 pt-1 flex justify-between space-x-4 text-xs">
+                          )}
+                        </span>
+                        <span className="text-slate-500 font-normal">
+                          {formatApplicationDateTime(sub.submittedAt)}
+                        </span>
+                      </div>
+
+                      {sub.externalReference && (
+                        <div className="text-slate-700 pt-1">
+                          <span className="font-medium text-slate-600">
+                            Employer Reference:{" "}
+                          </span>
+                          <span className="font-mono font-semibold text-slate-900">
+                            {sub.externalReference}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Authoritative State History Timeline */}
+            {application.stateHistory.length > 0 && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="border-b border-slate-100 pb-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Application History & Milestones
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Chronological record of status progression</p>
+                </div>
+                <div className="flow-root pt-2">
+                  <ul className="-mb-6">
+                    {application.stateHistory.map((event, idx) => (
+                      <li key={event.id}>
+                        <div className="relative pb-6">
+                          {idx !== application.stateHistory.length - 1 && (
+                            <span
+                              className="absolute left-3.5 top-3.5 -ml-px h-full w-0.5 bg-slate-200"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <div className="relative flex space-x-3 items-start">
                             <div>
-                              <p className="font-semibold text-slate-900">
-                                {getCandidateStatusPresentation(event.toStatus).label}
-                              </p>
-                              {event.reason && (
-                                <p className="text-slate-500 mt-0.5">{event.reason}</p>
-                              )}
+                              <span className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-bold border border-slate-300">
+                                {application.stateHistory.length - idx}
+                              </span>
                             </div>
-                            <div className="text-right text-slate-400 whitespace-nowrap text-[11px]">
-                              {new Date(event.createdAt).toLocaleDateString([], {
-                                month: "short",
-                                day: "numeric",
-                              })}
+                            <div className="flex-1 min-w-0 pt-1 flex justify-between space-x-4 text-xs">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {getCandidateStatusPresentation(event.toStatus).label}
+                                </p>
+                                {event.reason && (
+                                  <p className="text-slate-500 mt-0.5">{event.reason}</p>
+                                )}
+                              </div>
+                              <div className="text-right text-slate-400 whitespace-nowrap text-[11px]">
+                                {formatApplicationCardDate(event.createdAt)}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        }
+      />
     </div>
   );
 }

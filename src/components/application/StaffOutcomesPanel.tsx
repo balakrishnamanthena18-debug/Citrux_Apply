@@ -12,6 +12,7 @@ import {
   verifyOutcomeAction,
   voidOutcomeAction,
 } from "@/lib/application/outcome-actions";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 const STAFF_TYPES = Object.keys(STAFF_OUTCOME_LABELS) as ApplicationOutcomeType[];
 
@@ -302,9 +303,12 @@ export function StaffOutcomesPanel({
         <form onSubmit={handleCreate} className="space-y-2.5 border-t pt-3 text-xs">
           <p className="font-semibold text-slate-800">Record outcome</p>
           <div>
-            <label className="block font-medium text-slate-700 mb-1">
-              Outcome type
-            </label>
+            <div className="flex items-center gap-1.5 mb-1">
+              <label className="block font-medium text-slate-700">
+                Outcome type
+              </label>
+              <HelpTooltip topic="offer_status" label="Outcome and offer verification help" />
+            </div>
             <select
               value={outcomeType}
               onChange={(e) => {

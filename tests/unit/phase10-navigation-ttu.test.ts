@@ -172,12 +172,12 @@ describe("Phase 10 — Navigation Time-to-Usable invariants", () => {
   });
 
   describe("Heavy query / refresh scope", () => {
-    it("application-log page parallelizes independent metrics", () => {
+    it("application-log page enforces bounded queries and safe transaction execution", () => {
       const page = readFileSync(
         join(ROOT, "src/app/(dashboard)/employee/application-log/page.tsx"),
         "utf8"
       );
-      expect(page).toContain("Promise.all");
+      expect(page).not.toContain("Promise.all");
       expect(page).toContain("withAuthenticatedData");
       expect(page).toContain("DESK_SELECTOR_LIMIT");
       expect(page).toContain("COUNT(DISTINCT");

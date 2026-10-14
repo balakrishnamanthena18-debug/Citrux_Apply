@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 interface Props {
   specialist?: {
@@ -37,7 +38,7 @@ export function CandidateSpecialistCard({
     specialist?.designationName || "Application Operations Specialist";
 
   return (
-    <div className="bg-white rounded-[20px] border border-[#E5EAE7] shadow-[0_4px_18px_rgba(15,23,32,0.04)] overflow-hidden flex flex-col justify-between">
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
       <div>
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex items-center justify-between">
@@ -88,6 +89,15 @@ export function CandidateSpecialistCard({
               </div>
             </div>
           </div>
+          <div className="rounded-lg bg-[#F7F9F8] border border-[#E5EAE7] p-2.5 text-[11px] text-[#64748B] space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-[#0F1720]">Service Response Policy</span>
+              <HelpTooltip topic="desk_sla" label="Desk SLA policy help" />
+            </div>
+            <p className="leading-relaxed">
+              Direct inquiries sent Mon–Fri (9:00 AM – 6:00 PM EST) are reviewed by your operations desk within 4 business hours.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -98,9 +108,9 @@ export function CandidateSpecialistCard({
         </span>
         <Link
           href="/candidate/messages"
-          className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] inline-flex items-center gap-1"
+          className="text-xs font-semibold text-[#0B3B2C] hover:text-[#126B45] inline-flex items-center gap-1.5"
         >
-          <span>Message {specialist?.firstName || "Specialist"}</span>
+          <span>Message {specialist?.firstName || "Desk Specialist"}</span>
           <span>→</span>
         </Link>
       </div>

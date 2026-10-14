@@ -311,3 +311,65 @@ export function getCandidateActionRequirement(status: ApplicationStatus): {
       };
   }
 }
+
+export interface NextExpectedStageInfo {
+  stageName: string;
+  description: string;
+}
+
+/**
+ * Returns the next operational stage expectation derived authoritatively
+ * from current ApplicationStatus. Returns null for terminal states.
+ */
+export function getNextExpectedStage(status: ApplicationStatus): NextExpectedStageInfo | null {
+  switch (status) {
+    case "DISCOVERED":
+    case "QUALIFIED":
+      return {
+        stageName: "Material Preparation",
+        description: "Specialist queued to author tailored resume and cover letter.",
+      };
+    case "PREPARING":
+      return {
+        stageName: "QA Review",
+        description: "Application materials will undergo internal quality assurance.",
+      };
+    case "REVIEW":
+    case "REVIEW_REQUIRED":
+      return {
+        stageName: "Candidate Authorization",
+        description: "Materials will be presented for your review and sign-off.",
+      };
+    case "AWAITING_APPROVAL":
+      return {
+        stageName: "Submission Execution",
+        description: "Once authorized by you, operations staff will manually submit.",
+      };
+    case "READY":
+      return {
+        stageName: "External Submission",
+        description: "Queued for manual submission to employer portal.",
+      };
+    case "SUBMITTED":
+      return {
+        stageName: "Employer Review",
+        description: "Awaiting employer response.",
+      };
+    case "SUBMISSION_ISSUE":
+      return {
+        stageName: "Specialist Triage",
+        description: "Operations specialist resolving submission impediment.",
+      };
+    case "CORRECTION_APPROVED":
+    case "RESUBMISSION":
+      return {
+        stageName: "External Resubmission",
+        description: "Queued for secondary submission attempt.",
+      };
+    case "REJECTED":
+    case "WITHDRAWN":
+    case "FAILED":
+    default:
+      return null;
+  }
+}

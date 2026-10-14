@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getAuthenticatedContext, requireEmployeeOrAdmin } from "@/lib/auth/context";
+import { getAuthenticatedContext, requireAdmin, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
-import { logUserAuditEvent } from "@/lib/audit";
+import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   CandidateProfileSchema,
   CandidateExperienceSchema,
@@ -18,6 +19,7 @@ import {
   CandidateDocumentUploadSchema,
   CandidateDocumentUploadSelfSchema,
   UpdateCandidateAuthorizationModeSchema,
+  CreateCandidateSchema,
   type CandidateProfileInput,
   type CandidateExperienceInput,
   type CandidateEducationInput,
@@ -29,6 +31,7 @@ import {
   type CandidateDocumentUploadInput,
   type CandidateDocumentUploadSelfInput,
   type UpdateCandidateAuthorizationModeInput,
+  type CreateCandidateInput,
 } from "@/lib/validation/candidate.schemas";
 import {
   generateCandidateDocumentPath,
@@ -38,7 +41,7 @@ import {
   createSignedDownloadUrl,
   deleteCandidateDocumentStorage,
 } from "@/lib/storage";
-import { CandidateStatus, Role, ApplicationAuthorizationMode, AuditAction } from "@/generated/prisma";
+import { CandidateStatus, Role, MembershipStatus, ApplicationAuthorizationMode, AuditAction } from "@/generated/prisma";
 import { AuthorizationError, InvalidStateTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
 import { markCandidateApplicationIntelligenceStale } from "@/lib/application-intelligence/runs";
 import { freshnessAfterTrigger } from "@/lib/application-intelligence/stale";
@@ -63,6 +66,252 @@ function revalidateCandidateViews() {
     // Safe fallback when executed outside Next.js request context
   }
 }
+
+/**
+ * Admin Action: Creates a new Candidate record in the organization.
+ * Distinguishes candidate record creation from account invitation.
+ * Enforces strict Admin authorization, tenant isolation, atomic transaction,
+ * compensating cleanup for auth users, and audit logging.
+ */
+export async function createCandidateAction(
+  input: CreateCandidateInput
+): Promise<ActionResult<{ candidateId: string; candidate: any }>> {
+  const parsed = CreateCandidateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  let authUserId: string | null = null;
+  let isNewAuthUser = false;
+
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireAdmin(ctx);
+
+    if (parsed.data.organizationId && parsed.data.organizationId !== ctx.organizationId) {
+      throw new AuthorizationError("Cannot create candidates in a different organization");
+    }
+
+    const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
+    // 1. Prepare Supabase Auth identity
+    const supabaseAdmin = getSupabaseAdminClient();
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: normalizedEmail,
+      email_confirm: true,
+      user_metadata: {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+      },
+    });
+
+    if (authError || !authData?.user) {
+      if (
+        authError?.message?.includes("already been registered") ||
+        authError?.message?.includes("already exists")
+      ) {
+        throw new ValidationError("A user with this email address already exists in authentication");
+      }
+      throw new Error(authError?.message || "Failed to create Supabase Auth user");
+    }
+
+    authUserId = authData.user.id;
+    isNewAuthUser = true;
+
+    // 2. Open PostgreSQL atomic transaction with compensating catch
+    let createdCandidate: any = null;
+    let createdMembership: any = null;
+
+    try {
+      const dbResult = await withRlsContext(ctx.userId, async (tx) => {
+        // Verify assigned employee if provided
+        let assignedStaff: any = null;
+        if (parsed.data.assignedEmployeeId) {
+          assignedStaff = await tx.membership.findFirst({
+            where: {
+              userId: parsed.data.assignedEmployeeId,
+              organizationId: ctx.organizationId,
+              role: { in: [Role.EMPLOYEE, Role.ADMIN] },
+              status: "ACTIVE",
+            },
+            include: {
+              user: {
+                select: { id: true, firstName: true, lastName: true, email: true },
+              },
+            },
+          });
+          if (!assignedStaff) {
+            throw new ValidationError("Selected specialist is not an active staff member in this organization");
+          }
+        }
+
+        // Check for existing User record
+        let targetUser = await tx.user.findUnique({
+          where: { id: authUserId! },
+        });
+
+        if (!targetUser) {
+          // Double check email uniqueness in user table
+          const existingByEmail = await tx.user.findUnique({
+            where: { email: normalizedEmail },
+          });
+          if (existingByEmail) {
+            throw new ValidationError("A candidate with this email address already exists");
+          }
+
+          targetUser = await tx.user.create({
+            data: {
+              id: authUserId!,
+              email: normalizedEmail,
+              firstName: parsed.data.firstName,
+              lastName: parsed.data.lastName,
+              status: "ACTIVE",
+            },
+          });
+        }
+
+        // Check for existing Candidate record
+        const existingCandidate = await tx.candidate.findUnique({
+          where: { userId: targetUser.id },
+        });
+        if (existingCandidate) {
+          throw new ValidationError("A candidate profile already exists for this user");
+        }
+
+        // Check for existing Membership in this organization
+        const existingMembership = await tx.membership.findUnique({
+          where: {
+            org_user_unique: {
+              organizationId: ctx.organizationId,
+              userId: targetUser.id,
+            },
+          },
+        });
+        if (existingMembership) {
+          throw new ValidationError("User is already a member of this organization");
+        }
+
+        // Create Membership: INVITED if sendInvitation is requested, else ACTIVE
+        const membership = await tx.membership.create({
+          data: {
+            organizationId: ctx.organizationId,
+            userId: targetUser.id,
+            role: Role.CANDIDATE,
+            status: parsed.data.sendInvitation ? MembershipStatus.INVITED : MembershipStatus.ACTIVE,
+          },
+        });
+
+        // Create Candidate (enforcing verificationStatus: UNVERIFIED, status: ONBOARDING or ACTIVE)
+        const candidate = await tx.candidate.create({
+          data: {
+            organizationId: ctx.organizationId,
+            userId: targetUser.id,
+            status: (parsed.data.status as CandidateStatus) ?? CandidateStatus.ONBOARDING,
+            verificationStatus: "UNVERIFIED",
+            phone: parsed.data.phone ?? null,
+            headline: parsed.data.headline ?? null,
+            country: parsed.data.country ?? "US",
+            city: parsed.data.city ?? null,
+            state: parsed.data.state ?? null,
+            assignedEmployeeId: parsed.data.assignedEmployeeId ?? null,
+          },
+          include: {
+            user: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+            assignedEmployee: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+            skills: {
+              select: { id: true, name: true },
+            },
+            applications: {
+              select: { id: true, status: true },
+            },
+          },
+        });
+
+        // Audit Logging (Atomic with tx)
+        await logUserAuditEvent({
+          tx,
+          userId: ctx.userId,
+          organizationId: ctx.organizationId,
+          action: AuditAction.CANDIDATE_CREATED,
+          entityType: "Candidate",
+          entityId: candidate.id,
+          details: {
+            candidateId: candidate.id,
+            userId: targetUser.id,
+            email: normalizedEmail,
+            status: candidate.status,
+            verificationStatus: candidate.verificationStatus,
+            assignedEmployeeId: candidate.assignedEmployeeId,
+            sendInvitation: Boolean(parsed.data.sendInvitation),
+          },
+        });
+
+        if (parsed.data.sendInvitation) {
+          await logUserAuditEvent({
+            tx,
+            userId: ctx.userId,
+            organizationId: ctx.organizationId,
+            action: AuditAction.USER_INVITED,
+            entityType: "Membership",
+            entityId: membership.id,
+            details: {
+              targetUserId: targetUser.id,
+              recipientEmail: normalizedEmail,
+              role: Role.CANDIDATE,
+            },
+          });
+        }
+
+        return { candidate, membership };
+      });
+
+      createdCandidate = dbResult.candidate;
+      createdMembership = dbResult.membership;
+    } catch (dbError: any) {
+      // Compensating transaction: Clean up orphaned Supabase Auth user if newly created
+      if (authUserId && isNewAuthUser) {
+        try {
+          const deleteRes = await supabaseAdmin.auth.admin.deleteUser(authUserId);
+          if (deleteRes?.error) {
+            throw new Error(deleteRes.error.message || "Supabase user deletion failed");
+          }
+        } catch (cleanupErr: any) {
+          await logSystemAuditEvent({
+            action: AuditAction.SECURITY_ALERT,
+            actorType: "SYSTEM",
+            organizationId: ctx.organizationId,
+            entityType: "AuthUser",
+            entityId: authUserId,
+            details: {
+              reason: "ORPHANED_AUTH_USER_CLEANUP_FAILED",
+              error: "Orphaned Supabase Auth user cleanup failed",
+              authUserId,
+              email: normalizedEmail,
+              cleanupError: cleanupErr.message,
+            },
+          });
+        }
+      }
+      throw dbError;
+    }
+
+    revalidateCandidateViews();
+    return {
+      success: true,
+      data: {
+        candidateId: createdCandidate.id,
+        candidate: createdCandidate,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to create candidate" };
+  }
+}
+
 
 // Valid lifecycle transition graph locked by human decision
 const ALLOWED_TRANSITIONS: Record<CandidateStatus, CandidateStatus[]> = {
@@ -1091,6 +1340,60 @@ export async function registerCandidateDocumentSelfAction(
     };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to register document" };
+  }
+}
+
+/**
+ * Sets a specific resume document as the authoritative default for application tailoring.
+ * Atomically clears default status from all other candidate resumes.
+ */
+export async function setDefaultCandidateResumeAction(
+  documentId: string
+): Promise<ActionResult<{ documentId: string }>> {
+  const ctx = await getAuthenticatedContext();
+
+  try {
+    const candidate = await withRlsContext(ctx.userId, async (tx) => {
+      const cand = await tx.candidate.findUnique({
+        where: { userId: ctx.userId },
+      });
+      if (!cand) throw new NotFoundError("Candidate profile not found");
+      return cand;
+    });
+
+    await withRlsContext(ctx.userId, async (tx) => {
+      const targetDoc = await tx.candidateDocument.findFirst({
+        where: { id: documentId, candidateId: candidate.id },
+      });
+      if (!targetDoc) throw new NotFoundError("Document not found");
+      if (targetDoc.documentType !== "RESUME") {
+        throw new ValidationError("Only resume documents can be set as default for tailoring");
+      }
+
+      await tx.candidateDocument.updateMany({
+        where: { candidateId: candidate.id, documentType: "RESUME" },
+        data: { isDefault: false },
+      });
+
+      await tx.candidateDocument.update({
+        where: { id: documentId },
+        data: { isDefault: true },
+      });
+    });
+
+    await logUserAuditEvent({
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
+      action: "CANDIDATE_DOCUMENT_UPLOADED",
+      entityType: "CandidateDocument",
+      entityId: documentId,
+      details: { action: "SET_DEFAULT_RESUME", documentId },
+    });
+
+    revalidateCandidateViews();
+    return { success: true, data: { documentId } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to set default resume" };
   }
 }
 

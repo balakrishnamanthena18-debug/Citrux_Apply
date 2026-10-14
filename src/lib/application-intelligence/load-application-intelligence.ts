@@ -23,63 +23,63 @@ async function loadPersistedIntelligence(
   applicationId: string,
   viewer: "CANDIDATE" | "STAFF"
 ): Promise<ApplicationIntelligenceViewModel> {
-  const [alignment, readiness, latestRun] = await Promise.all([
-    db.applicationAlignmentResult.findFirst({
-      where: { applicationId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        runId: true,
-        freshness: true,
-        scoringVersion: true,
-        overallScore: true,
-        evidence: true,
-        run: {
-          select: {
-            id: true,
-            status: true,
-            analysisPurpose: true,
-            requirementSetId: true,
-            snapshotId: true,
-            ...(viewer === "STAFF" ? { errorCode: true } : {}),
-          },
+  const alignment = await db.applicationAlignmentResult.findFirst({
+    where: { applicationId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      runId: true,
+      freshness: true,
+      scoringVersion: true,
+      overallScore: true,
+      evidence: true,
+      run: {
+        select: {
+          id: true,
+          status: true,
+          analysisPurpose: true,
+          requirementSetId: true,
+          snapshotId: true,
+          ...(viewer === "STAFF" ? { errorCode: true } : {}),
         },
       },
-    }),
-    db.applicationReadinessResult.findFirst({
-      where: { applicationId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        runId: true,
-        freshness: true,
-        readinessState: true,
-        blockers: true,
-        warnings: true,
-        nextActions: true,
-        evidence: true,
-        run: {
-          select: {
-            id: true,
-            status: true,
-            analysisPurpose: true,
-            ...(viewer === "STAFF" ? { errorCode: true } : {}),
-          },
+    },
+  });
+
+  const readiness = await db.applicationReadinessResult.findFirst({
+    where: { applicationId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      runId: true,
+      freshness: true,
+      readinessState: true,
+      blockers: true,
+      warnings: true,
+      nextActions: true,
+      evidence: true,
+      run: {
+        select: {
+          id: true,
+          status: true,
+          analysisPurpose: true,
+          ...(viewer === "STAFF" ? { errorCode: true } : {}),
         },
       },
-    }),
-    db.applicationIntelligenceRun.findFirst({
-      where: { applicationId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        status: true,
-        analysisPurpose: true,
-        freshness: true,
-        ...(viewer === "STAFF" ? { errorCode: true } : {}),
-      },
-    }),
-  ]);
+    },
+  });
+
+  const latestRun = await db.applicationIntelligenceRun.findFirst({
+    where: { applicationId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      analysisPurpose: true,
+      freshness: true,
+      ...(viewer === "STAFF" ? { errorCode: true } : {}),
+    },
+  });
 
   return buildApplicationIntelligenceViewModel({
     viewer,

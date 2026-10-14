@@ -2,12 +2,27 @@
 
 import React from "react";
 import Link from "next/link";
+import {
+  formatApplicationCardDate,
+  formatApplicationCardTime,
+} from "@/lib/utils/format-application-date";
 
 export interface CandidateActivityEvent {
   id: string;
-  type: "SUBMISSION" | "APPROVAL_REQUEST" | "QA_PASS" | "PREPARATION" | "DOCUMENT" | "GENERAL";
+  type:
+    | "SUBMISSION"
+    | "APPROVAL_REQUEST"
+    | "QA_PASS"
+    | "PREPARATION"
+    | "DOCUMENT"
+    | "INTERVIEW"
+    | "OUTCOME"
+    | "GENERAL";
   title: string;
   description: string;
+  whatItMeans?: string;
+  whatHappensNext?: string;
+  candidateActionNeeded?: boolean;
   timestamp: string | Date;
   linkUrl?: string;
   linkText?: string;
@@ -48,8 +63,12 @@ export function CandidateActivityFeed({
         return { icon: "★", bg: "bg-purple-50 text-purple-700 border-purple-200" };
       case "PREPARATION":
         return { icon: "✎", bg: "bg-blue-50 text-blue-700 border-blue-200" };
+      case "INTERVIEW":
+        return { icon: "🗓️", bg: "bg-sky-50 text-sky-700 border-sky-200" };
       case "DOCUMENT":
         return { icon: "📄", bg: "bg-slate-100 text-slate-700 border-slate-200" };
+      case "OUTCOME":
+        return { icon: "📋", bg: "bg-slate-100 text-slate-700 border-slate-200" };
       default:
         return { icon: "•", bg: "bg-slate-100 text-slate-700 border-slate-200" };
     }
@@ -74,14 +93,8 @@ export function CandidateActivityFeed({
       <div className="divide-y divide-slate-100">
         {events.map((evt) => {
           const { icon, bg } = getEventIcon(evt.type);
-          const dateText = new Date(evt.timestamp).toLocaleDateString([], {
-            month: "short",
-            day: "numeric",
-          });
-          const timeText = new Date(evt.timestamp).toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          });
+          const dateText = formatApplicationCardDate(evt.timestamp, { year: false });
+          const timeText = formatApplicationCardTime(evt.timestamp);
 
           return (
             <div
@@ -95,13 +108,39 @@ export function CandidateActivityFeed({
                   {icon}
                 </span>
 
-                <div className="space-y-0.5 min-w-0">
-                  <h4 className="font-semibold text-slate-900 text-xs">
-                    {evt.title}
-                  </h4>
-                  <p className="text-slate-600 leading-relaxed max-w-xl">
+                <div className="space-y-1.5 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-semibold text-slate-900 text-xs">
+                      {evt.title}
+                    </h4>
+                    {evt.candidateActionNeeded && (
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        Action Required
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-slate-600 leading-relaxed">
                     {evt.description}
                   </p>
+
+                  {(evt.whatItMeans || evt.whatHappensNext) && (
+                    <div className="space-y-1 pt-1 text-[11px] text-slate-500">
+                      {evt.whatItMeans && (
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-semibold text-slate-700 shrink-0">Meaning:</span>
+                          <span className="text-slate-600">{evt.whatItMeans}</span>
+                        </div>
+                      )}
+                      {evt.whatHappensNext && (
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-semibold text-slate-700 shrink-0">Next step:</span>
+                          <span className="text-slate-600">{evt.whatHappensNext}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {evt.linkUrl && (
                     <div className="pt-1">
                       <Link
@@ -116,9 +155,16 @@ export function CandidateActivityFeed({
                 </div>
               </div>
 
-              <div className="text-right shrink-0 text-slate-400 text-[11px] whitespace-nowrap">
-                <span className="block font-medium text-slate-600">{dateText}</span>
-                <span className="block text-[10px]">{timeText}</span>
+              <div className="text-right shrink-0 text-slate-400 text-[11px] whitespace-nowrap pl-2">
+                <span
+                  className="block font-medium text-slate-600"
+                  suppressHydrationWarning
+                >
+                  {dateText}
+                </span>
+                <span className="block text-[10px]" suppressHydrationWarning>
+                  {timeText}
+                </span>
               </div>
             </div>
           );

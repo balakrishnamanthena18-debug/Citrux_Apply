@@ -83,6 +83,12 @@ describe("Application Lifecycle & Universal Approval Integration (tests/integrat
         applicationStateHistory: {
           create: vi.fn().mockResolvedValue({}),
         },
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            team: "eng",
+            reportingManagerId: null,
+          }),
+        },
       };
       return callback(tx as any);
     });
