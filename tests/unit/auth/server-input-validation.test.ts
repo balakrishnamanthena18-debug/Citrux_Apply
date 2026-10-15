@@ -18,6 +18,7 @@ import {
 import { signInAction, signUpCandidateAction } from "@/lib/auth/actions";
 import { POST as loginRouteHandler } from "@/app/api/auth/login/route";
 import { POST as signupRouteHandler } from "@/app/api/auth/signup/route";
+import { POST as registerRouteHandler } from "@/app/api/auth/register/route";
 import { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
 import { createServerClient } from "@/lib/supabase/server";
@@ -264,6 +265,22 @@ describe("CareerButton Authentication Input Validation & Security Review", () =>
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data.error).toBe(GENERIC_LOGIN_VALIDATION_ERROR);
+    });
+
+    it("POST /api/auth/register delegates directly to signup route handler and processes requests", async () => {
+      expect(registerRouteHandler).toBe(signupRouteHandler);
+
+      const req = new NextRequest("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": "100000",
+        },
+        body: JSON.stringify({ email: "user@example.com", password: "password123" }),
+      });
+
+      const res = await registerRouteHandler(req);
+      expect(res.status).toBe(413);
     });
   });
 });
