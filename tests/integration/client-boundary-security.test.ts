@@ -54,6 +54,7 @@ describe("Server/Client Boundary Security Inspection (tests/integration/client-b
     const allowedPublicVars = [
       "NEXT_PUBLIC_SUPABASE_URL",
       "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "NEXT_PUBLIC_APP_URL",
     ];
 
     for (const v of publicVarMatches) {

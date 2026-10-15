@@ -130,6 +130,7 @@ describe("Staff Activation Protocol Integration Tests (tests/integration/staff-a
           membership: {
             id: mockMembershipId,
             userId: mockUserId,
+            organizationId: mockOrgId,
             status: MembershipStatus.INVITED,
           },
         }),
@@ -142,8 +143,9 @@ describe("Staff Activation Protocol Integration Tests (tests/integration/staff-a
       staffActivationToken: {
         findUnique: vi.fn().mockResolvedValue({
           id: mockTokenId,
+          organizationId: mockOrgId,
           usedAt: null,
-          membership: { status: MembershipStatus.INVITED },
+          membership: { status: MembershipStatus.INVITED, organizationId: mockOrgId },
         }),
         update: vi.fn().mockResolvedValue({ id: mockTokenId, usedAt: new Date() }),
       },
@@ -227,6 +229,7 @@ describe("Staff Activation Protocol Integration Tests (tests/integration/staff-a
           membership: {
             id: mockMembershipId,
             userId: mockUserId,
+            organizationId: mockOrgId,
             status: MembershipStatus.INVITED,
           },
         }),

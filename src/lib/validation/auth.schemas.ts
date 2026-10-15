@@ -1,9 +1,104 @@
 import { z } from "zod";
 
-const passwordField = z
-  .string()
+export const GENERIC_AUTH_VALIDATION_ERROR =
+  "Invalid input provided. Please verify your details and try again.";
+export const GENERIC_LOGIN_VALIDATION_ERROR =
+  "Invalid input provided. Please check your credentials and try again.";
+export const GENERIC_SIGNUP_VALIDATION_ERROR =
+  "Invalid input provided. Please review your registration details and try again.";
+
+export function getGenericValidationError(context: "login" | "signup" | "auth" = "auth"): string {
+  switch (context) {
+    case "login":
+      return GENERIC_LOGIN_VALIDATION_ERROR;
+    case "signup":
+      return GENERIC_SIGNUP_VALIDATION_ERROR;
+    default:
+      return GENERIC_AUTH_VALIDATION_ERROR;
+  }
+}
+
+/**
+ * Strict email validation:
+ * - Normalizes via trim and lowercase (standard email normalization)
+ * - Validates length (3 to 254 characters)
+ * - Rejects any HTML tags, angle brackets, script fragments, or whitespace
+ * - NEVER silently mutates the email address
+ */
+export const emailField = z
+  .string({ required_error: "Email is required" })
+  .trim()
+  .toLowerCase()
+  .min(3, "Email must be at least 3 characters")
+  .max(254, "Email must not exceed 254 characters")
+  .email("Please provide a valid email address")
+  .refine((val) => !/[<>"'`\\;\s]/.test(val), {
+    message: "Email contains invalid characters",
+  });
+
+/**
+ * Password validation:
+ * - Validates type (string) and length (8 to 128 characters)
+ * - Rejects null bytes (\0)
+ * - CRITICAL SECURITY INVARIANT: NEVER transforms, strips, or mutates the password string.
+ *   The exact string entered by the user is passed directly to Supabase Auth.
+ */
+export const passwordField = z
+  .string({ required_error: "Password is required" })
   .min(8, "Password must be at least 8 characters")
-  .max(128, "Password must not exceed 128 characters");
+  .max(128, "Password must not exceed 128 characters")
+  .refine((val) => !val.includes("\0"), {
+    message: "Password cannot contain null bytes",
+  });
+
+/**
+ * Username validation:
+ * - Validates length (3 to 50 characters)
+ * - Restricts characters strictly to alphanumeric, underscores, hyphens, and periods
+ * - Rejects invalid characters without silent stripping
+ */
+export const usernameField = z
+  .string()
+  .trim()
+  .min(3, "Username must be at least 3 characters")
+  .max(50, "Username must not exceed 50 characters")
+  .regex(
+    /^[a-zA-Z0-9._-]+$/,
+    "Username may only contain alphanumeric characters, underscores, hyphens, and periods"
+  );
+
+// Unicode letters (\p{L}), marks (\p{M}), apostrophes (' ’), hyphens (-), periods (.), spaces
+const SAFE_INTERNATIONAL_NAME_REGEX = /^[\p{L}\p{M}'’\-\.\s]+$/u;
+
+export const displayNameField = z
+  .string()
+  .trim()
+  .min(2, "Display name must be at least 2 characters")
+  .max(100, "Display name must not exceed 100 characters")
+  .regex(SAFE_INTERNATIONAL_NAME_REGEX, "Display name contains invalid characters")
+  .refine((val) => !/[<>]/.test(val), {
+    message: "HTML tags are not permitted",
+  });
+
+export const firstNameField = z
+  .string({ required_error: "First name is required" })
+  .trim()
+  .min(1, "First name is required")
+  .max(100, "First name must not exceed 100 characters")
+  .regex(SAFE_INTERNATIONAL_NAME_REGEX, "First name contains invalid characters")
+  .refine((val) => !/[<>]/.test(val), {
+    message: "HTML tags are not permitted",
+  });
+
+export const lastNameField = z
+  .string({ required_error: "Last name is required" })
+  .trim()
+  .min(1, "Last name is required")
+  .max(100, "Last name must not exceed 100 characters")
+  .regex(SAFE_INTERNATIONAL_NAME_REGEX, "Last name contains invalid characters")
+  .refine((val) => !/[<>]/.test(val), {
+    message: "HTML tags are not permitted",
+  });
 
 /** Stronger policy for password reset / staff activation (not login). */
 const strongPasswordField = z
@@ -13,27 +108,44 @@ const strongPasswordField = z
   .regex(/[A-Z]/, "Password must include an uppercase letter")
   .regex(/[a-z]/, "Password must include a lowercase letter")
   .regex(/[0-9]/, "Password must include a number")
-  .regex(/[^A-Za-z0-9]/, "Password must include a special character");
+  .regex(/[^A-Za-z0-9]/, "Password must include a special character")
+  .refine((val) => !val.includes("\0"), {
+    message: "Password cannot contain null bytes",
+  });
 
 export const LoginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Please provide a valid email address"),
+  email: emailField,
   password: passwordField,
+  username: usernameField.optional(),
 });
 
 export const CandidateRegisterSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Please provide a valid email address"),
+  email: emailField,
   password: passwordField,
-  firstName: z.string().trim().min(1, "First name is required").max(100),
-  lastName: z.string().trim().min(1, "Last name is required").max(100),
+  username: usernameField.optional(),
+  displayName: displayNameField.optional(),
+  firstName: firstNameField,
+  lastName: lastNameField,
 });
 
 export const CandidateSignUpSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Please provide a valid email address"),
+  email: emailField,
   password: passwordField,
   confirmPassword: passwordField.optional(),
-  fullName: z.string().trim().min(1).max(200).optional(),
-  firstName: z.string().trim().min(1).max(100).optional(),
-  lastName: z.string().trim().min(1).max(100).optional(),
+  username: usernameField.optional(),
+  displayName: displayNameField.optional(),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, "Full name is required")
+    .max(200, "Full name must not exceed 200 characters")
+    .regex(SAFE_INTERNATIONAL_NAME_REGEX, "Full name contains invalid characters")
+    .refine((val) => !/[<>]/.test(val), {
+      message: "HTML tags are not permitted",
+    })
+    .optional(),
+  firstName: firstNameField.optional(),
+  lastName: lastNameField.optional(),
 }).refine((data) => {
   if (data.confirmPassword !== undefined) {
     return data.password === data.confirmPassword;

@@ -62,7 +62,7 @@ function VerifyResetOtpForm() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12">
         <div className="w-full max-w-md rounded-[20px] bg-white p-8 border border-[#E5EAE7] space-y-4 text-center">
-          <h2 className="text-xl font-bold text-[#0F1720]">Verify your email</h2>
+          <h2 className="text-xl font-bold text-[#0F1720]">Password Reset</h2>
           <p className="text-sm text-[#64748B]">
             Start from the forgot password page to receive a verification code.
           </p>
@@ -110,10 +110,10 @@ function VerifyResetOtpForm() {
             Security
           </p>
           <h2 className="mt-2 text-center text-2xl font-bold tracking-tight text-[#0F1720]">
-            Verify your email
+            Enter password reset code
           </h2>
           <p className="mt-1.5 text-center text-xs text-[#64748B] font-medium">
-            Enter the verification code we sent to
+            Enter the 8-digit verification code sent to
           </p>
           <p className="mt-1 text-center text-sm font-semibold text-[#0F1720]">{masked}</p>
           <p className="mt-3 text-center text-xs text-[#64748B]">

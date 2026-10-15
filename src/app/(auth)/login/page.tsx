@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signInAction } from "@/lib/auth/actions";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const isConfirmed = searchParams.get("confirmed") === "true";
+  const callbackError = searchParams.get("error");
+  const [error, setError] = useState<string | null>(
+    callbackError === "auth_callback_failed"
+      ? "Verification link expired or invalid. Please try signing in or request a new code."
+      : null
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -81,6 +88,15 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {isConfirmed && (
+          <div
+            className="rounded-[12px] bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 border border-emerald-200"
+            role="status"
+          >
+            Email confirmed successfully! You can now sign in with your credentials.
+          </div>
+        )}
+
         {error && (
           <div className="rounded-[12px] bg-rose-50 p-4 text-xs font-semibold text-rose-700 border border-rose-200" role="alert">
             {error}
@@ -148,5 +164,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

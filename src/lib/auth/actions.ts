@@ -20,6 +20,8 @@ import {
   DeactivateMemberSchema,
   ForgotPasswordSchema,
   ActivateStaffAccountSchema,
+  GENERIC_LOGIN_VALIDATION_ERROR,
+  GENERIC_SIGNUP_VALIDATION_ERROR,
 } from "@/lib/validation/auth.schemas";
 import {
   checkRateLimit,
@@ -55,18 +57,27 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
   let stage = "STAGE_0_START";
   try {
     stage = "STAGE_1_PARSE_INPUT";
+    const clientIp = await getClientIp();
     const rawData = {
       email: formData.get("email"),
       password: formData.get("password"),
+      username: formData.get("username") || undefined,
     };
 
     const parsed = LoginSchema.safeParse(rawData);
     if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+      logger.warn("[AUTH_VALIDATION_FAILURE] Login input validation rejected", {
+        endpoint: "signInAction",
+        ip: clientIp,
+        failedFields: parsed.error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          code: issue.code,
+        })),
+      });
+      return { success: false, error: GENERIC_LOGIN_VALIDATION_ERROR };
     }
 
     const normalizedEmail = parsed.data.email.toLowerCase().trim();
-    const clientIp = await getClientIp();
     const rateLimitParams = { email: normalizedEmail, ip: clientIp };
 
     console.log(`[AUTH_FLOW] LOGIN_START email_domain=${normalizedEmail.split("@")[1] ?? "unknown"}`);
@@ -297,16 +308,36 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
       return { success: false, error: "Registration rate limit exceeded. Please try again later." };
     }
 
+    const rawDisplayName = formData.get("displayName")?.toString().trim();
+    let rawFirstName = formData.get("firstName")?.toString().trim();
+    let rawLastName = formData.get("lastName")?.toString().trim();
+
+    if (!rawFirstName && rawDisplayName) {
+      const parts = rawDisplayName.split(" ");
+      rawFirstName = parts[0] || "Candidate";
+      rawLastName = parts.slice(1).join(" ") || "User";
+    }
+
     const rawData = {
       email: formData.get("email"),
       password: formData.get("password"),
-      firstName: formData.get("firstName"),
-      lastName: formData.get("lastName"),
+      username: formData.get("username") || undefined,
+      displayName: rawDisplayName || undefined,
+      firstName: rawFirstName,
+      lastName: rawLastName,
     };
 
     const parsed = CandidateRegisterSchema.safeParse(rawData);
     if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+      logger.warn("[AUTH_VALIDATION_FAILURE] Registration input validation rejected", {
+        endpoint: "signUpCandidateAction",
+        ip: clientIp,
+        failedFields: parsed.error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          code: issue.code,
+        })),
+      });
+      return { success: false, error: GENERIC_SIGNUP_VALIDATION_ERROR };
     }
 
     // 1. Resolve operating organization strictly via explicit OPERATING_ORGANIZATION_ID configuration
@@ -346,6 +377,7 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
       email: parsed.data.email,
       password: parsed.data.password,
       options: {
+        emailRedirectTo: buildAppUrl("/login?confirmed=true"),
         data: {
           firstName: parsed.data.firstName,
           lastName: parsed.data.lastName,
