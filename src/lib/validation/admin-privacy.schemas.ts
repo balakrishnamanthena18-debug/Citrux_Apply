@@ -91,14 +91,30 @@ export const ReassignWorkSchema = z
   );
 
 export const ListAuditLogsSchema = z.object({
-  page: z.number().int().min(1).default(1),
-  limit: z.number().int().min(1).max(100).default(25),
-  actorUserId: z.string().uuid("Invalid user ID format").optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  category: z.string().trim().optional(),
+  actorUserId: z.string().trim().optional(),
   entityType: z.string().trim().optional(),
-  entityId: z.string().uuid("Invalid entity ID format").optional(),
+  entityId: z.string().trim().max(255).optional(),
   action: z.string().trim().optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export const ExportAuditLogsSchema = z.object({
+  format: z.enum(["json", "csv"]).default("json"),
+  limit: z.coerce.number().int().min(1).max(500).default(500),
+  category: z.string().trim().optional(),
+  action: z.string().trim().optional(),
+  actorUserId: z.string().trim().optional(),
+  entityType: z.string().trim().optional(),
+  entityId: z.string().trim().max(255).optional(),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
 });
 
 export const CreatePrivacyRequestSchema = z.object({
@@ -137,6 +153,7 @@ export type SetEmployeeStatusInput = z.input<typeof SetEmployeeStatusSchema>;
 export type UpdateEmployeeRoleInput = z.input<typeof UpdateEmployeeRoleSchema>;
 export type ReassignWorkInput = z.input<typeof ReassignWorkSchema>;
 export type ListAuditLogsInput = z.input<typeof ListAuditLogsSchema>;
+export type ExportAuditLogsInput = z.input<typeof ExportAuditLogsSchema>;
 export type CreatePrivacyRequestInput = z.input<typeof CreatePrivacyRequestSchema>;
 export type VerifyPrivacyRequestInput = z.input<typeof VerifyPrivacyRequestSchema>;
 export type CompletePrivacyRequestInput = z.input<typeof CompletePrivacyRequestSchema>;

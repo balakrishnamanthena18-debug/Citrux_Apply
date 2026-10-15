@@ -5,6 +5,7 @@ import { useNavigationPending } from "@/components/navigation/NavigationPendingC
 import {
   GenericDashboardSkeleton,
   MessagesPageSkeleton,
+  AuditPageSkeleton,
 } from "@/components/navigation/RouteSkeletons";
 
 /**
@@ -37,6 +38,8 @@ export function SoftNavPendingShell({ children }: { children: React.ReactNode })
           {/* Opaque skeleton matching target route geometry */}
           {pendingHref?.includes("/messages") ? (
             <MessagesPageSkeleton />
+          ) : pendingHref?.includes("/admin/audit") ? (
+            <AuditPageSkeleton />
           ) : (
             <GenericDashboardSkeleton />
           )}

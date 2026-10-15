@@ -35,6 +35,7 @@ import {
   UpdateEmployeeRoleSchema,
   ReassignWorkSchema,
   ListAuditLogsSchema,
+  ExportAuditLogsSchema,
   type CreateEmployeeInput,
   type CreateDesignationInput,
   type UpdateDesignationInput,
@@ -46,7 +47,10 @@ import {
   type UpdateEmployeeRoleInput,
   type ReassignWorkInput,
   type ListAuditLogsInput,
+  type ExportAuditLogsInput,
 } from "@/lib/validation/admin-privacy.schemas";
+import { getActionsForCategory, getActionMetadata } from "@/lib/audit/catalog";
+import { sanitizeObject } from "@/lib/utils/sanitization";
 import {
   AuthorizationError,
   NotFoundError,
@@ -1242,6 +1246,95 @@ export async function reassignOperationalWorkAction(
   }
 }
 
+function buildAuditWhereClause(
+  organizationId: string,
+  params: {
+    category?: string;
+    action?: string;
+    actorUserId?: string;
+    entityType?: string;
+    entityId?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }
+) {
+  const whereClause: any = { organizationId };
+
+  if (params.category && params.category !== "ALL") {
+    const catActions = getActionsForCategory(params.category);
+    if (params.action && Object.values(AuditAction).includes(params.action as AuditAction)) {
+      if (catActions.includes(params.action as AuditAction)) {
+        whereClause.action = params.action as AuditAction;
+      } else {
+        whereClause.action = { in: [] };
+      }
+    } else {
+      whereClause.action = { in: catActions };
+    }
+  } else if (params.action && Object.values(AuditAction).includes(params.action as AuditAction)) {
+    whereClause.action = params.action as AuditAction;
+  }
+
+  if (params.actorUserId) {
+    whereClause.actorId = params.actorUserId;
+  }
+
+  if (params.entityType) {
+    whereClause.entityType = { contains: params.entityType, mode: "insensitive" };
+  }
+
+  if (params.entityId) {
+    whereClause.entityId = { contains: params.entityId, mode: "insensitive" };
+  }
+
+  if (params.startDate || params.endDate) {
+    whereClause.createdAt = {};
+    if (params.startDate) {
+      const s = params.startDate.length === 10 ? `${params.startDate}T00:00:00.000Z` : params.startDate;
+      const parsedStart = new Date(s);
+      if (!isNaN(parsedStart.getTime())) {
+        whereClause.createdAt.gte = parsedStart;
+      }
+    }
+    if (params.endDate) {
+      const e = params.endDate.length === 10 ? `${params.endDate}T23:59:59.999Z` : params.endDate;
+      const parsedEnd = new Date(e);
+      if (!isNaN(parsedEnd.getTime())) {
+        whereClause.createdAt.lte = parsedEnd;
+      }
+    }
+  }
+
+  if (params.search) {
+    const term = params.search.trim().toLowerCase();
+    const matchingActions = Object.values(AuditAction).filter(
+      (a) => a.toLowerCase().includes(term) || a.replace(/_/g, " ").toLowerCase().includes(term)
+    );
+
+    whereClause.OR = [
+      ...(matchingActions.length > 0 ? [{ action: { in: matchingActions } }] : []),
+      { entityType: { contains: term, mode: "insensitive" } },
+      { entityId: { contains: term, mode: "insensitive" } },
+      { ipAddress: { contains: term, mode: "insensitive" } },
+      { actor: { email: { contains: term, mode: "insensitive" } } },
+      { actor: { firstName: { contains: term, mode: "insensitive" } } },
+      { actor: { lastName: { contains: term, mode: "insensitive" } } },
+    ];
+  }
+
+  return whereClause;
+}
+
+function escapeCsv(val: any): string {
+  if (val === null || val === undefined) return "";
+  const str = typeof val === "object" ? JSON.stringify(val) : String(val);
+  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 export async function listAuditLogsAction(
   input?: ListAuditLogsInput
 ): Promise<ActionResult<{ logs: any[]; totalCount: number; page: number; totalPages: number }>> {
@@ -1254,24 +1347,11 @@ export async function listAuditLogsAction(
     const ctx = await getAuthenticatedContext();
     requireAdmin(ctx);
 
-    const { page, limit, actorUserId, entityType, entityId, action, startDate, endDate } = parsed.data;
+    const { page, limit, sortOrder, ...filterParams } = parsed.data;
     const skip = (page - 1) * limit;
 
     const result = await withRlsContext(ctx.userId, async (tx) => {
-      const whereClause: any = {
-        organizationId: ctx.organizationId,
-      };
-
-      if (actorUserId) whereClause.actorId = actorUserId;
-      if (entityType) whereClause.entityType = entityType;
-      if (entityId) whereClause.entityId = entityId;
-      if (action) whereClause.action = action;
-
-      if (startDate || endDate) {
-        whereClause.createdAt = {};
-        if (startDate) whereClause.createdAt.gte = new Date(startDate);
-        if (endDate) whereClause.createdAt.lte = new Date(endDate);
-      }
+      const whereClause = buildAuditWhereClause(ctx.organizationId, filterParams);
 
       const logs = await tx.auditEvent.findMany({
         where: whereClause,
@@ -1280,7 +1360,7 @@ export async function listAuditLogsAction(
             select: { id: true, firstName: true, lastName: true, email: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: sortOrder }, { id: sortOrder }],
         skip,
         take: limit,
       });
@@ -1289,12 +1369,17 @@ export async function listAuditLogsAction(
       return { logs, totalCount };
     });
 
+    const sanitizedLogs = result.logs.map((evt) => ({
+      ...evt,
+      details: evt.details ? sanitizeObject(evt.details) : null,
+    }));
+
     const totalPages = Math.ceil(result.totalCount / limit) || 1;
 
     return {
       success: true,
       data: {
-        logs: result.logs,
+        logs: sanitizedLogs,
         totalCount: result.totalCount,
         page,
         totalPages,
@@ -1304,4 +1389,106 @@ export async function listAuditLogsAction(
     return { success: false, error: err.message || "Failed to list audit logs" };
   }
 }
+
+export async function exportAuditLogsAction(
+  input?: ExportAuditLogsInput
+): Promise<ActionResult<{ format: "json" | "csv"; data: string; count: number; filename: string }>> {
+  const parsed = ExportAuditLogsSchema.safeParse(input || {});
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireAdmin(ctx);
+
+    const { format, limit, ...filterParams } = parsed.data;
+
+    const result = await withRlsContext(ctx.userId, async (tx) => {
+      const whereClause = buildAuditWhereClause(ctx.organizationId, filterParams);
+
+      const logs = await tx.auditEvent.findMany({
+        where: whereClause,
+        include: {
+          actor: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit,
+      });
+
+      return logs;
+    });
+
+    const sanitizedLogs = result.map((evt) => ({
+      ...evt,
+      details: evt.details ? sanitizeObject(evt.details) : null,
+    }));
+
+    const dateSlug = new Date().toISOString().slice(0, 10);
+    const filename = `audit-export-${dateSlug}.${format}`;
+
+    if (format === "json") {
+      return {
+        success: true,
+        data: {
+          format: "json",
+          data: JSON.stringify(sanitizedLogs, null, 2),
+          count: sanitizedLogs.length,
+          filename,
+        },
+      };
+    }
+
+    const headers = [
+      "ID",
+      "Timestamp_UTC",
+      "Action",
+      "Category",
+      "Actor_ID",
+      "Actor_Name",
+      "Actor_Email",
+      "Actor_Type",
+      "Entity_Type",
+      "Entity_ID",
+      "IP_Address",
+      "Details",
+    ];
+
+    const rows = sanitizedLogs.map((evt) => {
+      const meta = getActionMetadata(evt.action);
+      const actorName = evt.actor ? `${evt.actor.firstName || ""} ${evt.actor.lastName || ""}`.trim() : "";
+      return [
+        escapeCsv(evt.id),
+        escapeCsv(evt.createdAt.toISOString()),
+        escapeCsv(evt.action),
+        escapeCsv(meta.category),
+        escapeCsv(evt.actorId || ""),
+        escapeCsv(actorName),
+        escapeCsv(evt.actor?.email || ""),
+        escapeCsv(evt.actorType),
+        escapeCsv(evt.entityType),
+        escapeCsv(evt.entityId || ""),
+        escapeCsv(evt.ipAddress || ""),
+        escapeCsv(evt.details ? JSON.stringify(evt.details) : ""),
+      ].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+
+    return {
+      success: true,
+      data: {
+        format: "csv",
+        data: csvContent,
+        count: sanitizedLogs.length,
+        filename,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to export audit logs" };
+  }
+}
+
 

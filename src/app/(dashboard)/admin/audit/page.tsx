@@ -2,13 +2,23 @@ import { getAuthenticatedContext, requireAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { AuditAction } from "@/generated/prisma";
 import Link from "next/link";
+import { AuditInvestigationWorkbench, type AuditKpis } from "@/components/admin/AuditInvestigationWorkbench";
+import { getActionsForCategory } from "@/lib/audit/catalog";
+import { sanitizeObject } from "@/lib/utils/sanitization";
 
 interface AuditPageProps {
   searchParams?: Promise<{
     action?: string;
+    category?: string;
     entityType?: string;
+    entityId?: string;
     actorUserId?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
     page?: string;
+    limit?: string;
+    sortOrder?: "asc" | "desc";
   }>;
 }
 
@@ -17,26 +27,83 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   requireAdmin(ctx);
 
   const resolvedParams = searchParams ? await searchParams : {};
+  const selectedCategory = resolvedParams.category || "ALL";
   const selectedAction = resolvedParams.action || undefined;
   const selectedEntityType = resolvedParams.entityType || undefined;
+  const selectedEntityId = resolvedParams.entityId || undefined;
   const selectedActor = resolvedParams.actorUserId || undefined;
+  const startDate = resolvedParams.startDate || undefined;
+  const endDate = resolvedParams.endDate || undefined;
+  const searchTerm = resolvedParams.search || undefined;
+  const sortOrder = resolvedParams.sortOrder === "asc" ? "asc" : "desc";
   const currentPage = Math.max(1, parseInt(resolvedParams.page || "1", 10));
-  const limit = 50;
+  const limit = Math.min(100, Math.max(1, parseInt(resolvedParams.limit || "25", 10)));
   const skip = (currentPage - 1) * limit;
 
-  const { auditEvents, totalCount } = await withRlsContext(ctx.userId, async (tx) => {
+  const { auditEvents, totalCount, kpis, knownActors } = await withRlsContext(ctx.userId, async (tx) => {
     const whereClause: any = { organizationId: ctx.organizationId };
 
-    if (selectedAction && Object.values(AuditAction).includes(selectedAction as AuditAction)) {
+    if (selectedCategory && selectedCategory !== "ALL") {
+      const catActions = getActionsForCategory(selectedCategory);
+      if (selectedAction && Object.values(AuditAction).includes(selectedAction as AuditAction)) {
+        if (catActions.includes(selectedAction as AuditAction)) {
+          whereClause.action = selectedAction as AuditAction;
+        } else {
+          whereClause.action = { in: [] };
+        }
+      } else {
+        whereClause.action = { in: catActions };
+      }
+    } else if (selectedAction && Object.values(AuditAction).includes(selectedAction as AuditAction)) {
       whereClause.action = selectedAction as AuditAction;
     }
+
     if (selectedEntityType) {
-      whereClause.entityType = selectedEntityType;
+      whereClause.entityType = { contains: selectedEntityType, mode: "insensitive" };
+    }
+    if (selectedEntityId) {
+      whereClause.entityId = { contains: selectedEntityId, mode: "insensitive" };
     }
     if (selectedActor) {
       whereClause.actorId = selectedActor;
     }
 
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) {
+        const s = startDate.length === 10 ? `${startDate}T00:00:00.000Z` : startDate;
+        const parsedStart = new Date(s);
+        if (!isNaN(parsedStart.getTime())) {
+          whereClause.createdAt.gte = parsedStart;
+        }
+      }
+      if (endDate) {
+        const e = endDate.length === 10 ? `${endDate}T23:59:59.999Z` : endDate;
+        const parsedEnd = new Date(e);
+        if (!isNaN(parsedEnd.getTime())) {
+          whereClause.createdAt.lte = parsedEnd;
+        }
+      }
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.trim().toLowerCase();
+      const matchingActions = Object.values(AuditAction).filter(
+        (a) => a.toLowerCase().includes(term) || a.replace(/_/g, " ").toLowerCase().includes(term)
+      );
+
+      whereClause.OR = [
+        ...(matchingActions.length > 0 ? [{ action: { in: matchingActions } }] : []),
+        { entityType: { contains: term, mode: "insensitive" } },
+        { entityId: { contains: term, mode: "insensitive" } },
+        { ipAddress: { contains: term, mode: "insensitive" } },
+        { actor: { email: { contains: term, mode: "insensitive" } } },
+        { actor: { firstName: { contains: term, mode: "insensitive" } } },
+        { actor: { lastName: { contains: term, mode: "insensitive" } } },
+      ];
+    }
+
+    // Main bounded query
     const events = await tx.auditEvent.findMany({
       where: whereClause,
       include: {
@@ -44,183 +111,123 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: sortOrder }, { id: sortOrder }],
       skip,
       take: limit,
     });
+
     const count = await tx.auditEvent.count({ where: whereClause });
 
-    return { auditEvents: events, totalCount: count };
+    // Real KPI metrics scoped to tenant
+    const [totalOrgEvents, securityAlertsCount, authLoginsCount, actorGroups] = await Promise.all([
+      tx.auditEvent.count({ where: { organizationId: ctx.organizationId } }),
+      tx.auditEvent.count({
+        where: {
+          organizationId: ctx.organizationId,
+          action: {
+            in: [
+              AuditAction.SECURITY_ALERT,
+              AuditAction.ACCESS_DENIED,
+              AuditAction.SECURITY_ALERT_INVALID_STORAGE_PATH,
+            ],
+          },
+        },
+      }),
+      tx.auditEvent.count({
+        where: {
+          organizationId: ctx.organizationId,
+          action: AuditAction.USER_LOGIN,
+        },
+      }),
+      tx.auditEvent.groupBy({
+        by: ["actorId"],
+        where: {
+          organizationId: ctx.organizationId,
+          actorId: { not: null },
+        },
+      }),
+    ]);
+
+    // Known staff / actors for filter dropdowns
+    const staffMembers = await tx.membership.findMany({
+      where: { organizationId: ctx.organizationId },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+      take: 50,
+    });
+
+    const actorList = staffMembers.map((m) => ({
+      id: m.user.id,
+      name: `${m.user.firstName || ""} ${m.user.lastName || ""}`.trim() || m.user.email,
+      email: m.user.email,
+    }));
+
+    const kpisData: AuditKpis = {
+      totalEvents: totalOrgEvents,
+      securityEvents: securityAlertsCount,
+      authSessions: authLoginsCount,
+      activeActors: actorGroups.length,
+    };
+
+    return {
+      auditEvents: events,
+      totalCount: count,
+      kpis: kpisData,
+      knownActors: actorList,
+    };
   });
 
-  const totalPages = Math.ceil(totalCount / limit) || 1;
+  const sanitizedEvents = auditEvents.map((evt) => ({
+    ...evt,
+    details: (evt.details ? sanitizeObject(evt.details) : null) as Record<string, unknown> | null,
+  }));
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">Authoritative Audit Trail</h1>
-          <p className="mt-1 text-sm text-[#64748B]">
-            Immutable, append-only security and operational audit records for organization governance.
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-[#0F1720] tracking-tight">Authoritative Audit Trail</h1>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Append-Only
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-[#64748B] max-w-2xl leading-relaxed">
+            Immutable, append-only security and operational audit records under organizational governance.
+            Inspect actor actions, state transitions, and forensic metadata with tenant isolation.
           </p>
         </div>
+
         <Link
           href="/admin"
-          className="text-sm font-medium text-[#64748B] hover:text-[#0F1720] bg-white border border-[#E5EAE7] px-3 py-1.5 rounded-md hover:bg-[#F7F9F8] shadow-[0_10px_40px_rgba(15,23,32,0.03)]"
+          className="self-start sm:self-auto text-xs font-semibold text-[#64748B] hover:text-[#0F1720] bg-white border border-[#E5EAE7] px-3.5 py-2 rounded-[10px] hover:bg-[#F7F9F8] shadow-2xs transition-colors"
         >
           ← Back to Admin Console
         </Link>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)]">
-        <form method="GET" className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-          <div>
-            <label className="block text-xs font-medium text-[#334155]">Audit Action</label>
-            <select
-              name="action"
-              defaultValue={selectedAction ?? ""}
-              className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 bg-white"
-            >
-              <option value="">All Actions</option>
-              {Object.values(AuditAction).map((act) => (
-                <option key={act} value={act}>
-                  {act}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#334155]">Entity Type</label>
-            <input
-              name="entityType"
-              defaultValue={selectedEntityType ?? ""}
-              placeholder="e.g. Membership, PrivacyRequest..."
-              className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#334155]">Actor UUID</label>
-            <input
-              name="actorUserId"
-              defaultValue={selectedActor ?? ""}
-              placeholder="Filter by Actor User ID"
-              className="mt-1 block w-full rounded-md border border-[#DDE5E0] px-3 py-1.5 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-            />
-          </div>
-
-          <div className="flex space-x-2">
-            <button
-              type="submit"
-              className="rounded-md bg-slate-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-            >
-              Filter Logs
-            </button>
-            <Link
-              href="/admin/audit"
-              className="rounded-md bg-white border border-[#DDE5E0] px-3 py-1.5 text-xs font-medium text-[#334155] hover:bg-[#F7F9F8]"
-            >
-              Reset
-            </Link>
-          </div>
-        </form>
-      </div>
-
-      {/* Audit Log Table */}
-      <div className="bg-white rounded-[16px] border border-[#E5EAE7] shadow-[0_10px_40px_rgba(15,23,32,0.03)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#E5EAE7] bg-[#F7F9F8] flex justify-between items-center">
-          <span className="text-xs font-semibold text-[#334155]">
-            Showing {auditEvents.length} of {totalCount} events (Page {currentPage} of {totalPages})
-          </span>
-        </div>
-
-        <table className="min-w-full divide-y divide-[#E5EAE7]">
-          <thead className="bg-[#F7F9F8]">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
-                Timestamp (UTC)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
-                Action
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
-                Actor
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
-                Entity
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[#64748B] uppercase tracking-wider">
-                Details & Metadata
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-[#E5EAE7] font-mono text-xs">
-            {auditEvents.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-[#64748B] font-sans text-sm">
-                  No audit events found matching criteria.
-                </td>
-              </tr>
-            ) : (
-              auditEvents.map((event) => (
-                <tr key={event.id} className="hover:bg-[#F7F9F8]">
-                  <td className="px-6 py-3 whitespace-nowrap text-[#64748B]">
-                    {new Date(event.createdAt).toISOString()}
-                  </td>
-                  <td className="px-6 py-3 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#EDF1EF] text-[#0F1720] border border-[#E5EAE7]">
-                      {event.action}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-[#334155] font-sans">
-                    {event.actor ? (
-                      <div>
-                        <div className="font-medium text-[#0F1720]">{event.actor.firstName} {event.actor.lastName}</div>
-                        <div className="text-xs text-[#64748B] font-mono">{event.actor.email}</div>
-                      </div>
-                    ) : (
-                      <span className="text-[#64748B]">{event.actorType}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-[#64748B]">
-                    {event.entityType}:{event.entityId ?? "N/A"}
-                  </td>
-                  <td className="px-6 py-3 text-[#64748B] max-w-md break-all">
-                    {event.details ? JSON.stringify(event.details) : "-"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 py-3 bg-[#F7F9F8] border-t border-[#E5EAE7] flex justify-between items-center">
-            <Link
-              href={`/admin/audit?page=${Math.max(1, currentPage - 1)}${selectedAction ? `&action=${selectedAction}` : ""}${selectedEntityType ? `&entityType=${selectedEntityType}` : ""}`}
-              className={`px-3 py-1 rounded text-xs font-medium border bg-white ${
-                currentPage === 1 ? "pointer-events-none opacity-50 text-[#94A3B8]" : "text-[#334155] hover:bg-[#EDF1EF]"
-              }`}
-            >
-              Previous
-            </Link>
-            <span className="text-xs text-[#64748B]">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Link
-              href={`/admin/audit?page=${Math.min(totalPages, currentPage + 1)}${selectedAction ? `&action=${selectedAction}` : ""}${selectedEntityType ? `&entityType=${selectedEntityType}` : ""}`}
-              className={`px-3 py-1 rounded text-xs font-medium border bg-white ${
-                currentPage === totalPages ? "pointer-events-none opacity-50 text-[#94A3B8]" : "text-[#334155] hover:bg-[#EDF1EF]"
-              }`}
-            >
-              Next
-            </Link>
-          </div>
-        )}
-      </div>
+      {/* Interactive Workbench with Real Data */}
+      <AuditInvestigationWorkbench
+        initialEvents={sanitizedEvents as any}
+        initialTotalCount={totalCount}
+        initialFilters={{
+          category: selectedCategory,
+          action: selectedAction,
+          actorUserId: selectedActor,
+          entityType: selectedEntityType,
+          entityId: selectedEntityId,
+          startDate,
+          endDate,
+          search: searchTerm,
+          page: currentPage,
+          limit,
+          sortOrder,
+        }}
+        kpis={kpis}
+        knownActors={knownActors}
+      />
     </div>
   );
 }
