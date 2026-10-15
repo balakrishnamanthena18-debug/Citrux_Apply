@@ -174,7 +174,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 4. Create user in Supabase Auth
+  // 4. Pre-check database to prevent redundant Supabase Auth calls and email quota burn if user already exists
+  const existingUser = prisma.user?.findUnique
+    ? await prisma.user.findUnique({
+        where: { email: parsed.data.email },
+        select: { id: true },
+      })
+    : null;
+  if (existingUser) {
+    return NextResponse.json(
+      { success: false, error: "A user with this email address already exists" },
+      { status: 409 }
+    );
+  }
+
+  // 5. Create user in Supabase Auth
   const supabase = await createServerClient();
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -192,9 +206,38 @@ export async function POST(request: NextRequest) {
 
   if (authError || !authData.user) {
     const rawMessage = (authError?.message || "").toLowerCase();
+    const status = authError?.status;
+    const code = (authError as any)?.code;
+
+    const isRateLimited =
+      status === 429 ||
+      code === "over_email_send_rate_limit" ||
+      code === "over_request_rate_limit" ||
+      rawMessage.includes("rate limit") ||
+      rawMessage.includes("too many requests") ||
+      rawMessage.includes("email rate limit");
+
+    if (isRateLimited) {
+      logger.warn("[AUTH_FLOW] Supabase Auth email rate limit exceeded during registration", {
+        endpoint: "/api/auth/signup",
+        status,
+        code,
+        message: authError?.message,
+        ip: clientIp,
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Too many registration or verification email requests. Please wait a few minutes before trying again, or contact support if the issue persists.",
+        },
+        { status: 429 }
+      );
+    }
+
     const isInternalError =
-      (authError?.status !== undefined && authError.status >= 500) ||
-      (authError as any)?.code === "unexpected_failure" ||
+      (status !== undefined && status >= 500) ||
+      code === "unexpected_failure" ||
       rawMessage.includes("database error") ||
       rawMessage.includes("scan error") ||
       rawMessage.includes("internal server error") ||
@@ -202,8 +245,8 @@ export async function POST(request: NextRequest) {
 
     if (isInternalError) {
       logger.error("[AUTH_FLOW] Supabase Auth internal error during registration:", {
-        status: authError?.status,
-        code: (authError as any)?.code,
+        status,
+        code,
         message: authError?.message,
       });
 
@@ -216,7 +259,7 @@ export async function POST(request: NextRequest) {
             email: parsed.data.email,
             ip: clientIp,
             reason: "Supabase Auth upstream error during registration",
-            errorStatus: authError?.status,
+            errorStatus: status,
           },
         });
       } catch {}
@@ -245,15 +288,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    logger.warn("[AUTH_FLOW] Supabase Auth error during registration", {
+      endpoint: "/api/auth/signup",
+      status,
+      code,
+      message: authError?.message,
+      ip: clientIp,
+    });
+
     return NextResponse.json(
       { success: false, error: authError?.message ?? "Registration failed" },
       { status: 400 }
     );
   }
 
+  // Check if Supabase returned user with empty identities (email enumeration protection enabled)
+  if (authData.user.identities && authData.user.identities.length === 0) {
+    return NextResponse.json(
+      { success: false, error: "A user with this email address already exists" },
+      { status: 409 }
+    );
+  }
+
   const userId = authData.user.id;
 
-  // 5. Create User record and Candidate Membership within user's RLS context
+  // 6. Create User record and Candidate Membership within user's RLS context
   try {
     await withRlsContext(userId, async (tx) => {
       await tx.user.create({
@@ -292,6 +351,13 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (err: any) {
+    if (err?.code === "P2002" || err?.message?.toLowerCase().includes("unique constraint")) {
+      return NextResponse.json(
+        { success: false, error: "A user with this email address already exists" },
+        { status: 409 }
+      );
+    }
+
     logger.error("[AUTH_FLOW] Failed to initialize user and candidate membership in database", {
       userId,
       error: err?.message,

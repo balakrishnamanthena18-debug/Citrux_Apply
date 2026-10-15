@@ -371,7 +371,18 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
       return { success: false, error: "Operating organization is unavailable or inactive. Registration is disabled." };
     }
 
-    // 2. Create user in Supabase Auth
+    // 2. Pre-check database to prevent redundant Supabase Auth calls and email quota burn if user already exists
+    const existingUser = prisma.user?.findUnique
+      ? await prisma.user.findUnique({
+          where: { email: parsed.data.email },
+          select: { id: true },
+        })
+      : null;
+    if (existingUser) {
+      return { success: false, error: "A user with this email address already exists" };
+    }
+
+    // 3. Create user in Supabase Auth
     const supabase = await createServerClient();
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: parsed.data.email,
@@ -387,18 +398,44 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
 
     if (authError || !authData.user) {
       const rawMessage = (authError?.message || "").toLowerCase();
+      const status = authError?.status;
+      const code = (authError as any)?.code;
+
+      const isRateLimited =
+        status === 429 ||
+        code === "over_email_send_rate_limit" ||
+        code === "over_request_rate_limit" ||
+        rawMessage.includes("rate limit") ||
+        rawMessage.includes("too many requests") ||
+        rawMessage.includes("email rate limit");
+
+      if (isRateLimited) {
+        logger.warn("[AUTH_FLOW] Supabase Auth email rate limit exceeded during registration", {
+          endpoint: "signUpCandidateAction",
+          status,
+          code,
+          message: authError?.message,
+          ip: clientIp,
+        });
+
+        return {
+          success: false,
+          error: "Too many registration or verification email requests. Please wait a few minutes before trying again, or contact support if the issue persists.",
+        };
+      }
+
       const isInternalError =
-        (authError?.status !== undefined && authError.status >= 500) ||
-        (authError as any)?.code === "unexpected_failure" ||
+        (status !== undefined && status >= 500) ||
+        code === "unexpected_failure" ||
         rawMessage.includes("database error") ||
         rawMessage.includes("scan error") ||
         rawMessage.includes("internal server error") ||
         rawMessage.includes("connection");
 
       if (isInternalError) {
-        console.error("[AUTH_FLOW] Supabase Auth internal error during registration:", {
-          status: authError?.status,
-          code: (authError as any)?.code,
+        logger.error("[AUTH_FLOW] Supabase Auth internal error during registration:", {
+          status,
+          code,
           message: authError?.message,
         });
 
@@ -411,7 +448,7 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
               email: parsed.data.email,
               ip: clientIp,
               reason: "Supabase Auth upstream error during registration",
-              errorStatus: authError?.status,
+              errorStatus: status,
             },
           });
         } catch {}
@@ -434,12 +471,25 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
         return { success: false, error: "A user with this email address already exists" };
       }
 
+      logger.warn("[AUTH_FLOW] Supabase Auth error during registration", {
+        endpoint: "signUpCandidateAction",
+        status,
+        code,
+        message: authError?.message,
+        ip: clientIp,
+      });
+
       return { success: false, error: authError?.message ?? "Registration failed" };
+    }
+
+    // Check if Supabase returned user with empty identities (email enumeration protection enabled)
+    if (authData.user.identities && authData.user.identities.length === 0) {
+      return { success: false, error: "A user with this email address already exists" };
     }
 
     const userId = authData.user.id;
 
-    // 3. Create User record and Candidate Membership within user's RLS context
+    // 4. Create User record and Candidate Membership within user's RLS context
     try {
       await withRlsContext(userId, async (tx) => {
         await tx.user.create({
@@ -475,6 +525,9 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
 
       return { success: true, data: { redirectUrl: "/candidate" } };
     } catch (err: any) {
+      if (err?.code === "P2002" || err?.message?.toLowerCase().includes("unique constraint")) {
+        return { success: false, error: "A user with this email address already exists" };
+      }
       return { success: false, error: err.message || "Failed to initialize candidate account" };
     }
   } catch (err: any) {

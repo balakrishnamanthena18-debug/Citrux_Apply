@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signUpCandidateAction } from "@/lib/auth/actions";
@@ -9,9 +9,12 @@ export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setError(null);
     setLoading(true);
 
@@ -21,7 +24,6 @@ export default function RegisterPage() {
 
       if (!result.success) {
         setError(result.error || "Registration failed");
-        setLoading(false);
         return;
       }
 
@@ -29,11 +31,12 @@ export default function RegisterPage() {
         window.location.assign(result.data.redirectUrl);
       } else {
         setError("Account created, but redirect destination was missing.");
-        setLoading(false);
       }
     } catch (err: any) {
       console.error("[REGISTER_CLIENT_ERROR]", err);
       setError(err?.message || "An unexpected error occurred during registration. Please try again.");
+    } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   }
@@ -96,7 +99,8 @@ export default function RegisterPage() {
                   name="firstName"
                   type="text"
                   required
-                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
+                  disabled={loading}
+                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
                   placeholder="Jane"
                 />
               </div>
@@ -110,7 +114,8 @@ export default function RegisterPage() {
                   name="lastName"
                   type="text"
                   required
-                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
+                  disabled={loading}
+                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
                   placeholder="Doe"
                 />
               </div>
@@ -126,7 +131,8 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
+                disabled={loading}
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
                 placeholder="jane@example.com"
               />
             </div>
@@ -141,7 +147,8 @@ export default function RegisterPage() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
+                disabled={loading}
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
                 placeholder="••••••••"
               />
               <p className="mt-1 text-[11px] text-[#94A3B8]">Minimum 8 characters</p>
