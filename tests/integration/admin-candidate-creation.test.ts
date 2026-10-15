@@ -736,7 +736,7 @@ describe("Admin Candidate Creation & Invitation Email Flow (tests/integration/ad
       }
     });
 
-    it("4.6 Candidate invitation in production with missing URL fails safely, preserves account, and does not send localhost email", async () => {
+    it("4.6 Candidate invitation in production with missing URL safely falls back to default production domain without localhost leakage", async () => {
       const origNodeEnv = process.env.NODE_ENV;
       const origAppUrl = process.env.NEXT_PUBLIC_APP_URL;
       const origServerAppUrl = process.env.APP_URL;
@@ -772,15 +772,23 @@ describe("Admin Candidate Creation & Invitation Email Flow (tests/integration/ad
           sendInvitation: true,
         });
 
-        // Candidate account is preserved even though URL resolution / email fails
+        // Candidate account is created and invitation succeeds using fallback production URL
         expect(res.success).toBe(true);
         expect(res.data?.candidateId).toBe(mockCandidateRecordId);
         expect(res.data?.invitation?.attempted).toBe(true);
-        expect(res.data?.invitation?.sent).toBe(false);
-        expect(res.data?.invitation?.error).toContain("Production application URL is not configured");
+        expect(res.data?.invitation?.sent).toBe(true);
 
-        // Email service was NOT called with any email
-        expect(mockSendTransactionalNotification).not.toHaveBeenCalled();
+        // Email service was called with canonical production URL, NEVER localhost
+        expect(mockSendTransactionalNotification).toHaveBeenCalledWith(
+          expect.objectContaining({
+            recipientEmail: "failsafe@example.com",
+            htmlBody: expect.stringContaining("https://portal.careerbutton.in/auth/activate?token="),
+            textBody: expect.stringContaining("https://portal.careerbutton.in/auth/activate?token="),
+          })
+        );
+        const lastCall = (mockSendTransactionalNotification as any).mock.calls.at(-1)?.[0];
+        expect(lastCall?.htmlBody).not.toContain("localhost");
+        expect(lastCall?.textBody).not.toContain("localhost");
       } finally {
         (process.env as Record<string, string | undefined>).NODE_ENV = origNodeEnv;
         process.env.NEXT_PUBLIC_APP_URL = origAppUrl;

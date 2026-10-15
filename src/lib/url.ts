@@ -14,11 +14,11 @@ export class AppUrlConfigurationError extends Error {
   }
 }
 
-export const DEFAULT_PRODUCTION_APP_URL = "https://citrux-apply-mrgx.vercel.app";
+export const DEFAULT_PRODUCTION_APP_URL = "https://portal.careerbutton.in";
 
 export const ALLOWED_REDIRECT_ORIGINS = new Set([
-  "https://citrux-apply-mrgx.vercel.app",
   "https://portal.careerbutton.in",
+  "https://citrux-apply-mrgx.vercel.app",
   "https://www.careerbutton.in",
   "https://careerbutton.in",
 ]);
@@ -31,12 +31,40 @@ export const LOCAL_DEV_ORIGINS = new Set([
 export interface ResolveUrlOptions {
   env?: Record<string, string | undefined>;
   nodeEnv?: string;
+  requestOrigin?: string | null;
 }
 
 export interface UrlValidationResult {
   isValid: boolean;
   error?: string;
   normalizedUrl?: string;
+}
+
+/**
+ * Determines whether the current execution context is running in a production or deployed cloud environment.
+ * Checks:
+ * 1. options.nodeEnv or env.NODE_ENV or process.env.NODE_ENV is "production" (case-insensitive)
+ * 2. VERCEL === "1"
+ * 3. VERCEL_ENV === "production"
+ * 4. NEXT_PUBLIC_VERCEL_ENV === "production"
+ */
+export function isProductionEnvironment(options?: {
+  env?: Record<string, string | undefined>;
+  nodeEnv?: string;
+}): boolean {
+  const envSource = options?.env ?? process.env;
+  const rawNodeEnv = (options?.nodeEnv ?? envSource.NODE_ENV ?? process.env.NODE_ENV ?? "")
+    .toLowerCase()
+    .trim();
+  if (rawNodeEnv === "production" || rawNodeEnv === "prod") {
+    return true;
+  }
+  const isVercel = envSource.VERCEL === "1" || process.env.VERCEL === "1";
+  const vercelEnv = (envSource.VERCEL_ENV ?? process.env.VERCEL_ENV ?? "").toLowerCase().trim();
+  if (isVercel && (vercelEnv === "production" || !vercelEnv)) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -73,6 +101,51 @@ function isLocalOrPrivateHost(hostname: string): boolean {
 }
 
 /**
+ * Safely extracts and validates a trusted origin from incoming request host and protocol headers.
+ * Strictly verifies against ALLOWED_REDIRECT_ORIGINS (and LOCAL_DEV_ORIGINS in development).
+ * Rejects any spoofed, unexpected, or unapproved host headers.
+ */
+export function getTrustedOriginFromHost(
+  rawHost: string | null | undefined,
+  rawProto?: string | null,
+  options?: { nodeEnv?: string; env?: Record<string, string | undefined> }
+): string | undefined {
+  if (!rawHost || typeof rawHost !== "string") return undefined;
+
+  // Forwarded host can be a comma-separated list; take the client-facing (first) host
+  const host = (rawHost.split(",")[0] ?? "").trim();
+  if (!host) return undefined;
+
+  const isProduction = isProductionEnvironment(options);
+  const proto = (
+    rawProto?.split(",")[0]?.trim() || (isProduction ? "https" : "http")
+  ).toLowerCase();
+
+  try {
+    const candidateUrl = new URL(`${proto}://${host}`);
+    const origin = candidateUrl.origin;
+
+    if (isProduction) {
+      if (
+        candidateUrl.protocol === "https:" &&
+        ALLOWED_REDIRECT_ORIGINS.has(origin) &&
+        !isLocalOrPrivateHost(candidateUrl.hostname)
+      ) {
+        return origin;
+      }
+      return undefined;
+    }
+
+    if (ALLOWED_REDIRECT_ORIGINS.has(origin) || LOCAL_DEV_ORIGINS.has(origin)) {
+      return origin;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Validates a candidate URL string for a given environment.
  */
 export function validateAppUrl(candidateUrl: string, nodeEnv?: string): UrlValidationResult {
@@ -88,8 +161,7 @@ export function validateAppUrl(candidateUrl: string, nodeEnv?: string): UrlValid
     return { isValid: false, error: `Invalid URL format: "${trimmed}" is not a valid absolute URL.` };
   }
 
-  const effectiveNodeEnv = nodeEnv ?? process.env.NODE_ENV ?? "development";
-  const isProduction = effectiveNodeEnv === "production";
+  const isProduction = isProductionEnvironment({ nodeEnv });
 
   if (isProduction) {
     if (parsed.protocol !== "https:") {
@@ -129,18 +201,47 @@ export function validateAppUrl(candidateUrl: string, nodeEnv?: string): UrlValid
  * Resolves the canonical base application URL.
  *
  * Rules:
- * 1. In local dev or test: defaults to "http://localhost:3000" if unconfigured.
- * 2. In production: uses configured APP_URL or NEXT_PUBLIC_APP_URL if valid HTTPS non-localhost.
- *    If unconfigured or invalid, safely falls back to DEFAULT_PRODUCTION_APP_URL (https://citrux-apply-mrgx.vercel.app).
- * 3. Never returns localhost in production.
- * 4. Normalizes trailing slashes.
+ * 1. If options.requestOrigin is provided and is an approved origin:
+ *    Uses the verified request origin (e.g., https://portal.careerbutton.in).
+ * 2. Checks server-canonical APP_URL, then public NEXT_PUBLIC_APP_URL:
+ *    In production: must be HTTPS non-localhost.
+ * 3. In production: if unconfigured, invalid, or resolves to localhost, safely falls back
+ *    to DEFAULT_PRODUCTION_APP_URL (https://portal.careerbutton.in).
+ * 4. Never returns localhost in production or deployed cloud environments.
+ * 5. In local dev or test: defaults to "http://localhost:3000" if unconfigured.
+ * 6. Normalizes trailing slashes.
  */
 export function resolveAppUrl(options?: ResolveUrlOptions): string {
   const envSource = options?.env ?? process.env;
-  const effectiveNodeEnv = options?.nodeEnv ?? envSource.NODE_ENV ?? process.env.NODE_ENV ?? "development";
-  const isProduction = effectiveNodeEnv === "production";
+  const isProduction = isProductionEnvironment(options);
 
-  // Check server-canonical APP_URL first, then public NEXT_PUBLIC_APP_URL
+  // 1. If request origin is provided from incoming HTTP headers and is an approved origin, use it
+  if (options?.requestOrigin) {
+    const trimmedOrigin = options.requestOrigin.trim().replace(/\/+$/, "");
+    try {
+      const parsedOrigin = new URL(trimmedOrigin);
+      if (isProduction) {
+        if (
+          parsedOrigin.protocol === "https:" &&
+          ALLOWED_REDIRECT_ORIGINS.has(parsedOrigin.origin) &&
+          !isLocalOrPrivateHost(parsedOrigin.hostname)
+        ) {
+          return parsedOrigin.origin;
+        }
+      } else {
+        if (
+          ALLOWED_REDIRECT_ORIGINS.has(parsedOrigin.origin) ||
+          LOCAL_DEV_ORIGINS.has(parsedOrigin.origin)
+        ) {
+          return parsedOrigin.origin;
+        }
+      }
+    } catch {
+      // Invalid requestOrigin format; continue to env resolution
+    }
+  }
+
+  // 2. Check server-canonical APP_URL first, then public NEXT_PUBLIC_APP_URL
   const configuredUrl = (envSource.APP_URL || envSource.NEXT_PUBLIC_APP_URL || "").trim();
 
   if (isProduction) {
@@ -166,6 +267,7 @@ export function resolveAppUrl(options?: ResolveUrlOptions): string {
     return "http://localhost:3000";
   }
 
+  const effectiveNodeEnv = options?.nodeEnv ?? envSource.NODE_ENV ?? process.env.NODE_ENV ?? "development";
   const validation = validateAppUrl(configuredUrl, effectiveNodeEnv);
   if (!validation.isValid || !validation.normalizedUrl) {
     return "http://localhost:3000";
@@ -177,15 +279,38 @@ export function resolveAppUrl(options?: ResolveUrlOptions): string {
 /**
  * Builds an absolute application URL given a path and optional options.
  * Normalizes leading and trailing slashes so paths are cleanly joined.
+ * Rewrites any accidental localhost URLs in production to the canonical production URL.
  *
  * Examples:
  *   buildAppUrl("/auth/activate?token=...")
- *   -> "https://citrux-apply-mrgx.vercel.app/auth/activate?token=..." (in production)
+ *   -> "https://portal.careerbutton.in/auth/activate?token=..." (in production)
  *   -> "http://localhost:3000/auth/activate?token=..." (in development)
  */
 export function buildAppUrl(path: string, options?: ResolveUrlOptions): string {
   const baseUrl = resolveAppUrl(options);
   if (!path) return baseUrl;
+
+  // Handle cases where an absolute URL is passed
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    try {
+      const parsed = new URL(path);
+      const isProduction = isProductionEnvironment(options);
+
+      // In production, prevent any localhost URL leakage by rewriting origin to baseUrl
+      if (isProduction && isLocalOrPrivateHost(parsed.hostname)) {
+        const pathPart = `${parsed.pathname === "/" ? "" : parsed.pathname}${parsed.search}${parsed.hash}`;
+        return `${baseUrl}${pathPart.startsWith("/") ? pathPart : "/" + pathPart}`;
+      }
+
+      // If already a valid absolute URL on an allowed domain, return as-is
+      const effectiveNodeEnv = options?.nodeEnv ?? options?.env?.NODE_ENV ?? process.env.NODE_ENV;
+      if (isAllowedRedirectUrl(path, effectiveNodeEnv)) {
+        return path;
+      }
+    } catch {
+      // Fall through to path joining
+    }
+  }
 
   // Clean leading slashes and ensure exactly one slash joins baseUrl and path
   const normalizedPath = "/" + path.replace(/^\/+/, "");
@@ -205,8 +330,7 @@ export function isAllowedRedirectUrl(candidateUrl: string | null | undefined, no
   const trimmed = candidateUrl.trim();
   if (!trimmed) return false;
 
-  const effectiveNodeEnv = nodeEnv ?? process.env.NODE_ENV ?? "development";
-  const isProduction = effectiveNodeEnv === "production";
+  const isProduction = isProductionEnvironment({ nodeEnv });
 
   // Check relative path
   if (trimmed.startsWith("/")) {

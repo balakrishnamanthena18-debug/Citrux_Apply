@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { withRlsContext } from "@/lib/db/rls";
 import { logger } from "@/lib/logger";
-import { buildAppUrl } from "@/lib/url";
+import { buildAppUrl, getTrustedOriginFromHost } from "@/lib/url";
 import {
   CandidateRegisterSchema,
   GENERIC_SIGNUP_VALIDATION_ERROR,
@@ -189,12 +189,18 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Create user in Supabase Auth
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto");
+  const requestOrigin = getTrustedOriginFromHost(host, proto);
+
   const supabase = await createServerClient();
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: buildAppUrl(`/api/auth/callback?next=${encodeURIComponent("/login?confirmed=true")}`),
+      emailRedirectTo: buildAppUrl(`/api/auth/callback?next=${encodeURIComponent("/login?confirmed=true")}`, {
+        requestOrigin,
+      }),
       data: {
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
@@ -346,8 +352,17 @@ export async function POST(request: NextRequest) {
       });
     } catch {}
 
+    const emailConfirmationRequired = !authData.session || !authData.user.email_confirmed_at;
+
     return NextResponse.json(
-      { success: true, data: { redirectUrl: "/candidate" } },
+      {
+        success: true,
+        data: {
+          redirectUrl: "/candidate",
+          emailConfirmationRequired,
+          email: parsed.data.email,
+        },
+      },
       { status: 201 }
     );
   } catch (err: any) {

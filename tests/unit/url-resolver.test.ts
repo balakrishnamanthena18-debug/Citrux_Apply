@@ -5,6 +5,7 @@ import {
   validateAppUrl,
   isAllowedRedirectUrl,
   sanitizeRedirectDestination,
+  getTrustedOriginFromHost,
   DEFAULT_PRODUCTION_APP_URL,
 } from "@/lib/url";
 
@@ -89,11 +90,12 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
   });
 
   describe("3. Production Fallback & Localhost Rejection", () => {
-    it("falls back to DEFAULT_PRODUCTION_APP_URL when production URL is missing", () => {
+    it("falls back to DEFAULT_PRODUCTION_APP_URL (https://portal.careerbutton.in) when production URL is missing", () => {
       const url = resolveAppUrl({
         env: {},
         nodeEnv: "production",
       });
+      expect(url).toBe("https://portal.careerbutton.in");
       expect(url).toBe(DEFAULT_PRODUCTION_APP_URL);
       expect(url).not.toContain("localhost");
     });
@@ -103,6 +105,7 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
         env: { NEXT_PUBLIC_APP_URL: "   " },
         nodeEnv: "production",
       });
+      expect(url).toBe("https://portal.careerbutton.in");
       expect(url).toBe(DEFAULT_PRODUCTION_APP_URL);
       expect(url).not.toContain("localhost");
     });
@@ -112,6 +115,7 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
         env: { NEXT_PUBLIC_APP_URL: "http://localhost:3000" },
         nodeEnv: "production",
       });
+      expect(url1).toBe("https://portal.careerbutton.in");
       expect(url1).toBe(DEFAULT_PRODUCTION_APP_URL);
       expect(url1).not.toContain("localhost");
 
@@ -119,6 +123,7 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
         env: { NEXT_PUBLIC_APP_URL: "https://127.0.0.1:3000" },
         nodeEnv: "production",
       });
+      expect(url2).toBe("https://portal.careerbutton.in");
       expect(url2).toBe(DEFAULT_PRODUCTION_APP_URL);
       expect(url2).not.toContain("127.0.0.1");
     });
@@ -128,7 +133,40 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
         env: { NEXT_PUBLIC_APP_URL: "https://10.0.1.5" },
         nodeEnv: "production",
       });
+      expect(url).toBe("https://portal.careerbutton.in");
       expect(url).toBe(DEFAULT_PRODUCTION_APP_URL);
+    });
+
+    it("detects Vercel deployment (VERCEL=1) as production and prevents localhost fallback even if NODE_ENV is unset", () => {
+      const url = resolveAppUrl({
+        env: { VERCEL: "1" },
+      });
+      expect(url).toBe("https://portal.careerbutton.in");
+      expect(url).not.toContain("localhost");
+    });
+
+    it("detects Vercel deployment (VERCEL=1) with invalid localhost NEXT_PUBLIC_APP_URL and falls back safely", () => {
+      const url = resolveAppUrl({
+        env: { VERCEL: "1", NEXT_PUBLIC_APP_URL: "http://localhost:3000" },
+      });
+      expect(url).toBe("https://portal.careerbutton.in");
+      expect(url).not.toContain("localhost");
+    });
+
+    it("resolves approved requestOrigin from incoming request headers", () => {
+      const url = resolveAppUrl({
+        requestOrigin: "https://portal.careerbutton.in",
+        nodeEnv: "production",
+      });
+      expect(url).toBe("https://portal.careerbutton.in");
+    });
+
+    it("ignores untrusted requestOrigin and falls back to production canonical URL", () => {
+      const url = resolveAppUrl({
+        requestOrigin: "https://malicious-attacker.com",
+        nodeEnv: "production",
+      });
+      expect(url).toBe("https://portal.careerbutton.in");
     });
   });
 
@@ -156,8 +194,23 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
         env: {},
         nodeEnv: "production",
       });
-      expect(fullUrl).toBe("https://citrux-apply-mrgx.vercel.app/login?confirmed=true");
+      expect(fullUrl).toBe("https://portal.careerbutton.in/login?confirmed=true");
       expect(fullUrl).not.toContain("localhost");
+    });
+
+    it("rewrites accidental absolute localhost URLs in production to the canonical production URL", () => {
+      const fullUrl = buildAppUrl("http://localhost:3000/login?confirmed=true", {
+        nodeEnv: "production",
+      });
+      expect(fullUrl).toBe("https://portal.careerbutton.in/login?confirmed=true");
+      expect(fullUrl).not.toContain("localhost");
+    });
+
+    it("preserves valid absolute URLs matching approved origins in production", () => {
+      const fullUrl = buildAppUrl("https://portal.careerbutton.in/login?confirmed=true", {
+        nodeEnv: "production",
+      });
+      expect(fullUrl).toBe("https://portal.careerbutton.in/login?confirmed=true");
     });
 
     it("normalizes paths lacking a leading slash", () => {
@@ -242,6 +295,49 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
       expect(sanitizeRedirectDestination("https://evil.com", "/login")).toBe("/login");
       expect(sanitizeRedirectDestination("//evil.com", "/login")).toBe("/login");
       expect(sanitizeRedirectDestination("/candidate", "/login")).toBe("/candidate");
+    });
+  });
+
+  describe("7. getTrustedOriginFromHost explicit allowlist enforcement", () => {
+    it("accepts valid canonical production domain portal.careerbutton.in", () => {
+      const origin = getTrustedOriginFromHost("portal.careerbutton.in", "https", {
+        nodeEnv: "production",
+      });
+      expect(origin).toBe("https://portal.careerbutton.in");
+    });
+
+    it("rejects untrusted/arbitrary host headers in production", () => {
+      expect(
+        getTrustedOriginFromHost("evil-phishing.com", "https", { nodeEnv: "production" })
+      ).toBeUndefined();
+      expect(
+        getTrustedOriginFromHost("attacker.io", "https", { nodeEnv: "production" })
+      ).toBeUndefined();
+    });
+
+    it("rejects localhost host headers in production", () => {
+      expect(
+        getTrustedOriginFromHost("localhost:3000", "http", { nodeEnv: "production" })
+      ).toBeUndefined();
+      expect(
+        getTrustedOriginFromHost("127.0.0.1:3000", "http", { nodeEnv: "production" })
+      ).toBeUndefined();
+    });
+
+    it("handles comma-separated multi-hop x-forwarded-host safely", () => {
+      const origin = getTrustedOriginFromHost(
+        "portal.careerbutton.in, proxy.internal",
+        "https",
+        { nodeEnv: "production" }
+      );
+      expect(origin).toBe("https://portal.careerbutton.in");
+    });
+
+    it("allows localhost host headers only in non-production", () => {
+      const devOrigin = getTrustedOriginFromHost("localhost:3000", "http", {
+        nodeEnv: "development",
+      });
+      expect(devOrigin).toBe("http://localhost:3000");
     });
   });
 });

@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const rawNext = searchParams.get("next");
 
+  const requestOrigin = request.nextUrl.origin;
+
   // Validate redirect destination against approved origins/paths; default to confirmed login
   const next = isAllowedRedirectUrl(rawNext) ? rawNext!.trim() : "/login?confirmed=true";
 
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
       token_hash,
     });
     if (!error) {
-      return NextResponse.redirect(buildAppUrl(next));
+      return NextResponse.redirect(buildAppUrl(next, { requestOrigin }));
     }
   }
 
@@ -41,9 +43,9 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(buildAppUrl(next));
+      return NextResponse.redirect(buildAppUrl(next, { requestOrigin }));
     }
   }
 
-  return NextResponse.redirect(buildAppUrl("/login?error=auth_callback_failed"));
+  return NextResponse.redirect(buildAppUrl("/login?error=auth_callback_failed", { requestOrigin }));
 }

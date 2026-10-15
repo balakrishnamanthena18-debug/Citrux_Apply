@@ -228,6 +228,10 @@ export const ActivateStaffAccountSchema = z.object({
   path: ["confirmPassword"],
 });
 
+export const ResendVerificationEmailSchema = z.object({
+  email: emailField,
+});
+
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type CandidateRegisterInput = z.infer<typeof CandidateRegisterSchema>;
 export type CandidateSignUpInput = z.infer<typeof CandidateSignUpSchema>;
@@ -238,6 +242,7 @@ export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 export type VerifyRecoveryOtpInput = z.infer<typeof VerifyRecoveryOtpSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type ActivateStaffAccountInput = z.infer<typeof ActivateStaffAccountSchema>;
+export type ResendVerificationEmailInput = z.infer<typeof ResendVerificationEmailSchema>;
 
 export function evaluatePasswordStrength(password: string): {
   minLength: boolean;

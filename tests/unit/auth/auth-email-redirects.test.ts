@@ -152,14 +152,14 @@ describe("Production Authentication Email Flow & Redirect Hardening (Phase 4)", 
       env: {},
       nodeEnv: "production",
     });
-    expect(urlFromMissing).toBe("https://citrux-apply-mrgx.vercel.app/login");
+    expect(urlFromMissing).toBe("https://portal.careerbutton.in/login");
     expect(urlFromMissing).not.toContain("localhost");
 
     const urlFromLocalhost = buildAppUrl("/login", {
       env: { NEXT_PUBLIC_APP_URL: "http://localhost:3000" },
       nodeEnv: "production",
     });
-    expect(urlFromLocalhost).toBe("https://citrux-apply-mrgx.vercel.app/login");
+    expect(urlFromLocalhost).toBe("https://portal.careerbutton.in/login");
     expect(urlFromLocalhost).not.toContain("localhost");
   });
 
@@ -172,7 +172,7 @@ describe("Production Authentication Email Flow & Redirect Hardening (Phase 4)", 
   });
 
   it("7. Signup confirmation remains separate from password recovery", async () => {
-    // 7A: Signup uses confirmation template and emailRedirectTo callback
+    // 7A: Signup uses confirmation template and emailRedirectTo callback targeting portal.careerbutton.in
     const confirmationHtml = buildConfirmationEmailHtml();
     expect(SUPABASE_AUTH_EMAIL_SUBJECTS.confirmation).toBe("Confirm your OOS email address");
     expect(confirmationHtml).toContain("{{ .ConfirmationURL }}");
@@ -184,16 +184,29 @@ describe("Production Authentication Email Flow & Redirect Hardening (Phase 4)", 
     signupData.set("firstName", "Jane");
     signupData.set("lastName", "Doe");
 
-    const signupResult = await signUpCandidateAction(signupData);
-    expect(signupResult.success).toBe(true);
-    expect(mockSupabase.auth.signUp).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: "candidate@example.com",
-        options: expect.objectContaining({
-          emailRedirectTo: expect.stringContaining("/api/auth/callback"),
-        }),
-      })
-    );
+    const origNodeEnv = process.env.NODE_ENV;
+    const origAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    try {
+      (process.env as any).NODE_ENV = "production";
+      process.env.NEXT_PUBLIC_APP_URL = "https://portal.careerbutton.in";
+
+      const signupResult = await signUpCandidateAction(signupData);
+      expect(signupResult.success).toBe(true);
+      expect(mockSupabase.auth.signUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "candidate@example.com",
+          options: expect.objectContaining({
+            emailRedirectTo: expect.stringMatching(
+              /^https:\/\/portal\.careerbutton\.in\/api\/auth\/callback\?next=/
+            ),
+          }),
+        })
+      );
+    } finally {
+      (process.env as any).NODE_ENV = origNodeEnv;
+      process.env.NEXT_PUBLIC_APP_URL = origAppUrl;
+    }
 
     // 7B: Recovery uses OTP template and resetPasswordForEmail
     const resetData = new FormData();

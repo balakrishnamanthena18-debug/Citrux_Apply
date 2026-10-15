@@ -9,7 +9,7 @@ import { withRlsContext } from "@/lib/db/rls";
 import { getAuthenticatedContext, requireAdmin } from "@/lib/auth/context";
 import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { buildAppUrl } from "@/lib/url";
+import { buildAppUrl, getTrustedOriginFromHost } from "@/lib/url";
 import { logger } from "@/lib/logger";
 import { AuditAction, Role } from "@/generated/prisma";
 import {
@@ -20,6 +20,7 @@ import {
   DeactivateMemberSchema,
   ForgotPasswordSchema,
   ActivateStaffAccountSchema,
+  ResendVerificationEmailSchema,
   GENERIC_LOGIN_VALIDATION_ERROR,
   GENERIC_SIGNUP_VALIDATION_ERROR,
 } from "@/lib/validation/auth.schemas";
@@ -47,6 +48,21 @@ async function getClientIp(): Promise<string> {
   } catch {
     return "127.0.0.1";
   }
+}
+
+/**
+ * Helper to safely extract and validate trusted incoming request origin in server action context
+ */
+async function getRequestOrigin(): Promise<string | undefined> {
+  try {
+    const headerStore = await headers();
+    const host = headerStore.get("x-forwarded-host") || headerStore.get("host");
+    const proto = headerStore.get("x-forwarded-proto");
+    return getTrustedOriginFromHost(host, proto);
+  } catch {
+    // Not in request context
+  }
+  return undefined;
 }
 
 /**
@@ -284,7 +300,15 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
  * Tenancy: Candidates belong to the company's operating organization as customer records.
  * Distributed rate limiting by client IP to prevent account creation abuse.
  */
-export async function signUpCandidateAction(formData: FormData): Promise<ActionResult<{ redirectUrl: string }>> {
+export async function signUpCandidateAction(
+  formData: FormData
+): Promise<
+  ActionResult<{
+    redirectUrl: string;
+    emailConfirmationRequired?: boolean;
+    email?: string;
+  }>
+> {
   try {
     const clientIp = await getClientIp();
     const rateLimitParams = { ip: clientIp };
@@ -383,12 +407,15 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
     }
 
     // 3. Create user in Supabase Auth
+    const requestOrigin = await getRequestOrigin();
     const supabase = await createServerClient();
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
       options: {
-        emailRedirectTo: buildAppUrl(`/api/auth/callback?next=${encodeURIComponent("/login?confirmed=true")}`),
+        emailRedirectTo: buildAppUrl(`/api/auth/callback?next=${encodeURIComponent("/login?confirmed=true")}`, {
+          requestOrigin,
+        }),
         data: {
           firstName: parsed.data.firstName,
           lastName: parsed.data.lastName,
@@ -523,7 +550,16 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
         });
       } catch {}
 
-      return { success: true, data: { redirectUrl: "/candidate" } };
+      const emailConfirmationRequired = !authData.session || !authData.user.email_confirmed_at;
+
+      return {
+        success: true,
+        data: {
+          redirectUrl: "/candidate",
+          emailConfirmationRequired,
+          email: parsed.data.email,
+        },
+      };
     } catch (err: any) {
       if (err?.code === "P2002" || err?.message?.toLowerCase().includes("unique constraint")) {
         return { success: false, error: "A user with this email address already exists" };
@@ -532,6 +568,111 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
     }
   } catch (err: any) {
     return { success: false, error: err?.message || "An unexpected error occurred during registration." };
+  }
+}
+
+/**
+ * Resends the candidate account verification / signup confirmation email.
+ * Enforces distributed rate limiting by IP and email, with neutral response against enumeration.
+ */
+export async function resendVerificationEmailAction(
+  formData: FormData
+): Promise<ActionResult<{ resent: boolean }>> {
+  try {
+    const rawEmail = formData.get("email");
+    const parsed = ResendVerificationEmailSchema.safeParse({ email: rawEmail });
+
+    if (!parsed.success) {
+      return { success: false, error: "Please provide a valid email address." };
+    }
+
+    const normalizedEmail = parsed.data.email;
+    const clientIp = await getClientIp();
+    const rateLimitParams = { email: normalizedEmail, ip: clientIp };
+
+    // 1. Enforce rate limiting against verification email flooding
+    const rateLimitCheck = await checkRateLimit("REGISTER", rateLimitParams);
+    if (!rateLimitCheck.allowed) {
+      try {
+        await logSystemAuditEvent({
+          action: AuditAction.SECURITY_ALERT,
+          actorType: "ANONYMOUS",
+          entityType: "User",
+          details: { reason: "Resend verification rate limit exceeded", ip: clientIp },
+        });
+      } catch {}
+
+      return {
+        success: false,
+        error: "Too many email requests. Please wait a few minutes before trying again.",
+      };
+    }
+
+    // 2. Call Supabase Auth resend
+    try {
+      const requestOrigin = await getRequestOrigin();
+      const supabase = await createServerClient();
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: normalizedEmail,
+        options: {
+          emailRedirectTo: buildAppUrl(`/api/auth/callback?next=${encodeURIComponent("/login?confirmed=true")}`, {
+            requestOrigin,
+          }),
+        },
+      });
+
+      if (resendError) {
+        const rawMessage = (resendError.message || "").toLowerCase();
+        const status = resendError.status;
+        const code = (resendError as any)?.code;
+
+        const isRateLimited =
+          status === 429 ||
+          code === "over_email_send_rate_limit" ||
+          code === "over_request_rate_limit" ||
+          rawMessage.includes("rate limit") ||
+          rawMessage.includes("too many requests") ||
+          rawMessage.includes("email rate limit");
+
+        if (isRateLimited) {
+          logger.warn("[AUTH_FLOW] Supabase Auth rate limit on verification resend", {
+            status,
+            code,
+            message: resendError.message,
+            ip: clientIp,
+          });
+
+          return {
+            success: false,
+            error: "Too many verification email attempts. Please wait a few minutes before trying again.",
+          };
+        }
+
+        logger.warn("[AUTH_FLOW] Supabase Auth error during verification resend", {
+          status,
+          code,
+          message: resendError.message,
+          ip: clientIp,
+        });
+      }
+    } catch (err: any) {
+      logger.error("[AUTH_FLOW] Unexpected error during verification email resend", {
+        error: err?.message,
+      });
+      return {
+        success: false,
+        error: "Unable to resend verification email right now. Please try again later.",
+      };
+    }
+
+    // Neutral success response to protect against account enumeration
+    return { success: true, data: { resent: true } };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while requesting verification email.",
+    };
   }
 }
 
@@ -757,8 +898,9 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
 
   try {
     console.info("[AUTH_ACTION] requestPasswordResetAction");
+    const requestOrigin = await getRequestOrigin();
     const supabase = await createServerClient();
-    const redirectTo = buildAppUrl("/reset-password");
+    const redirectTo = buildAppUrl("/reset-password", { requestOrigin });
     // redirectTo is retained for Auth URL allow-list compliance; OTP flow does not require clicking it.
     await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo,
