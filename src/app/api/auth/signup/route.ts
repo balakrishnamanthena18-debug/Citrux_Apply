@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: buildAppUrl("/login?confirmed=true"),
+      emailRedirectTo: buildAppUrl(`/api/auth/callback?next=${encodeURIComponent("/login?confirmed=true")}`),
       data: {
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,

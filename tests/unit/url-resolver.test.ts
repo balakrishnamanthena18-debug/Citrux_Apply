@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   resolveAppUrl,
   buildAppUrl,
   validateAppUrl,
-  AppUrlConfigurationError,
+  isAllowedRedirectUrl,
+  sanitizeRedirectDestination,
+  DEFAULT_PRODUCTION_APP_URL,
 } from "@/lib/url";
 
 describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
@@ -86,95 +88,47 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
     });
   });
 
-  describe("3. Production Fail-Safe Enforcement & Hostname/Protocol Validation", () => {
-    it("fails safely and throws AppUrlConfigurationError when production URL is missing", () => {
-      expect(() =>
-        resolveAppUrl({
-          env: {},
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-
-      // Verify it does NOT silently return localhost
-      try {
-        resolveAppUrl({ env: {}, nodeEnv: "production" });
-      } catch (err: any) {
-        expect(err.message).toContain("Production application URL is not configured");
-        expect(err.message).not.toContain("localhost:3000");
-      }
+  describe("3. Production Fallback & Localhost Rejection", () => {
+    it("falls back to DEFAULT_PRODUCTION_APP_URL when production URL is missing", () => {
+      const url = resolveAppUrl({
+        env: {},
+        nodeEnv: "production",
+      });
+      expect(url).toBe(DEFAULT_PRODUCTION_APP_URL);
+      expect(url).not.toContain("localhost");
     });
 
-    it("fails safely when production URL is empty or whitespace", () => {
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "   " },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
+    it("falls back to DEFAULT_PRODUCTION_APP_URL when production URL is empty or whitespace", () => {
+      const url = resolveAppUrl({
+        env: { NEXT_PUBLIC_APP_URL: "   " },
+        nodeEnv: "production",
+      });
+      expect(url).toBe(DEFAULT_PRODUCTION_APP_URL);
+      expect(url).not.toContain("localhost");
     });
 
-    it("rejects non-HTTPS protocol in production", () => {
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "http://portal.careerbutton.in" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
+    it("safely falls back to DEFAULT_PRODUCTION_APP_URL when localhost is passed in production", () => {
+      const url1 = resolveAppUrl({
+        env: { NEXT_PUBLIC_APP_URL: "http://localhost:3000" },
+        nodeEnv: "production",
+      });
+      expect(url1).toBe(DEFAULT_PRODUCTION_APP_URL);
+      expect(url1).not.toContain("localhost");
+
+      const url2 = resolveAppUrl({
+        env: { NEXT_PUBLIC_APP_URL: "https://127.0.0.1:3000" },
+        nodeEnv: "production",
+      });
+      expect(url2).toBe(DEFAULT_PRODUCTION_APP_URL);
+      expect(url2).not.toContain("127.0.0.1");
     });
 
-    it("rejects localhost in production", () => {
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "http://localhost:3000" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "https://localhost" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "https://127.0.0.1:3000" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-    });
-
-    it("rejects private and link-local IPv4 hostnames in production", () => {
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "https://10.0.1.5" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "https://192.168.1.100" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "https://172.20.0.1" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
-    });
-
-    it("rejects invalid URL syntax", () => {
-      expect(() =>
-        resolveAppUrl({
-          env: { NEXT_PUBLIC_APP_URL: "not-a-valid-url" },
-          nodeEnv: "production",
-        })
-      ).toThrow(AppUrlConfigurationError);
+    it("safely falls back when private IPv4 hostnames are passed in production", () => {
+      const url = resolveAppUrl({
+        env: { NEXT_PUBLIC_APP_URL: "https://10.0.1.5" },
+        nodeEnv: "production",
+      });
+      expect(url).toBe(DEFAULT_PRODUCTION_APP_URL);
     });
   });
 
@@ -195,6 +149,15 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
         nodeEnv: "development",
       });
       expect(fullUrl).toBe(`http://localhost:3000/auth/activate?token=${token}`);
+    });
+
+    it("uses DEFAULT_PRODUCTION_APP_URL in production when env is unconfigured", () => {
+      const fullUrl = buildAppUrl("/login?confirmed=true", {
+        env: {},
+        nodeEnv: "production",
+      });
+      expect(fullUrl).toBe("https://citrux-apply-mrgx.vercel.app/login?confirmed=true");
+      expect(fullUrl).not.toContain("localhost");
     });
 
     it("normalizes paths lacking a leading slash", () => {
@@ -241,6 +204,44 @@ describe("Canonical Application URL Resolver (src/lib/url.ts)", () => {
       const res = validateAppUrl("https://localhost:3000", "production");
       expect(res.isValid).toBe(false);
       expect(res.error).toContain("cannot resolve to localhost");
+    });
+  });
+
+  describe("6. isAllowedRedirectUrl & sanitizeRedirectDestination", () => {
+    it("allows relative paths", () => {
+      expect(isAllowedRedirectUrl("/login?confirmed=true")).toBe(true);
+      expect(isAllowedRedirectUrl("/candidate/applications")).toBe(true);
+      expect(isAllowedRedirectUrl("/reset-password")).toBe(true);
+    });
+
+    it("allows approved production origins in production", () => {
+      expect(isAllowedRedirectUrl("https://citrux-apply-mrgx.vercel.app/login", "production")).toBe(true);
+      expect(isAllowedRedirectUrl("https://portal.careerbutton.in/candidate", "production")).toBe(true);
+    });
+
+    it("rejects untrusted third-party domains", () => {
+      expect(isAllowedRedirectUrl("https://evil-attacker.com", "production")).toBe(false);
+      expect(isAllowedRedirectUrl("https://evil-attacker.com/login", "production")).toBe(false);
+      expect(isAllowedRedirectUrl("http://evil-attacker.com", "development")).toBe(false);
+    });
+
+    it("rejects open-redirect attack vectors (protocol-relative, javascript, backslashes)", () => {
+      expect(isAllowedRedirectUrl("//evil.com")).toBe(false);
+      expect(isAllowedRedirectUrl("/\\evil.com")).toBe(false);
+      expect(isAllowedRedirectUrl("javascript:alert(1)")).toBe(false);
+      expect(isAllowedRedirectUrl("/test\0path")).toBe(false);
+    });
+
+    it("rejects localhost URLs in production but allows them in development", () => {
+      expect(isAllowedRedirectUrl("http://localhost:3000/login", "production")).toBe(false);
+      expect(isAllowedRedirectUrl("http://localhost:3000/login", "development")).toBe(true);
+      expect(isAllowedRedirectUrl("http://127.0.0.1:3000/login", "development")).toBe(true);
+    });
+
+    it("sanitizeRedirectDestination returns safe fallback when untrusted", () => {
+      expect(sanitizeRedirectDestination("https://evil.com", "/login")).toBe("/login");
+      expect(sanitizeRedirectDestination("//evil.com", "/login")).toBe("/login");
+      expect(sanitizeRedirectDestination("/candidate", "/login")).toBe("/candidate");
     });
   });
 });

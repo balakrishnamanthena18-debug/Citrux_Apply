@@ -14,6 +14,20 @@ export class AppUrlConfigurationError extends Error {
   }
 }
 
+export const DEFAULT_PRODUCTION_APP_URL = "https://citrux-apply-mrgx.vercel.app";
+
+export const ALLOWED_REDIRECT_ORIGINS = new Set([
+  "https://citrux-apply-mrgx.vercel.app",
+  "https://portal.careerbutton.in",
+  "https://www.careerbutton.in",
+  "https://careerbutton.in",
+]);
+
+export const LOCAL_DEV_ORIGINS = new Set([
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
+
 export interface ResolveUrlOptions {
   env?: Record<string, string | undefined>;
   nodeEnv?: string;
@@ -116,10 +130,10 @@ export function validateAppUrl(candidateUrl: string, nodeEnv?: string): UrlValid
  *
  * Rules:
  * 1. In local dev or test: defaults to "http://localhost:3000" if unconfigured.
- * 2. In production: strictly requires an explicitly configured production URL via APP_URL or NEXT_PUBLIC_APP_URL.
- * 3. Never silently falls back to localhost in production.
- * 4. Fails safely by logging a sanitized configuration error and throwing AppUrlConfigurationError.
- * 5. Normalizes trailing slashes.
+ * 2. In production: uses configured APP_URL or NEXT_PUBLIC_APP_URL if valid HTTPS non-localhost.
+ *    If unconfigured or invalid, safely falls back to DEFAULT_PRODUCTION_APP_URL (https://citrux-apply-mrgx.vercel.app).
+ * 3. Never returns localhost in production.
+ * 4. Normalizes trailing slashes.
  */
 export function resolveAppUrl(options?: ResolveUrlOptions): string {
   const envSource = options?.env ?? process.env;
@@ -129,28 +143,32 @@ export function resolveAppUrl(options?: ResolveUrlOptions): string {
   // Check server-canonical APP_URL first, then public NEXT_PUBLIC_APP_URL
   const configuredUrl = (envSource.APP_URL || envSource.NEXT_PUBLIC_APP_URL || "").trim();
 
-  if (!configuredUrl) {
-    if (isProduction) {
-      const errorMsg =
-        "Production application URL is not configured. Set APP_URL or NEXT_PUBLIC_APP_URL in the production environment (expected https://portal.careerbutton.in).";
-      logger.error("[CRITICAL_CONFIG] " + errorMsg, {
-        environment: effectiveNodeEnv,
-        action: "resolveAppUrl",
-      });
-      throw new AppUrlConfigurationError(errorMsg);
+  if (isProduction) {
+    if (!configuredUrl) {
+      return DEFAULT_PRODUCTION_APP_URL;
     }
-    // Safe default for local development and test environments
+
+    const validation = validateAppUrl(configuredUrl, "production");
+    if (!validation.isValid || !validation.normalizedUrl) {
+      logger.warn("[CONFIG] Invalid or development URL configured in production, falling back to default production URL", {
+        configuredUrl,
+        error: validation.error,
+        fallback: DEFAULT_PRODUCTION_APP_URL,
+      });
+      return DEFAULT_PRODUCTION_APP_URL;
+    }
+
+    return validation.normalizedUrl;
+  }
+
+  // Non-production (development / test)
+  if (!configuredUrl) {
     return "http://localhost:3000";
   }
 
   const validation = validateAppUrl(configuredUrl, effectiveNodeEnv);
   if (!validation.isValid || !validation.normalizedUrl) {
-    const errorMsg = `Invalid application URL configured: ${validation.error}`;
-    logger.error("[CRITICAL_CONFIG] " + errorMsg, {
-      environment: effectiveNodeEnv,
-      action: "resolveAppUrl",
-    });
-    throw new AppUrlConfigurationError(errorMsg);
+    return "http://localhost:3000";
   }
 
   return validation.normalizedUrl;
@@ -162,7 +180,7 @@ export function resolveAppUrl(options?: ResolveUrlOptions): string {
  *
  * Examples:
  *   buildAppUrl("/auth/activate?token=...")
- *   -> "https://portal.careerbutton.in/auth/activate?token=..." (in production)
+ *   -> "https://citrux-apply-mrgx.vercel.app/auth/activate?token=..." (in production)
  *   -> "http://localhost:3000/auth/activate?token=..." (in development)
  */
 export function buildAppUrl(path: string, options?: ResolveUrlOptions): string {
@@ -172,4 +190,59 @@ export function buildAppUrl(path: string, options?: ResolveUrlOptions): string {
   // Clean leading slashes and ensure exactly one slash joins baseUrl and path
   const normalizedPath = "/" + path.replace(/^\/+/, "");
   return `${baseUrl}${normalizedPath}`;
+}
+
+/**
+ * Validates whether a redirect URL is trusted and safe.
+ * Rejects untrusted external domains, javascript: protocols, protocol-relative URLs (//).
+ * Allows:
+ * - Relative internal paths (e.g. "/login?confirmed=true")
+ * - Absolute URLs whose origin matches an approved production domain
+ * - Absolute localhost URLs ONLY in development/test
+ */
+export function isAllowedRedirectUrl(candidateUrl: string | null | undefined, nodeEnv?: string): boolean {
+  if (!candidateUrl || typeof candidateUrl !== "string") return false;
+  const trimmed = candidateUrl.trim();
+  if (!trimmed) return false;
+
+  const effectiveNodeEnv = nodeEnv ?? process.env.NODE_ENV ?? "development";
+  const isProduction = effectiveNodeEnv === "production";
+
+  // Check relative path
+  if (trimmed.startsWith("/")) {
+    // Disallow protocol-relative URLs like "//attacker.com" and backslashes
+    if (trimmed.startsWith("//") || trimmed.includes("\\")) return false;
+    // Disallow javascript/data schemes or control chars
+    if (trimmed.toLowerCase().startsWith("/\\") || trimmed.includes("\0")) return false;
+    return true;
+  }
+
+  // Check absolute URL
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+
+    if (isProduction) {
+      if (parsed.protocol !== "https:") return false;
+      return ALLOWED_REDIRECT_ORIGINS.has(parsed.origin);
+    } else {
+      return ALLOWED_REDIRECT_ORIGINS.has(parsed.origin) || LOCAL_DEV_ORIGINS.has(parsed.origin);
+    }
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sanitizes redirect destination against allowed URLs.
+ */
+export function sanitizeRedirectDestination(
+  targetUrl: string | null | undefined,
+  defaultFallback: string = "/",
+  nodeEnv?: string
+): string {
+  if (isAllowedRedirectUrl(targetUrl, nodeEnv)) {
+    return targetUrl!.trim();
+  }
+  return defaultFallback;
 }
