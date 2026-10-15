@@ -5,10 +5,15 @@ import pg from "pg";
 let adminClient: ReturnType<typeof createClient> | null = null;
 let pgPool: pg.Pool | null = null;
 
+function isLocalDatabase(): boolean {
+  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || "";
+  return connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+}
+
 function getPgPool() {
   if (!pgPool) {
     const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
-    const isLocal = !connectionString || connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+    const isLocal = isLocalDatabase();
     pgPool = new pg.Pool({
       connectionString,
       ssl: isLocal ? undefined : { rejectUnauthorized: false },
@@ -19,7 +24,7 @@ function getPgPool() {
 
 /**
  * Creates an auth user with fallback to direct PostgreSQL auth.users provisioning
- * if SUPABASE_SERVICE_ROLE_KEY is absent or returns an authorization error.
+ * ONLY in offline/local environments when SUPABASE_SERVICE_ROLE_KEY is absent.
  */
 export async function createAuthUser(params: {
   email: string;
@@ -42,15 +47,32 @@ export async function createAuthUser(params: {
         },
       });
 
-      if (!res.error && res.data?.user) {
+      if (!res.error && res.data.user) {
         return { data: { user: { id: res.data.user.id, email: res.data.user.email! } }, error: null };
       }
-    } catch {
-      // Fall through to database fallback
+
+      // When SUPABASE_SERVICE_ROLE_KEY is configured, Supabase Auth is authoritative.
+      // Fail fast to prevent silent bypass and inconsistent identity provisioning.
+      return {
+        data: null,
+        error: { message: res.error?.message || "Failed to create Supabase Auth user" },
+      };
+    } catch (apiErr: any) {
+      return {
+        data: null,
+        error: { message: apiErr?.message || "Failed to connect to Supabase Auth service" },
+      };
     }
   }
 
-  // Direct PostgreSQL auth.users fallback
+  // Direct PostgreSQL auth.users fallback ONLY in local development environments against a local database
+  if (process.env.NODE_ENV === "production" || !isLocalDatabase()) {
+    return {
+      data: null,
+      error: { message: "SUPABASE_SERVICE_ROLE_KEY is required in production/remote environments. Direct auth fallback is prohibited." },
+    };
+  }
+
   try {
     const pool = getPgPool();
     const existing = await pool.query(`SELECT id FROM auth.users WHERE email = $1`, [params.email]);
@@ -76,8 +98,19 @@ export async function createAuthUser(params: {
         role,
         email,
         email_confirmed_at,
+        confirmation_token,
+        recovery_token,
+        email_change_token_new,
+        email_change,
+        phone_change,
+        phone_change_token,
+        email_change_token_current,
+        reauthentication_token,
         raw_app_meta_data,
         raw_user_meta_data,
+        is_super_admin,
+        is_sso_user,
+        is_anonymous,
         created_at,
         updated_at
       )
@@ -88,8 +121,19 @@ export async function createAuthUser(params: {
         'authenticated',
         $2,
         NOW(),
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
         '{"provider":"email","providers":["email"]}',
         $3::jsonb,
+        false,
+        false,
+        false,
         NOW(),
         NOW()
       )
@@ -125,9 +169,17 @@ export async function updateAuthUserPassword(
       if (!res.error) {
         return { error: null };
       }
-    } catch {
-      // Fall through to database fallback
+      return { error: { message: res.error.message || "Failed to update auth password" } };
+    } catch (err: any) {
+      return { error: { message: err?.message || "Failed to connect to Supabase Auth service" } };
     }
+  }
+
+  // Database fallback only in local development environments against a local database
+  if (process.env.NODE_ENV === "production" || !isLocalDatabase()) {
+    return {
+      error: { message: "SUPABASE_SERVICE_ROLE_KEY is required in production/remote environments. Direct auth fallback is prohibited." },
+    };
   }
 
   try {
@@ -168,9 +220,17 @@ export async function deleteAuthUser(userId: string): Promise<{ error: { message
       );
       const res = await client.auth.admin.deleteUser(userId);
       if (!res.error) return { error: null };
-    } catch {
-      // Fall through
+      return { error: { message: res.error.message || "Failed to delete auth user" } };
+    } catch (err: any) {
+      return { error: { message: err?.message || "Failed to connect to Supabase Auth service" } };
     }
+  }
+
+  // Database fallback only in local development environments against a local database
+  if (process.env.NODE_ENV === "production" || !isLocalDatabase()) {
+    return {
+      error: { message: "SUPABASE_SERVICE_ROLE_KEY is required in production/remote environments. Direct auth fallback is prohibited." },
+    };
   }
 
   try {

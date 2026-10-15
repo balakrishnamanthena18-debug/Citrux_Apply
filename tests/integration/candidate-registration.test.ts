@@ -244,4 +244,75 @@ describe("Candidate Tenancy & Registration Security (tests/integration/candidate
 
     expect(createdMembershipRole).toBe("CANDIDATE");
   });
+
+  it("6. Safely handles duplicate user registration when account already exists in authentication", async () => {
+    vi.mocked(prisma.organization.findUnique).mockResolvedValueOnce({
+      id: mockOrgId,
+      name: "Acme Operating Co",
+      slug: "acme-ops",
+      status: "ACTIVE",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const mockSupabaseAuth = {
+      signUp: vi.fn().mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: "User already registered", status: 400 },
+      }),
+    };
+
+    vi.mocked(createServerClient).mockResolvedValueOnce({
+      auth: mockSupabaseAuth,
+    } as any);
+
+    const formData = new FormData();
+    formData.append("email", "existing@example.com");
+    formData.append("password", "Password123!");
+    formData.append("firstName", "Existing");
+    formData.append("lastName", "User");
+
+    const result = await signUpCandidateAction(formData);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("A user with this email address already exists");
+  });
+
+  it("7. Does not expose raw database errors when Supabase Auth fails with 500 unexpected_failure", async () => {
+    vi.mocked(prisma.organization.findUnique).mockResolvedValueOnce({
+      id: mockOrgId,
+      name: "Acme Operating Co",
+      slug: "acme-ops",
+      status: "ACTIVE",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const mockSupabaseAuth = {
+      signUp: vi.fn().mockResolvedValueOnce({
+        data: { user: null },
+        error: {
+          message: "Database error finding user",
+          status: 500,
+          code: "unexpected_failure",
+        },
+      }),
+    };
+
+    vi.mocked(createServerClient).mockResolvedValueOnce({
+      auth: mockSupabaseAuth,
+    } as any);
+
+    const formData = new FormData();
+    formData.append("email", "error@example.com");
+    formData.append("password", "Password123!");
+    formData.append("firstName", "Error");
+    formData.append("lastName", "User");
+
+    const result = await signUpCandidateAction(formData);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Registration service is temporarily unavailable. Please try again later.");
+    expect(result.error).not.toContain("Database error");
+  });
 });

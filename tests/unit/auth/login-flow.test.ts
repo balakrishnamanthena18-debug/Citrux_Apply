@@ -151,6 +151,43 @@ describe("Login Flow (signInAction) Invariants", () => {
     expect(mockSupabase.auth.signOut).toHaveBeenCalled();
   });
 
+  it("should handle unconfirmed email cleanly and return specific guidance", async () => {
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: { message: "Email not confirmed", status: 400 },
+    });
+
+    const formData = new FormData();
+    formData.append("email", "unverified@example.com");
+    formData.append("password", "validPass123!");
+
+    const res = await signInAction(formData);
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("Email not confirmed. Please verify your email address before signing in.");
+  });
+
+  it("should NOT falsely report an internal Supabase Auth 500/database failure as an incorrect password and NOT record failed attempt", async () => {
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: {
+        message: "Database error querying schema",
+        status: 500,
+        code: "unexpected_failure",
+      },
+    });
+
+    const formData = new FormData();
+    formData.append("email", "candidate@example.com");
+    formData.append("password", "Password123!");
+
+    const res = await signInAction(formData);
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("Authentication service is temporarily unavailable. Please try again later.");
+    expect(res.error).not.toBe("Invalid email or password");
+    // Verify rate limit counter was NOT penalized for server-side database failure
+    expect(recordFailedAttempt).not.toHaveBeenCalled();
+  });
+
   it("should successfully authenticate an Admin and return /admin redirect", async () => {
     mockSupabase.auth.signInWithPassword.mockResolvedValue({
       data: { user: { id: "admin-user-id" } },

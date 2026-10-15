@@ -119,7 +119,45 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
     console.log(`[AUTH_FLOW] SUPABASE_AUTH_COMPLETE success=${!error && !!data?.user}`);
 
     if (error || !data.user) {
-      // Record failed attempt atomically in PostgreSQL
+      const rawMessage = (error?.message || "").toLowerCase();
+      const isInternalError =
+        (error?.status !== undefined && error.status >= 500) ||
+        (error as any)?.code === "unexpected_failure" ||
+        rawMessage.includes("database error") ||
+        rawMessage.includes("scan error") ||
+        rawMessage.includes("internal server error") ||
+        rawMessage.includes("connection");
+
+      if (isInternalError) {
+        console.error(`[AUTH_FLOW] Supabase Auth internal error during sign in for domain [${normalizedEmail.split("@")[1]}]:`, {
+          status: error?.status,
+          code: (error as any)?.code,
+          message: error?.message,
+        });
+
+        try {
+          await logSystemAuditEvent({
+            action: AuditAction.SECURITY_ALERT,
+            actorType: "SYSTEM",
+            entityType: "User",
+            details: {
+              email: normalizedEmail,
+              ip: clientIp,
+              reason: "Supabase Auth service internal error during sign in",
+              errorStatus: error?.status,
+            },
+          });
+        } catch (auditErr: any) {
+          console.error("[AUTH_FLOW] Failed to record system audit for auth server error:", auditErr?.message);
+        }
+
+        return {
+          success: false,
+          error: "Authentication service is temporarily unavailable. Please try again later.",
+        };
+      }
+
+      // Record failed attempt atomically in PostgreSQL only for true credential failures
       try {
         await recordFailedAttempt("LOGIN", rateLimitParams);
       } catch (e: any) {
@@ -141,7 +179,7 @@ export async function signInAction(formData: FormData): Promise<ActionResult<{ r
         console.error("[AUTH_FLOW] logSystemAuditEvent error:", e?.message);
       }
 
-      const errorMessage = error?.message?.toLowerCase().includes("email not confirmed")
+      const errorMessage = rawMessage.includes("email not confirmed")
         ? "Email not confirmed. Please verify your email address before signing in."
         : "Invalid email or password";
 
@@ -316,9 +354,54 @@ export async function signUpCandidateAction(formData: FormData): Promise<ActionR
     });
 
     if (authError || !authData.user) {
+      const rawMessage = (authError?.message || "").toLowerCase();
+      const isInternalError =
+        (authError?.status !== undefined && authError.status >= 500) ||
+        (authError as any)?.code === "unexpected_failure" ||
+        rawMessage.includes("database error") ||
+        rawMessage.includes("scan error") ||
+        rawMessage.includes("internal server error") ||
+        rawMessage.includes("connection");
+
+      if (isInternalError) {
+        console.error("[AUTH_FLOW] Supabase Auth internal error during registration:", {
+          status: authError?.status,
+          code: (authError as any)?.code,
+          message: authError?.message,
+        });
+
+        try {
+          await logSystemAuditEvent({
+            action: AuditAction.SECURITY_ALERT,
+            actorType: "SYSTEM",
+            entityType: "User",
+            details: {
+              email: parsed.data.email,
+              ip: clientIp,
+              reason: "Supabase Auth upstream error during registration",
+              errorStatus: authError?.status,
+            },
+          });
+        } catch {}
+
+        return {
+          success: false,
+          error: "Registration service is temporarily unavailable. Please try again later.",
+        };
+      }
+
       try {
         await recordFailedAttempt("REGISTER", rateLimitParams);
       } catch {}
+
+      if (
+        rawMessage.includes("already registered") ||
+        rawMessage.includes("already exists") ||
+        rawMessage.includes("user already exists")
+      ) {
+        return { success: false, error: "A user with this email address already exists" };
+      }
+
       return { success: false, error: authError?.message ?? "Registration failed" };
     }
 
