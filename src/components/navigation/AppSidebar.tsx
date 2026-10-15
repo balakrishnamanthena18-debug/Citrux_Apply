@@ -4,6 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { Role } from "@/generated/prisma";
 import { signOutAction } from "@/lib/auth/actions";
 import { TransitionLink } from "@/components/ui/TransitionLink";
+import { ResponsiveAccountPanel } from "./ResponsiveAccountPanel";
 
 function isSidebarItemActive(pathname: string, href: string, searchParams: URLSearchParams): boolean {
   if (href === "/admin/dashboard") {
@@ -39,6 +40,10 @@ interface AppSidebarProps {
   email: string;
   fullName?: string | null;
   organizationName?: string;
+  designationName?: string | null;
+  isTeamLead?: boolean;
+  isManager?: boolean;
+  membershipId?: string;
   isMobile?: boolean;
   onClose?: () => void;
 }
@@ -61,6 +66,10 @@ export function AppSidebar({
   email,
   fullName,
   organizationName = "Operations Operating System",
+  designationName,
+  isTeamLead = false,
+  isManager = false,
+  membershipId,
   isMobile = false,
   onClose,
 }: AppSidebarProps) {
@@ -506,75 +515,55 @@ export function AppSidebar({
       </div>
 
       {/* User / Account Footer */}
-      <div
-        className="p-3 border-t border-[#EDF1EF] bg-[#F7F9F8]/60 flex-shrink-0"
-        style={
-          isMobile
-            ? { paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }
-            : undefined
-        }
-      >
-        <div className="p-2.5 rounded-xl bg-white border border-[#E5EAE7] shadow-2xs flex items-center justify-between gap-2">
-          <div className="flex items-center space-x-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-[#12A150]/10 text-[#0B3B2C] border border-[#12A150]/20 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-[#0F1720] truncate">
-                {displayName}
-              </div>
-              <div className="text-[10px] text-[#94A3B8] truncate max-w-[100px]">
-                {email}
-              </div>
-            </div>
-          </div>
+      {!isMobile && (
+        <ResponsiveAccountPanel
+          role={role}
+          email={email}
+          fullName={fullName}
+          organizationName={organizationName}
+          designationName={designationName}
+          isTeamLead={isTeamLead}
+          isManager={isManager}
+          membershipId={membershipId}
+          isMobile={false}
+        />
+      )}
 
-          <div className="flex items-center space-x-1.5 flex-shrink-0">
-            <span
-              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                role === "ADMIN"
-                  ? "bg-purple-50 text-purple-700 border border-purple-200"
-                  : role === "EMPLOYEE"
-                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                  : "bg-emerald-50 text-[#12A150] border border-emerald-200"
-              }`}
-            >
-              {role}
-            </span>
-            {/* Desktop: compact icon control (unchanged). */}
-            {!isMobile && (
-              <form action={signOutAction}>
-                <button
-                  type="submit"
-                  title="Sign out"
-                  aria-label="Sign out"
-                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
-              </form>
-            )}
-          </div>
+      {/* Mobile drawer: labeled Sign Out above the safe-area, never under the tab bar. */}
+      {isMobile && (
+        <div
+          className="p-3 border-t border-[#EDF1EF] bg-[#F7F9F8]/60 flex-shrink-0"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+        >
+          <ResponsiveAccountPanel
+            role={role}
+            email={email}
+            fullName={fullName}
+            organizationName={organizationName}
+            designationName={designationName}
+            isTeamLead={isTeamLead}
+            isManager={isManager}
+            membershipId={membershipId}
+            isMobile={true}
+            hideMobileSignOut={true}
+            onClose={onClose}
+          />
+          {isMobile && (
+            <form action={signOutAction} className="mt-2">
+              <button
+                type="submit"
+                aria-label="Sign out"
+                className="flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border border-[#E5EAE7] bg-white px-3 py-2.5 text-xs font-semibold text-[#475569] shadow-2xs transition-colors hover:bg-slate-50 hover:text-[#0F1720]"
+              >
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Sign out</span>
+              </button>
+            </form>
+          )}
         </div>
-
-        {/* Mobile drawer: labeled Sign Out above the safe-area, never under the tab bar. */}
-        {isMobile && (
-          <form action={signOutAction} className="mt-2">
-            <button
-              type="submit"
-              aria-label="Sign out"
-              className="flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border border-[#E5EAE7] bg-white px-3 py-2.5 text-xs font-semibold text-[#475569] shadow-2xs transition-colors hover:bg-slate-50 hover:text-[#0F1720]"
-            >
-              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span>Sign out</span>
-            </button>
-          </form>
-        )}
-      </div>
+      )}
     </aside>
   );
 }

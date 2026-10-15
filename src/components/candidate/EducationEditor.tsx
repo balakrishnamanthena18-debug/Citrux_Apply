@@ -5,6 +5,7 @@ import {
   upsertCandidateEducationAction,
   deleteCandidateEducationAction,
 } from "@/lib/candidate/actions";
+import { ConfirmDialog, AlertDialog } from "@/components/ui/dialog";
 import { SaveStateIndicator, SaveStatus } from "./SaveStateIndicator";
 
 export interface CandidateEducationItem {
@@ -31,6 +32,8 @@ export function EducationEditor({ educations, onEducationsChanged }: Props) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("IDLE");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; name: string } | null>(null);
+  const [alertDialog, setAlertDialog] = useState<{ title: string; message: string } | null>(null);
 
   const [formState, setFormState] = useState({
     id: "",
@@ -135,19 +138,33 @@ export function EducationEditor({ educations, onEducationsChanged }: Props) {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to remove education record from ${name}?`)) return;
+  const handleDelete = (id: string, name: string) => {
+    setDeleteConfirmItem({ id, name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmItem) return;
+    const { id } = deleteConfirmItem;
 
     setDeletingId(id);
     try {
       const res = await deleteCandidateEducationAction(id);
       if (res.success) {
+        setDeleteConfirmItem(null);
         onEducationsChanged?.();
       } else {
-        alert(res.error || "Failed to delete education record");
+        setDeleteConfirmItem(null);
+        setAlertDialog({
+          title: "Failed to delete education record",
+          message: res.error || "The server could not remove this education record.",
+        });
       }
     } catch {
-      alert("Network error deleting education record");
+      setDeleteConfirmItem(null);
+      setAlertDialog({
+        title: "Network Error",
+        message: "Network error occurred while deleting education record. Please check your connection and try again.",
+      });
     } finally {
       setDeletingId(null);
     }
@@ -374,6 +391,27 @@ export function EducationEditor({ educations, onEducationsChanged }: Props) {
           ))}
         </div>
       )}
+
+      {/* Enterprise Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirmItem}
+        title="Remove education record?"
+        description={`Are you sure you want to remove your education record from "${deleteConfirmItem?.name}"? Historical details for this education entry will be permanently deleted.`}
+        confirmLabel="Remove education"
+        variant="danger"
+        pending={deletingId === deleteConfirmItem?.id}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmItem(null)}
+      />
+
+      {/* Enterprise Alert Dialog for errors */}
+      <AlertDialog
+        open={!!alertDialog}
+        title={alertDialog?.title || "Notification"}
+        message={alertDialog?.message || ""}
+        variant="error"
+        onClose={() => setAlertDialog(null)}
+      />
     </div>
   );
 }

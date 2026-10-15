@@ -7,6 +7,7 @@ import {
   setDesignationStatusAction,
 } from "@/lib/admin/actions";
 import type { DesignationStatus } from "@/generated/prisma";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 export interface DesignationItem {
   id: string;
@@ -47,6 +48,13 @@ export function DesignationManager({ initialDesignations }: DesignationManagerPr
 
   // Action feedback
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Status toggle confirmation modal state
+  const [statusConfirmItem, setStatusConfirmItem] = useState<{
+    item: DesignationItem;
+    nextStatus: "ACTIVE" | "ARCHIVED";
+  } | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const filtered = designations.filter((d) => {
     const matchesSearch =
@@ -133,19 +141,22 @@ export function DesignationManager({ initialDesignations }: DesignationManagerPr
     setActionMessage({ type: "success", text: `Designation "${res.data.name}" updated successfully.` });
   }
 
-  async function handleToggleStatus(item: DesignationItem) {
+  function handleToggleStatus(item: DesignationItem) {
     const nextStatus = item.status === "ACTIVE" ? "ARCHIVED" : "ACTIVE";
-    const confirmText =
-      nextStatus === "ARCHIVED"
-        ? `Are you sure you want to archive "${item.name}"? It will no longer be assignable to new employees, but historical records will be preserved.`
-        : `Reactivate designation "${item.name}"?`;
+    setStatusConfirmItem({ item, nextStatus });
+  }
 
-    if (!window.confirm(confirmText)) return;
+  async function handleConfirmStatusToggle() {
+    if (!statusConfirmItem) return;
+    const { item, nextStatus } = statusConfirmItem;
+    setStatusLoading(true);
 
     const res = await setDesignationStatusAction({
       designationId: item.id,
       status: nextStatus,
     });
+
+    setStatusLoading(false);
 
     if (!res.success || !res.data) {
       setActionMessage({ type: "error", text: res.error || "Failed to update designation status." });
@@ -157,6 +168,7 @@ export function DesignationManager({ initialDesignations }: DesignationManagerPr
         d.id === item.id ? { ...d, status: res.data!.status } : d
       )
     );
+    setStatusConfirmItem(null);
     setActionMessage({
       type: "success",
       text: `Designation "${item.name}" is now ${res.data.status.toLowerCase()}.`,
@@ -495,6 +507,22 @@ export function DesignationManager({ initialDesignations }: DesignationManagerPr
           </div>
         </div>
       )}
+
+      {/* Enterprise Status Toggle Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!statusConfirmItem}
+        title={statusConfirmItem?.nextStatus === "ARCHIVED" ? "Archive designation?" : "Reactivate designation?"}
+        description={
+          statusConfirmItem?.nextStatus === "ARCHIVED"
+            ? `Archive "${statusConfirmItem.item.name}"? It will no longer be assignable to new employees, but historical records will be preserved.`
+            : `Reactivate designation "${statusConfirmItem?.item.name}" so it can be assigned to staff members again.`
+        }
+        confirmLabel={statusConfirmItem?.nextStatus === "ARCHIVED" ? "Archive designation" : "Reactivate designation"}
+        variant={statusConfirmItem?.nextStatus === "ARCHIVED" ? "danger" : "primary"}
+        pending={statusLoading}
+        onConfirm={handleConfirmStatusToggle}
+        onCancel={() => setStatusConfirmItem(null)}
+      />
     </div>
   );
 }

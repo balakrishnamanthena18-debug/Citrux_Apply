@@ -5,6 +5,7 @@ import {
   upsertCandidateProjectAction,
   deleteCandidateProjectAction,
 } from "@/lib/candidate/actions";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { SaveStateIndicator, SaveStatus } from "./SaveStateIndicator";
 
 export interface CandidateProjectItem {
@@ -32,6 +33,7 @@ export function ProjectEditor({ projects, onProjectsChanged }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; title: string } | null>(null);
 
   const [formState, setFormState] = useState({
     id: "",
@@ -147,24 +149,26 @@ export function ProjectEditor({ projects, onProjectsChanged }: Props) {
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (
-      !window.confirm(
-        `Remove “${title}” from your projects? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+  const handleDelete = (id: string, title: string) => {
+    setDeleteConfirmItem({ id, title });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmItem) return;
+    const { id } = deleteConfirmItem;
 
     setDeletingId(id);
     try {
       const res = await deleteCandidateProjectAction(id);
       if (res.success) {
+        setDeleteConfirmItem(null);
         onProjectsChanged?.();
       } else {
+        setDeleteConfirmItem(null);
         setErrorMessage(res.error || "We couldn't remove this project.");
       }
     } catch {
+      setDeleteConfirmItem(null);
       setErrorMessage("We couldn't remove this project. Please try again.");
     } finally {
       setDeletingId(null);
@@ -594,6 +598,18 @@ export function ProjectEditor({ projects, onProjectsChanged }: Props) {
           })}
         </div>
       )}
+
+      {/* Enterprise Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirmItem}
+        title="Remove project?"
+        description={`Remove "${deleteConfirmItem?.title}" from your projects? Highlights, technologies, and recorded details for this project cannot be recovered.`}
+        confirmLabel="Remove project"
+        variant="danger"
+        pending={deletingId === deleteConfirmItem?.id}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmItem(null)}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   upsertCandidateExperienceAction,
   deleteCandidateExperienceAction,
 } from "@/lib/candidate/actions";
+import { ConfirmDialog, AlertDialog } from "@/components/ui/dialog";
 import { SaveStateIndicator, SaveStatus } from "./SaveStateIndicator";
 
 export interface CandidateExperienceItem {
@@ -32,6 +33,8 @@ export function ExperienceEditor({ experiences, onExperiencesChanged }: Props) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("IDLE");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; title: string } | null>(null);
+  const [alertDialog, setAlertDialog] = useState<{ title: string; message: string } | null>(null);
 
   // Form State
   const [formState, setFormState] = useState({
@@ -147,19 +150,33 @@ export function ExperienceEditor({ experiences, onExperiencesChanged }: Props) {
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`Are you sure you want to delete ${title}?`)) return;
+  const handleDelete = (id: string, title: string) => {
+    setDeleteConfirmItem({ id, title });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmItem) return;
+    const { id } = deleteConfirmItem;
 
     setDeletingId(id);
     try {
       const res = await deleteCandidateExperienceAction(id);
       if (res.success) {
+        setDeleteConfirmItem(null);
         onExperiencesChanged?.();
       } else {
-        alert(res.error || "Failed to delete experience");
+        setDeleteConfirmItem(null);
+        setAlertDialog({
+          title: "Failed to delete experience",
+          message: res.error || "The server could not remove this experience entry.",
+        });
       }
     } catch {
-      alert("Network error deleting experience");
+      setDeleteConfirmItem(null);
+      setAlertDialog({
+        title: "Network Error",
+        message: "Network error occurred while deleting experience. Please check your connection and try again.",
+      });
     } finally {
       setDeletingId(null);
     }
@@ -469,6 +486,27 @@ export function ExperienceEditor({ experiences, onExperiencesChanged }: Props) {
           ))}
         </div>
       )}
+
+      {/* Enterprise Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirmItem}
+        title="Remove experience entry?"
+        description={`Are you sure you want to remove your work experience entry for "${deleteConfirmItem?.title}"? Historical achievements and details for this role will be permanently removed.`}
+        confirmLabel="Remove experience"
+        variant="danger"
+        pending={deletingId === deleteConfirmItem?.id}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmItem(null)}
+      />
+
+      {/* Enterprise Alert Dialog for errors */}
+      <AlertDialog
+        open={!!alertDialog}
+        title={alertDialog?.title || "Notification"}
+        message={alertDialog?.message || ""}
+        variant="error"
+        onClose={() => setAlertDialog(null)}
+      />
     </div>
   );
 }

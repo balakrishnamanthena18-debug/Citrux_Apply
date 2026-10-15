@@ -9,6 +9,7 @@ import {
   deleteCandidateDocumentAction,
 } from "@/lib/candidate/actions";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 interface CandidateDocumentItem {
   id: string;
@@ -51,6 +52,10 @@ export function EmployeeCandidateDocuments({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Deletion confirmation state
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; title: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // Document Viewer State
   const [viewingDocId, setViewingDocId] = useState<string | null>(null);
   const [viewingDocMeta, setViewingDocMeta] = useState<{ title: string; mimeType: string; sizeBytes: number } | null>(null);
@@ -79,18 +84,23 @@ export function EmployeeCandidateDocuments({
     }
   };
 
-  const handleDelete = async (docId: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
-      return;
-    }
-    // Optimistic local removal
-    setDocList((prev) => prev.filter((d) => d.id !== docId));
+  const handleDelete = (docId: string, title: string) => {
+    setDeleteConfirmItem({ id: docId, title });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmItem) return;
+    const { id: docId, title } = deleteConfirmItem;
+    setDeleteLoading(true);
+
     const res = await deleteCandidateDocumentAction(docId);
+    setDeleteLoading(false);
+
     if (res.success) {
+      setDocList((prev) => prev.filter((d) => d.id !== docId));
+      setDeleteConfirmItem(null);
       showFeedback("success", `Document "${title}" removed successfully.`);
     } else {
-      // Revert if server failed
-      setDocList(documents);
       showFeedback("error", res.error || "Failed to delete document");
     }
   };
@@ -525,6 +535,18 @@ export function EmployeeCandidateDocuments({
           }}
         />
       )}
+
+      {/* Enterprise Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirmItem}
+        title="Delete document?"
+        description={`Are you sure you want to delete "${deleteConfirmItem?.title}"? This cannot be undone and will permanently remove the file from storage.`}
+        confirmLabel="Delete document"
+        variant="danger"
+        pending={deleteLoading}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmItem(null)}
+      />
     </div>
   );
 }

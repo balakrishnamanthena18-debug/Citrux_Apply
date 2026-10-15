@@ -12,10 +12,25 @@ interface AppShellProps {
   role: Role;
   email: string;
   fullName?: string | null;
+  organizationName?: string;
+  designationName?: string | null;
+  isTeamLead?: boolean;
+  isManager?: boolean;
+  membershipId?: string;
   children: React.ReactNode;
 }
 
-export function AppShell({ role, email, fullName, children }: AppShellProps) {
+export function AppShell({
+  role,
+  email,
+  fullName,
+  organizationName,
+  designationName,
+  isTeamLead,
+  isManager,
+  membershipId,
+  children,
+}: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -47,6 +62,11 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
               role={role}
               email={email}
               fullName={fullName}
+              organizationName={organizationName}
+              designationName={designationName}
+              isTeamLead={isTeamLead}
+              isManager={isManager}
+              membershipId={membershipId}
               isMobile={false}
             />
           </Suspense>
@@ -76,6 +96,11 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
                   role={role}
                   email={email}
                   fullName={fullName}
+                  organizationName={organizationName}
+                  designationName={designationName}
+                  isTeamLead={isTeamLead}
+                  isManager={isManager}
+                  membershipId={membershipId}
                   isMobile={true}
                   onClose={() => setMobileMenuOpen(false)}
                 />
@@ -89,6 +114,11 @@ export function AppShell({ role, email, fullName, children }: AppShellProps) {
             role={role}
             email={email}
             fullName={fullName}
+            organizationName={organizationName}
+            designationName={designationName}
+            isTeamLead={isTeamLead}
+            isManager={isManager}
+            membershipId={membershipId}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
           />
           <main

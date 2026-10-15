@@ -3,11 +3,17 @@
 import { NotificationsBell } from "@/components/NotificationsBell";
 import type { Role } from "@/generated/prisma";
 import { usePathname } from "next/navigation";
+import { AccountMenu } from "./AccountMenu";
 
 interface AppHeaderProps {
   role: Role;
   email: string;
   fullName?: string | null;
+  organizationName?: string;
+  designationName?: string | null;
+  isTeamLead?: boolean;
+  isManager?: boolean;
+  membershipId?: string;
   onOpenMobileMenu?: () => void;
 }
 
@@ -93,19 +99,19 @@ function resolveSection(pathname: string): { breadcrumb: string; section: string
   return { breadcrumb, section, mobileTitle };
 }
 
-export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeaderProps) {
+export function AppHeader({
+  role,
+  email,
+  fullName,
+  organizationName,
+  designationName,
+  isTeamLead,
+  isManager,
+  membershipId,
+  onOpenMobileMenu,
+}: AppHeaderProps) {
   const pathname = usePathname();
   const { breadcrumb, section, mobileTitle } = resolveSection(pathname);
-
-  const displayName: string = fullName || (email ? email.split("@")[0] : "User") || "User";
-  const initials =
-    displayName
-      .split(" ")
-      .map((s) => s[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "U";
 
   return (
     <header
@@ -152,14 +158,16 @@ export function AppHeader({ role, email, fullName, onOpenMobileMenu }: AppHeader
 
         <div className="hidden h-4 w-px bg-[#E5EAE7] sm:block" />
 
-        <div className="flex items-center gap-2 pl-0.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#12A150]/20 bg-[#12A150]/10 text-[10px] font-bold text-[#0B3B2C] sm:h-7 sm:w-7">
-            {initials}
-          </div>
-          <span className="hidden max-w-[140px] truncate text-xs font-semibold text-[#0F1720] sm:inline-block">
-            {displayName}
-          </span>
-        </div>
+        <AccountMenu
+          role={role}
+          email={email}
+          fullName={fullName}
+          organizationName={organizationName}
+          designationName={designationName}
+          isTeamLead={isTeamLead}
+          isManager={isManager}
+          membershipId={membershipId}
+        />
       </div>
     </header>
   );

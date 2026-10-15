@@ -35,6 +35,7 @@ import {
   AuditInvestigationDrawer,
   type AuditEventDetail,
 } from "@/components/admin/AuditInvestigationDrawer";
+import { AlertDialog } from "@/components/ui/dialog";
 import {
   getAllCategories,
   getActionMetadata,
@@ -108,6 +109,7 @@ export function AuditInvestigationWorkbench({
   const [selectedEvent, setSelectedEvent] = useState<AuditEventDetail | null>(null);
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [exportAlert, setExportAlert] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
@@ -300,10 +302,14 @@ export function AuditInvestigationWorkbench({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        alert(res.error || "Failed to export audit logs");
+        const msg = res.error || "Failed to export audit logs";
+        setErrorMessage(msg);
+        setExportAlert(msg);
       }
     } catch (err: any) {
-      alert(err.message || "Export failed");
+      const msg = err.message || "Export failed";
+      setErrorMessage(msg);
+      setExportAlert(msg);
     } finally {
       setIsExporting(false);
     }
@@ -817,6 +823,15 @@ export function AuditInvestigationWorkbench({
         onClose={() => setSelectedEvent(null)}
         onFilterByActor={handleFilterByActor}
         onFilterByEntity={handleFilterByEntity}
+      />
+
+      {/* Enterprise Alert Dialog */}
+      <AlertDialog
+        open={!!exportAlert}
+        title="Export Failed"
+        message={exportAlert || "An unexpected error occurred while exporting the audit logs."}
+        variant="error"
+        onClose={() => setExportAlert(null)}
       />
     </div>
   );

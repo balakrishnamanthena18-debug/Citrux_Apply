@@ -19,6 +19,7 @@ import {
   deleteCandidateDocumentAction,
   updateCandidateStatusAction,
 } from "@/lib/candidate/actions";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 interface Props {
   candidate: any;
@@ -31,6 +32,15 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
   const [isPending, startTransition] = useTransition();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Deletion confirmation dialog state
+  const [deleteConfirmConfig, setDeleteConfirmConfig] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Form editing states
   const [editingExperience, setEditingExperience] = useState<any | null>(null);
@@ -178,15 +188,24 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
     }
   };
 
-  const handleDeleteExperience = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this work experience entry?")) return;
-    const res = await deleteCandidateExperienceAction(id);
-    if (res.success) {
-      showFeedback("success", "Experience entry removed.");
-      refreshData();
-    } else {
-      showFeedback("error", res.error || "Failed to delete experience.");
-    }
+  const handleDeleteExperience = (id: string) => {
+    setDeleteConfirmConfig({
+      title: "Delete work experience?",
+      description: "Are you sure you want to delete this work experience entry? Historical details for this role will be permanently removed.",
+      confirmLabel: "Delete experience",
+      onConfirm: async () => {
+        setDeleteLoading(true);
+        const res = await deleteCandidateExperienceAction(id);
+        setDeleteLoading(false);
+        if (res.success) {
+          setDeleteConfirmConfig(null);
+          showFeedback("success", "Experience entry removed.");
+          refreshData();
+        } else {
+          showFeedback("error", res.error || "Failed to delete experience.");
+        }
+      },
+    });
   };
 
   // ----------------------------------------------------
@@ -216,15 +235,24 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
     }
   };
 
-  const handleDeleteEducation = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this education entry?")) return;
-    const res = await deleteCandidateEducationAction(id);
-    if (res.success) {
-      showFeedback("success", "Education entry removed.");
-      refreshData();
-    } else {
-      showFeedback("error", res.error || "Failed to delete education.");
-    }
+  const handleDeleteEducation = (id: string) => {
+    setDeleteConfirmConfig({
+      title: "Delete education record?",
+      description: "Are you sure you want to delete this education entry? Historical institution and graduation details will be permanently removed.",
+      confirmLabel: "Delete education",
+      onConfirm: async () => {
+        setDeleteLoading(true);
+        const res = await deleteCandidateEducationAction(id);
+        setDeleteLoading(false);
+        if (res.success) {
+          setDeleteConfirmConfig(null);
+          showFeedback("success", "Education entry removed.");
+          refreshData();
+        } else {
+          showFeedback("error", res.error || "Failed to delete education.");
+        }
+      },
+    });
   };
 
   // ----------------------------------------------------
@@ -255,15 +283,24 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
     }
   };
 
-  const handleDeleteProject = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this project entry?")) return;
-    const res = await deleteCandidateProjectAction(id);
-    if (res.success) {
-      showFeedback("success", "Project entry removed.");
-      refreshData();
-    } else {
-      showFeedback("error", res.error || "Failed to delete project.");
-    }
+  const handleDeleteProject = (id: string) => {
+    setDeleteConfirmConfig({
+      title: "Delete project entry?",
+      description: "Are you sure you want to delete this project entry? Project details and technologies will be permanently removed.",
+      confirmLabel: "Delete project",
+      onConfirm: async () => {
+        setDeleteLoading(true);
+        const res = await deleteCandidateProjectAction(id);
+        setDeleteLoading(false);
+        if (res.success) {
+          setDeleteConfirmConfig(null);
+          showFeedback("success", "Project entry removed.");
+          refreshData();
+        } else {
+          showFeedback("error", res.error || "Failed to delete project.");
+        }
+      },
+    });
   };
 
   // ----------------------------------------------------
@@ -295,15 +332,24 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
     }
   };
 
-  const handleDeleteCertification = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this certification?")) return;
-    const res = await deleteCandidateCertificationAction(id);
-    if (res.success) {
-      showFeedback("success", "Certification entry removed.");
-      refreshData();
-    } else {
-      showFeedback("error", res.error || "Failed to delete certification.");
-    }
+  const handleDeleteCertification = (id: string) => {
+    setDeleteConfirmConfig({
+      title: "Delete certification?",
+      description: "Are you sure you want to delete this certification? Credential details will be permanently removed.",
+      confirmLabel: "Delete certification",
+      onConfirm: async () => {
+        setDeleteLoading(true);
+        const res = await deleteCandidateCertificationAction(id);
+        setDeleteLoading(false);
+        if (res.success) {
+          setDeleteConfirmConfig(null);
+          showFeedback("success", "Certification entry removed.");
+          refreshData();
+        } else {
+          showFeedback("error", res.error || "Failed to delete certification.");
+        }
+      },
+    });
   };
 
   // ----------------------------------------------------
@@ -318,15 +364,24 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
     }
   };
 
-  const handleDeleteDoc = async (docId: string) => {
-    if (!confirm("Are you sure you want to remove this document from your profile?")) return;
-    const res = await deleteCandidateDocumentAction(docId);
-    if (res.success) {
-      showFeedback("success", "Document removed.");
-      refreshData();
-    } else {
-      showFeedback("error", res.error || "Failed to delete document.");
-    }
+  const handleDeleteDoc = (docId: string) => {
+    setDeleteConfirmConfig({
+      title: "Remove document?",
+      description: "Are you sure you want to remove this document from your profile? This file will be permanently removed from your storage vault.",
+      confirmLabel: "Remove document",
+      onConfirm: async () => {
+        setDeleteLoading(true);
+        const res = await deleteCandidateDocumentAction(docId);
+        setDeleteLoading(false);
+        if (res.success) {
+          setDeleteConfirmConfig(null);
+          showFeedback("success", "Document removed.");
+          refreshData();
+        } else {
+          showFeedback("error", res.error || "Failed to delete document.");
+        }
+      },
+    });
   };
 
   const handleUploadDoc = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1528,6 +1583,18 @@ export function CandidateProfileManager({ candidate, userEmail, userName }: Prop
           </div>
         )}
       </div>
+
+      {/* Enterprise Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirmConfig}
+        title={deleteConfirmConfig?.title || "Confirm Action"}
+        description={deleteConfirmConfig?.description || ""}
+        confirmLabel={deleteConfirmConfig?.confirmLabel || "Delete"}
+        variant="danger"
+        pending={deleteLoading}
+        onConfirm={() => deleteConfirmConfig?.onConfirm()}
+        onCancel={() => setDeleteConfirmConfig(null)}
+      />
     </div>
   );
 }
