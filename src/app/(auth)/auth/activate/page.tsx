@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -8,6 +8,15 @@ import {
   activateStaffAccountAction,
   type ValidatedActivationTokenData,
 } from "@/lib/auth/actions";
+import { evaluatePasswordStrength } from "@/lib/validation/auth.schemas";
+
+function RequirementRow({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className={`text-[11px] font-medium ${ok ? "text-[#12A150]" : "text-[#94A3B8]"}`}>
+      {ok ? "✓" : "○"} {label}
+    </li>
+  );
+}
 
 function StaffActivationForm() {
   const searchParams = useSearchParams();
@@ -25,6 +34,10 @@ function StaffActivationForm() {
   const [activatedSuccess, setActivatedSuccess] = useState(false);
 
   const [retryCount, setRetryCount] = useState(0);
+
+  const strength = useMemo(() => evaluatePasswordStrength(password), [password]);
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const canSubmit = strength.isValid && passwordsMatch && !submitting;
 
   useEffect(() => {
     async function validateToken() {
@@ -58,12 +71,12 @@ function StaffActivationForm() {
     e.preventDefault();
     if (!token) return;
 
-    if (password.length < 8) {
-      setSubmitError("Password must be at least 8 characters long.");
+    if (!strength.isValid) {
+      setSubmitError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!passwordsMatch) {
       setSubmitError("Passwords do not match.");
       return;
     }
@@ -229,9 +242,16 @@ function StaffActivationForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
-                placeholder="At least 8 characters"
+                placeholder="••••••••"
                 autoComplete="new-password"
               />
+              <ul className="mt-2 space-y-1">
+                <RequirementRow ok={strength.minLength} label="Minimum 8 characters" />
+                <RequirementRow ok={strength.uppercase} label="Uppercase letter" />
+                <RequirementRow ok={strength.lowercase} label="Lowercase letter" />
+                <RequirementRow ok={strength.number} label="Number" />
+                <RequirementRow ok={strength.special} label="Special character" />
+              </ul>
             </div>
 
             <div>
@@ -247,9 +267,12 @@ function StaffActivationForm() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
-                placeholder="Re-enter password"
+                placeholder="••••••••"
                 autoComplete="new-password"
               />
+              {confirmPassword.length > 0 && !passwordsMatch && (
+                <p className="mt-1 text-[11px] font-medium text-rose-600">Passwords do not match</p>
+              )}
             </div>
 
             <div className="rounded-[12px] bg-amber-50/70 p-3.5 text-xs text-amber-900 border border-amber-200">
@@ -261,7 +284,7 @@ function StaffActivationForm() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={!canSubmit}
               className="flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 disabled:opacity-50 transition"
             >
               {submitting ? "Activating Account..." : "Set Password & Complete Activation"}

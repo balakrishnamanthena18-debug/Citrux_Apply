@@ -25,6 +25,39 @@ const SENSITIVE_KEYS = new Set([
   "direct_url",
 ]);
 
+const SENSITIVE_KEY_PATTERNS = [
+  /password/i,
+  /passphrase/i,
+  /token/i,
+  /otp/i,
+  /secret/i,
+  /credential/i,
+  /authorization/i,
+  /cookie/i,
+  /apikey/i,
+  /api_key/i,
+  /access_token/i,
+  /refresh_token/i,
+  /servicerolekey/i,
+  /service_role_key/i,
+  /private_key/i,
+  /privatekey/i,
+  /database_url/i,
+  /databaseurl/i,
+  /direct_url/i,
+  /directurl/i,
+];
+
+/**
+ * Checks whether an object key name represents sensitive credentials or secrets.
+ */
+export function isSensitiveKey(key: string): boolean {
+  if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+    return true;
+  }
+  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
+}
+
 /**
  * HTML entities mapping for XSS prevention.
  */
@@ -145,7 +178,7 @@ export function sanitizeObject(obj: unknown): Record<string, unknown> | undefine
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-    if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+    if (isSensitiveKey(key)) {
       sanitized[key] = "[REDACTED]";
     } else if (value && typeof value === "object" && !Array.isArray(value)) {
       sanitized[key] = sanitizeObject(value);

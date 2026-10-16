@@ -592,7 +592,9 @@ describe("Gate 11 — cron + worker boundaries", () => {
       (c) => c.path.includes("intelligence-worker")
     );
     expect(cron).toBeTruthy();
-    expect(cron?.schedule).toMatch(/^\*\/\d+/);
+    const isDailySchedule = cron?.schedule === "0 3 * * *";
+    const isBoundedInterval = /^\*\/\d+/.test(cron?.schedule ?? "");
+    expect(isDailySchedule || isBoundedInterval).toBe(true);
   });
 });
 

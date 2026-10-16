@@ -101,7 +101,7 @@ export const lastNameField = z
   });
 
 /** Stronger policy for password reset / staff activation (not login). */
-const strongPasswordField = z
+export const strongPasswordField = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(128, "Password must not exceed 128 characters")

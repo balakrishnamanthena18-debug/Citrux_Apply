@@ -10,7 +10,7 @@ async function main() {
 
   // Check auth.users
   const authUsers = await pool.query(`
-    SELECT id, email, email_confirmed_at, encrypted_password
+    SELECT id, email, email_confirmed_at
     FROM auth.users
   `);
   console.log("Current Supabase Auth users:");
