@@ -12,7 +12,7 @@ import {
   buildStaffWelcomeEmailSubject,
   buildStaffResentEmailSubject,
 } from "@/lib/email/templates/staffWelcomeActivation";
-import { buildAppUrl } from "@/lib/url";
+import { buildAppUrl, getRequestOrigin } from "@/lib/url";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildAssignmentWriteData } from "@/lib/application/assignment-snapshot";
 import {
@@ -555,7 +555,8 @@ export async function createEmployeeAction(
 
     // 4. Post-Commit: Dispatch Welcome Email with single-use activation link
     try {
-      const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
+      const requestOrigin = await getRequestOrigin();
+      const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`, { requestOrigin });
       await emailNotificationService.sendTransactionalNotification({
         organizationId: ctx.organizationId,
         recipientEmail: parsed.data.email,
@@ -666,7 +667,8 @@ export async function resendStaffActivationAction(
 
     // Post-Commit email dispatch
     try {
-      const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
+      const requestOrigin = await getRequestOrigin();
+      const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`, { requestOrigin });
       await emailNotificationService.sendTransactionalNotification({
         organizationId: ctx.organizationId,
         recipientEmail: target.user.email,

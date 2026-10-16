@@ -9,7 +9,7 @@ import { withRlsContext } from "@/lib/db/rls";
 import { getAuthenticatedContext, requireAdmin } from "@/lib/auth/context";
 import { logUserAuditEvent, logSystemAuditEvent } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { buildAppUrl, getTrustedOriginFromHost } from "@/lib/url";
+import { buildAppUrl, getTrustedOriginFromHost, getRequestOrigin } from "@/lib/url";
 import { logger } from "@/lib/logger";
 import { AuditAction, Role } from "@/generated/prisma";
 import {
@@ -48,21 +48,6 @@ async function getClientIp(): Promise<string> {
   } catch {
     return "127.0.0.1";
   }
-}
-
-/**
- * Helper to safely extract and validate trusted incoming request origin in server action context
- */
-async function getRequestOrigin(): Promise<string | undefined> {
-  try {
-    const headerStore = await headers();
-    const host = headerStore.get("x-forwarded-host") || headerStore.get("host");
-    const proto = headerStore.get("x-forwarded-proto");
-    return getTrustedOriginFromHost(host, proto);
-  } catch {
-    // Not in request context
-  }
-  return undefined;
 }
 
 /**

@@ -18,7 +18,7 @@ import {
   buildApplicationSubmittedEmailSubject,
   buildApplicationSubmittedEmailText,
 } from "@/lib/email/templates/applicationSubmitted";
-import { buildAppUrl } from "@/lib/url";
+import { buildAppUrl, getRequestOrigin } from "@/lib/url";
 import {
   GenerateSubmissionEvidenceUploadUrlSchema,
   RecordApplicationSubmissionSchema,
@@ -285,7 +285,8 @@ export async function recordApplicationSubmissionAction(
 
   if (result.candidateUser?.email) {
     try {
-      const applicationUrl = buildAppUrl(`/candidate/applications/${result.application.id}`);
+      const requestOrigin = await getRequestOrigin();
+      const applicationUrl = buildAppUrl(`/candidate/applications/${result.application.id}`, { requestOrigin });
       const emailParams = {
         firstName: result.candidateUser.firstName,
         jobTitle: result.jobTitle,

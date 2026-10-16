@@ -14,7 +14,7 @@ import {
   buildCandidateWelcomeEmailSubject,
   buildCandidateResentEmailSubject,
 } from "@/lib/email/templates/candidateWelcomeActivation";
-import { buildAppUrl } from "@/lib/url";
+import { buildAppUrl, getRequestOrigin } from "@/lib/url";
 import {
   CandidateProfileSchema,
   CandidateExperienceSchema,
@@ -372,7 +372,8 @@ export async function createCandidateAction(
 
     if (parsed.data.sendInvitation && rawToken) {
       try {
-        const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
+        const requestOrigin = await getRequestOrigin();
+        const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`, { requestOrigin });
         const delivery = await emailNotificationService.sendTransactionalNotification({
           organizationId: ctx.organizationId,
           recipientEmail: normalizedEmail,
@@ -527,7 +528,8 @@ export async function resendCandidateInvitationAction(
     });
 
     // Post-Commit email dispatch
-    const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`);
+    const requestOrigin = await getRequestOrigin();
+    const activationUrl = buildAppUrl(`/auth/activate?token=${rawToken}`, { requestOrigin });
     const specialistName = target.candidate.assignedEmployee
       ? [target.candidate.assignedEmployee.firstName, target.candidate.assignedEmployee.lastName].filter(Boolean).join(" ") ||
         target.candidate.assignedEmployee.email

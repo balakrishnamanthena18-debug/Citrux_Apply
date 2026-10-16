@@ -60,8 +60,7 @@ export function isProductionEnvironment(options?: {
     return true;
   }
   const isVercel = envSource.VERCEL === "1" || process.env.VERCEL === "1";
-  const vercelEnv = (envSource.VERCEL_ENV ?? process.env.VERCEL_ENV ?? "").toLowerCase().trim();
-  if (isVercel && (vercelEnv === "production" || !vercelEnv)) {
+  if (isVercel) {
     return true;
   }
   return false;
@@ -141,6 +140,27 @@ export function getTrustedOriginFromHost(
     }
     return undefined;
   } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Safely extracts and validates a trusted incoming request origin in server context.
+ * Strictly verifies against ALLOWED_REDIRECT_ORIGINS (and LOCAL_DEV_ORIGINS in development).
+ * Catches and safely ignores any errors if invoked outside of a request context.
+ */
+export async function getRequestOrigin(options?: {
+  nodeEnv?: string;
+  env?: Record<string, string | undefined>;
+}): Promise<string | undefined> {
+  try {
+    const { headers } = await import("next/headers");
+    const headerStore = await headers();
+    const host = headerStore.get("x-forwarded-host") || headerStore.get("host");
+    const proto = headerStore.get("x-forwarded-proto");
+    return getTrustedOriginFromHost(host, proto, options);
+  } catch {
+    // Not in request context (e.g. CLI, tests, cron worker)
     return undefined;
   }
 }
