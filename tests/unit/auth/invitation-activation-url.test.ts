@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, assert } from "vitest";
 import {
   buildAppUrl,
   resolveAppUrl,
@@ -246,7 +246,10 @@ describe("OOS Activation URL Fix & Regression Test Suite", () => {
       expect(res.success).toBe(true);
       expect(mockSendTransactionalNotification).toHaveBeenCalledTimes(1);
 
-      const emailCall = mockSendTransactionalNotification.mock.calls[0][0];
+      const firstCall = mockSendTransactionalNotification.mock.calls[0];
+      assert(firstCall, "Expected transactional email notification call to be recorded");
+      const emailCall = firstCall[0];
+      assert(emailCall, "Expected email notification payload to be provided");
       expect(emailCall.recipientEmail).toBe("new.employee@careerbutton.in");
       expect(emailCall.templateId).toBe("STAFF_WELCOME_ACTIVATION");
       expect(emailCall.htmlBody).toContain("https://portal.careerbutton.in/auth/activate?token=");
@@ -293,7 +296,10 @@ describe("OOS Activation URL Fix & Regression Test Suite", () => {
       expect(res.success).toBe(true);
       expect(mockSendTransactionalNotification).toHaveBeenCalledTimes(1);
 
-      const emailCall = mockSendTransactionalNotification.mock.calls[0][0];
+      const firstCall = mockSendTransactionalNotification.mock.calls[0];
+      assert(firstCall, "Expected transactional email notification call to be recorded");
+      const emailCall = firstCall[0];
+      assert(emailCall, "Expected email notification payload to be provided");
       expect(emailCall.recipientEmail).toBe("existing.staff@careerbutton.in");
       expect(emailCall.templateId).toBe("STAFF_WELCOME_ACTIVATION");
       expect(emailCall.htmlBody).toContain("https://portal.careerbutton.in/auth/activate?token=");
@@ -349,7 +355,10 @@ describe("OOS Activation URL Fix & Regression Test Suite", () => {
       expect(res.success).toBe(true);
       expect(mockSendTransactionalNotification).toHaveBeenCalledTimes(1);
 
-      const emailCall = mockSendTransactionalNotification.mock.calls[0][0];
+      const firstCall = mockSendTransactionalNotification.mock.calls[0];
+      assert(firstCall, "Expected transactional email notification call to be recorded");
+      const emailCall = firstCall[0];
+      assert(emailCall, "Expected email notification payload to be provided");
       expect(emailCall.recipientEmail).toBe("cand@careerbutton.in");
       expect(emailCall.templateId).toBe("CANDIDATE_WELCOME_ACTIVATION");
       expect(emailCall.htmlBody).toContain("https://portal.careerbutton.in/auth/activate?token=");
@@ -409,7 +418,10 @@ describe("OOS Activation URL Fix & Regression Test Suite", () => {
       expect(res.success).toBe(true);
       expect(mockSendTransactionalNotification).toHaveBeenCalledTimes(1);
 
-      const emailCall = mockSendTransactionalNotification.mock.calls[0][0];
+      const firstCall = mockSendTransactionalNotification.mock.calls[0];
+      assert(firstCall, "Expected transactional email notification call to be recorded");
+      const emailCall = firstCall[0];
+      assert(emailCall, "Expected email notification payload to be provided");
       expect(emailCall.recipientEmail).toBe("resend.cand@careerbutton.in");
       expect(emailCall.templateId).toBe("CANDIDATE_WELCOME_ACTIVATION");
       expect(emailCall.htmlBody).toContain("https://portal.careerbutton.in/auth/activate?token=");
