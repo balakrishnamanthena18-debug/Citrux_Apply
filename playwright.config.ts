@@ -3,6 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright E2E configuration for OOS / CareerButton
  */
+const testPort = process.env.PORT || '3000';
+const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || `http://localhost:${testPort}`;
+
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /.*\.spec\.ts/,
@@ -20,7 +23,7 @@ export default defineConfig({
     ['json', { outputFile: 'playwright-results.json' }],
   ],
   use: {
-    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000',
+    baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -53,8 +56,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
+    command: `npm run dev -- -p ${testPort}`,
+    url: baseURL,
     reuseExistingServer: true,
     timeout: 120000,
   },

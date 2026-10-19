@@ -67,9 +67,9 @@ export function getRoleBadgeConfig(
 
   return {
     label: "CANDIDATE",
-    bg: "bg-emerald-50",
-    text: "text-[#12A150]",
-    border: "border-emerald-200",
+    bg: "bg-[#EBF2ED]",
+    text: "text-[#082F26]",
+    border: "border-[#C2D6CA]",
   };
 }
 
@@ -77,13 +77,15 @@ export function AccountIdentity({
   role,
   email,
   fullName,
-  organizationName = "Operations Operating System",
+  organizationName,
   designationName,
   isTeamLead = false,
   isManager = false,
   variant = "detailed",
   className = "",
 }: AccountIdentityProps) {
+  const defaultOrgName = role === "CANDIDATE" ? "Career Button" : "Operations Operating System";
+  const effectiveOrgName = organizationName || defaultOrgName;
   const displayName = fullName || (email ? email.split("@")[0] : "User") || "User";
   const initials = getInitials(fullName, email);
   const badge = getRoleBadgeConfig(role, isTeamLead, isManager);
@@ -92,7 +94,11 @@ export function AccountIdentity({
     return (
       <div className={`flex items-center gap-2.5 ${className}`}>
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#12A150]/30 bg-[#12A150]/10 text-xs font-bold text-[#0B3B2C] shadow-2xs transition-transform group-hover:scale-105"
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-2xs transition-transform group-hover:scale-105 ${
+            role === "CANDIDATE"
+              ? "border-[#082F26]/30 bg-[#082F26]/10 text-[#082F26]"
+              : "border-[#12A150]/30 bg-[#12A150]/10 text-[#0B3B2C]"
+          }`}
           aria-hidden="true"
         >
           {initials}
@@ -120,7 +126,11 @@ export function AccountIdentity({
     return (
       <div className={`flex items-center gap-2.5 min-w-0 ${className}`}>
         <div
-          className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#12A150]/20 bg-[#12A150]/10 text-xs font-bold text-[#0B3B2C]"
+          className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+            role === "CANDIDATE"
+              ? "border-[#082F26]/20 bg-[#082F26]/10 text-[#082F26]"
+              : "border-[#12A150]/20 bg-[#12A150]/10 text-[#0B3B2C]"
+          }`}
           aria-hidden="true"
         >
           {initials}
@@ -134,7 +144,7 @@ export function AccountIdentity({
                 ? "bg-amber-500"
                 : role === "EMPLOYEE"
                 ? "bg-blue-500"
-                : "bg-[#12A150]"
+                : "bg-[#082F26]"
             }`}
           />
         </div>
@@ -159,7 +169,11 @@ export function AccountIdentity({
   return (
     <div className={`flex items-start gap-3 ${className}`}>
       <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#12A150]/30 bg-[#12A150]/10 text-sm font-bold text-[#0B3B2C] shadow-2xs"
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-2xs ${
+          role === "CANDIDATE"
+            ? "border-[#082F26]/30 bg-[#082F26]/10 text-sm font-bold text-[#082F26]"
+            : "border-[#12A150]/30 bg-[#12A150]/10 text-sm font-bold text-[#0B3B2C]"
+        }`}
         aria-hidden="true"
       >
         {initials}
@@ -181,7 +195,7 @@ export function AccountIdentity({
             <span className="font-medium text-[#475569]">{designationName}</span>
           )}
           {designationName && <span>•</span>}
-          <span className="truncate">{organizationName}</span>
+          <span className="truncate" data-testid="identity-org-name">{effectiveOrgName}</span>
         </div>
       </div>
     </div>

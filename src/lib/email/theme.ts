@@ -32,6 +32,25 @@ export const EMAIL_THEME = {
   maxWidth: 640,
 } as const;
 
+export const CAREER_BUTTON_EMAIL_THEME = {
+  forestGreen: "#082F26",
+  deepEmerald: "#0B3D32",
+  lime: "#D8F971",
+  canvas: "#FAF9F5",
+  paleSage: "#EBF2ED",
+  sageBorder: "#C2D6CA",
+  text: "#082F26",
+  textSecondary: "#4A5B53",
+  textMuted: "#7D8F86",
+  border: "#D5DFD9",
+  borderSoft: "#E2EAE5",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F7F9F7",
+  surfaceFooter: "#FAFBF9",
+  font: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+  maxWidth: 640,
+} as const;
+
 export type EmailStatusTone = "success" | "warning" | "error" | "info" | "neutral";
 
 export function statusToneStyles(tone: EmailStatusTone): {

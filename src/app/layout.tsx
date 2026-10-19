@@ -10,15 +10,27 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Operations Operating System (OOS)",
-  description: "Operations Operating System platform baseline",
+  title: "Career Button Client Portal",
+  description: "Career Button Client Portal — Candidate Account & Career Services",
+  robots: {
+    index: false,
+    follow: false,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0B3B2C",
+  themeColor: "#082F26",
 };
 
 export default function RootLayout({

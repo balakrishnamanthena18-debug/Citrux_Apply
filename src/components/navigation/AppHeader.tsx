@@ -141,7 +141,9 @@ export function AppHeader({
 
         {/* Desktop breadcrumbs */}
         <div className="hidden min-w-0 items-center space-x-2 text-xs md:flex">
-          <span className="font-semibold text-[#94A3B8]">OOS</span>
+          <span className="font-semibold text-[#94A3B8]" data-testid="header-breadcrumb-root">
+            {role === "CANDIDATE" ? "Career Button" : "OOS"}
+          </span>
           <span className="text-[#E5EAE7]">/</span>
           <span className="font-medium text-[#64748B]">{breadcrumb}</span>
           {section && (

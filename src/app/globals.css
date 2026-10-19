@@ -18,6 +18,15 @@
     --accent-lime: #C6F432;
     --primary-tint: rgba(18, 161, 80, 0.08);
     --primary-subtle: rgba(18, 161, 80, 0.035);
+
+    /* Career Button Brand Tokens */
+    --cb-forest: #082F26;
+    --cb-emerald: #0B3D32;
+    --cb-canvas: #FAF9F5;
+    --cb-sage: #EBF2ED;
+    --cb-lime: #D8F971;
+    --cb-text: #081C15;
+    --cb-text-muted: #52605B;
   }
 
   * {

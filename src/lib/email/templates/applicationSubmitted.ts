@@ -1,6 +1,7 @@
 /**
  * Application submitted email — presentation only.
  * Candidate-facing; does not expose internal notes or evidence paths.
+ * Aligned with Career Button candidate portal branding.
  */
 
 import {
@@ -14,6 +15,7 @@ import {
   Footer,
   PrimaryButton,
   SuccessNotice,
+  SupportBlock,
 } from "@/lib/email/components";
 import { renderEmailDocument } from "@/lib/email/render";
 
@@ -64,12 +66,12 @@ export function buildApplicationSubmittedEmailHtml(
   const reference = params.confirmationReference?.trim() || "Recorded";
 
   const bodyRowsHtml = [
-    BrandHeader(),
+    BrandHeader({ brand: "careerbutton" }),
     ContentRow(`
       ${Eyebrow("Application update")}
       ${EmailTitle("Your application was submitted")}
       ${EmailBody(
-        `Hello ${firstName}, an operational team member has submitted your application for ${params.jobTitle} at ${params.companyName} on your behalf.`
+        `Hello ${firstName}, our team has submitted your application for ${params.jobTitle} at ${params.companyName} on your behalf.`
       )}
       ${ApplicationSummary({
         jobTitle: params.jobTitle,
@@ -81,16 +83,17 @@ export function buildApplicationSubmittedEmailHtml(
       })}
       ${SuccessNotice(`Confirmation reference: ${reference}`)}
       ${EmailBody(
-        "You can review submission details and next steps in your Operations OS portal."
+        "You can review submission details and next steps in your Career Button candidate portal."
       )}
-      ${PrimaryButton("View application →", params.applicationUrl)}
-      ${FallbackLink("If the button does not work, open this link:", params.applicationUrl)}
+      ${PrimaryButton("View application →", params.applicationUrl, { brand: "careerbutton" })}
+      ${FallbackLink("If the button does not work, open this link:", params.applicationUrl, { brand: "careerbutton" })}
+      ${SupportBlock({ brand: "careerbutton" })}
     `),
-    Footer(),
+    Footer({ brand: "careerbutton" }),
   ].join("\n");
 
   return renderEmailDocument({
-    title: "Application submitted — Operations OS",
+    title: "Application submitted — Career Button",
     preheader: `Your application to ${params.companyName} has been submitted.`,
     bodyRowsHtml,
   });
@@ -102,11 +105,11 @@ export function buildApplicationSubmittedEmailText(
   const firstName = params.firstName?.trim() || "Candidate";
   const reference = params.confirmationReference?.trim() || "Recorded";
   return [
-    "OOS — Application submitted",
+    "Career Button — Application submitted",
     "",
     `Hello ${firstName},`,
     "",
-    `An operational team member has submitted your application for ${params.jobTitle} at ${params.companyName} on your behalf.`,
+    `Our team has submitted your application for ${params.jobTitle} at ${params.companyName} on your behalf.`,
     "",
     `Confirmation reference: ${reference}`,
     "",
@@ -114,8 +117,8 @@ export function buildApplicationSubmittedEmailText(
     params.applicationUrl,
     "",
     "Best regards,",
-    "Operations Team",
-    "Operations OS",
+    "Career Button Team",
+    "Career Button",
   ].join("\n");
 }
 
@@ -123,5 +126,5 @@ export function buildApplicationSubmittedEmailSubject(
   jobTitle: string,
   companyName: string
 ): string {
-  return `OOS — Application submitted: ${jobTitle} at ${companyName}`;
+  return `Career Button — Application submitted: ${jobTitle} at ${companyName}`;
 }

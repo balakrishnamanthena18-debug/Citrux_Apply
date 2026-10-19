@@ -6,10 +6,35 @@ test.describe('Authentication and Account Lifecycle', () => {
     await context.clearCookies();
   });
 
-  test('Public root renders marketing/engineering foundation page', async ({ page }) => {
+  test('Public root redirects unauthenticated visitor to /login', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /Operations Operating System/i })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Phase 0 — Engineering Foundation')).toBeVisible();
+    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 15000 });
+    expect(page.url()).toContain('/login');
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
+  });
+
+  test('Public root redirects authenticated candidate to /candidate', async ({ page }) => {
+    await loginUser(page, 'candidate');
+    expect(page.url()).toContain('/candidate');
+    await page.goto('/');
+    await page.waitForURL((url) => url.pathname.includes('/candidate'), { timeout: 15000 });
+    expect(page.url()).toContain('/candidate');
+  });
+
+  test('Public root redirects authenticated employee to /employee', async ({ page }) => {
+    await loginUser(page, 'employee');
+    expect(page.url()).toContain('/employee');
+    await page.goto('/');
+    await page.waitForURL((url) => url.pathname.includes('/employee'), { timeout: 15000 });
+    expect(page.url()).toContain('/employee');
+  });
+
+  test('Public root redirects authenticated admin to /admin', async ({ page }) => {
+    await loginUser(page, 'admin');
+    expect(page.url()).toContain('/admin');
+    await page.goto('/');
+    await page.waitForURL((url) => url.pathname.includes('/admin'), { timeout: 15000 });
+    expect(page.url()).toContain('/admin');
   });
 
   test('Login form renders required elements and validation', async ({ page }) => {

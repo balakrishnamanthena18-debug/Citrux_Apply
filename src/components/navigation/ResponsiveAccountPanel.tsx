@@ -28,7 +28,7 @@ export function ResponsiveAccountPanel({
   role,
   email,
   fullName,
-  organizationName = "Operations Operating System",
+  organizationName,
   designationName,
   isTeamLead = false,
   isManager = false,
@@ -42,6 +42,8 @@ export function ResponsiveAccountPanel({
   const [activeModal, setActiveModal] = useState<"details" | "help" | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const defaultOrgName = role === "CANDIDATE" ? "Career Button" : "Operations Operating System";
+  const effectiveOrgName = organizationName || defaultOrgName;
   const displayName = fullName || (email ? email.split("@")[0] : "User") || "User";
   const initials = getInitials(fullName, email);
   const badge = getRoleBadgeConfig(role, isTeamLead, isManager);
@@ -105,7 +107,7 @@ export function ResponsiveAccountPanel({
             role={role}
             email={email}
             fullName={fullName}
-            organizationName={organizationName}
+            organizationName={effectiveOrgName}
             designationName={designationName}
             isTeamLead={isTeamLead}
             isManager={isManager}
@@ -165,7 +167,7 @@ export function ResponsiveAccountPanel({
                 role={role}
                 email={email}
                 fullName={fullName}
-                organizationName={organizationName}
+                organizationName={effectiveOrgName}
                 designationName={designationName}
                 isTeamLead={isTeamLead}
                 isManager={isManager}
@@ -200,12 +202,24 @@ export function ResponsiveAccountPanel({
           onClick={() => setPopoverOpen((prev) => !prev)}
           title={`${displayName} (${badge.label})`}
           aria-label={`Account menu for ${displayName}`}
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#12A150]/30 bg-[#12A150]/10 text-xs font-bold text-[#0B3B2C] shadow-2xs hover:scale-105 transition-transform"
+          className={`relative flex h-10 w-10 items-center justify-center rounded-xl border shadow-2xs hover:scale-105 transition-transform ${
+            role === "CANDIDATE"
+              ? "border-[#082F26]/30 bg-[#082F26]/10 text-xs font-bold text-[#082F26]"
+              : "border-[#12A150]/30 bg-[#12A150]/10 text-xs font-bold text-[#0B3B2C]"
+          }`}
         >
           {initials}
           <span
             className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white ${
-              role === "ADMIN" ? "bg-purple-500" : isManager ? "bg-indigo-500" : isTeamLead ? "bg-amber-500" : role === "EMPLOYEE" ? "bg-blue-500" : "bg-[#12A150]"
+              role === "ADMIN"
+                ? "bg-purple-500"
+                : isManager
+                ? "bg-indigo-500"
+                : isTeamLead
+                ? "bg-amber-500"
+                : role === "EMPLOYEE"
+                ? "bg-blue-500"
+                : "bg-[#082F26]"
             }`}
           />
         </button>
@@ -241,7 +255,7 @@ export function ResponsiveAccountPanel({
               role={role}
               email={email}
               fullName={fullName}
-              organizationName={organizationName}
+              organizationName={effectiveOrgName}
               designationName={designationName}
               isTeamLead={isTeamLead}
               isManager={isManager}
@@ -278,7 +292,13 @@ export function ResponsiveAccountPanel({
           aria-expanded={popoverOpen}
         >
           <div className="flex items-center space-x-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-[#12A150]/10 text-[#0B3B2C] border border-[#12A150]/20 font-bold text-[10px] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <div
+              className={`w-7 h-7 rounded-full font-bold text-[10px] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform border ${
+                role === "CANDIDATE"
+                  ? "bg-[#082F26]/10 text-[#082F26] border-[#082F26]/20"
+                  : "bg-[#12A150]/10 text-[#0B3B2C] border-[#12A150]/20"
+              }`}
+            >
               {initials}
             </div>
             <div className="min-w-0">
@@ -332,13 +352,14 @@ export function ResponsiveAccountPanel({
 
       {/* Account & Session Details & Help Modals rendered via Portal */}
       <AccountModals
+        role={role}
         activeModal={activeModal}
         onClose={() => setActiveModal(null)}
         displayName={displayName}
         email={email}
         badge={badge}
         designationName={designationName}
-        organizationName={organizationName}
+        organizationName={effectiveOrgName}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signInAction } from "@/lib/auth/actions";
+import { CareerButtonLogo } from "@/components/brand/CareerButtonLogo";
 
 function LoginForm() {
   const router = useRouter();
@@ -49,15 +50,15 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
-      {/* Back option to main site */}
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-4 py-10 sm:px-6 lg:px-8">
+      {/* Top bar with back link to marketing site and portal badge */}
       <div className="w-full max-w-md mb-3 flex items-center justify-between">
         <a
           href="https://www.careerbutton.in/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#0B3B2C] transition-colors group"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#52605B] hover:text-[#082F26] transition-colors group"
         >
           <svg
-            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#94A3B8] group-hover:text-[#0B3B2C]"
+            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#52605B] group-hover:text-[#082F26]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -65,26 +66,28 @@ function LoginForm() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
-          Back to CareerButton
+          Back to Career Button
         </a>
+        <span className="text-[11px] font-medium text-[#082F26] bg-[#EBF2ED] px-2.5 py-0.5 rounded-full">
+          Candidate Portal
+        </span>
       </div>
 
-      <div className="w-full max-w-md space-y-8 rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7]">
+      <div className="w-full max-w-md space-y-7 rounded-[20px] bg-white p-6 sm:p-10 shadow-[0_4px_24px_rgba(8,47,38,0.06)] border border-[#E5EAE7]">
         <div>
           <a
             href="https://www.careerbutton.in/"
-            title="Back to CareerButton (careerbutton.in)"
-            aria-label="Back to CareerButton homepage"
-            className="group mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#0B3B2C] text-white shadow-2xs transition-all duration-200 hover:scale-105 hover:bg-[#0E4735] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 relative cursor-pointer"
+            title="Career Button Homepage"
+            aria-label="Career Button — Return to homepage"
+            className="group mx-auto mb-5 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#082F26] focus-visible:ring-offset-2 rounded-lg py-1 transition-opacity hover:opacity-90"
           >
-            <span className="font-bold text-base transition-transform group-hover:scale-105">C</span>
-            <span className="w-2 h-2 rounded-full bg-[#C6F432] absolute -top-0.5 -right-0.5 ring-2 ring-white transition-transform group-hover:scale-110" />
+            <CareerButtonLogo className="h-7 sm:h-8 w-auto text-[#082F26]" />
           </a>
-          <h2 className="text-center text-2xl font-bold tracking-tight text-[#0F1720]">
+          <h1 className="text-center text-2xl font-bold tracking-tight text-[#082F26]">
             Sign in to your account
-          </h2>
-          <p className="mt-1.5 text-center text-xs text-[#64748B] font-medium">
-            Operations Operating System (OOS)
+          </h1>
+          <p className="mt-1.5 text-center text-xs text-[#52605B] font-medium">
+            Access your Career Button candidate portal
           </p>
         </div>
 
@@ -106,7 +109,7 @@ function LoginForm() {
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
+              <label htmlFor="email" className="block text-xs font-semibold text-[#081C15] uppercase tracking-wider">
                 Email address
               </label>
               <input
@@ -115,13 +118,13 @@ function LoginForm() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] text-sm transition"
                 placeholder="you@company.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
+              <label htmlFor="password" className="block text-xs font-semibold text-[#081C15] uppercase tracking-wider">
                 Password
               </label>
               <input
@@ -130,7 +133,7 @@ function LoginForm() {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition"
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] text-sm transition"
                 placeholder="••••••••"
               />
             </div>
@@ -139,7 +142,7 @@ function LoginForm() {
           <div className="flex items-center justify-between">
             <Link
               href="/forgot-password"
-              className="text-xs font-semibold text-[#12A150] hover:text-[#0B3B2C] transition"
+              className="text-xs font-semibold text-[#082F26] hover:text-[#0B3D32] hover:underline transition"
             >
               Forgot your password?
             </Link>
@@ -149,20 +152,59 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 disabled:opacity-50 transition"
+              aria-busy={loading}
+              className="flex w-full justify-center rounded-[11px] bg-[#082F26] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0B3D32] focus:outline-none focus:ring-2 focus:ring-[#082F26] focus:ring-offset-2 disabled:opacity-50 transition active:scale-[0.99] cursor-pointer disabled:cursor-not-allowed"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </div>
         </form>
 
-        <div className="text-center text-xs text-[#64748B]">
+        <div className="text-center text-xs text-[#52605B]">
           Candidate without an account?{" "}
-          <Link href="/register" className="font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline">
+          <Link href="/register" className="font-semibold text-[#082F26] hover:text-[#0B3D32] hover:underline">
             Register here
           </Link>
         </div>
+
+        <div className="pt-4 border-t border-[#E5EAE7] text-center text-xs text-[#52605B] space-y-1">
+          <div>
+            Need candidate assistance?{" "}
+            <a
+              href="https://wa.me/919110543176"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#082F26] hover:underline"
+            >
+              Contact on WhatsApp (+91 91105 43176)
+            </a>
+          </div>
+          <div className="text-[11px] text-[#718096]">
+            Email:{" "}
+            <a
+              href="mailto:support@careerbutton.in"
+              className="font-medium text-[#082F26] hover:underline"
+            >
+              support@careerbutton.in
+            </a>{" "}
+            <span className="text-amber-700">(under activation)</span>
+          </div>
+        </div>
       </div>
+
+      {/* Portal footer */}
+      <footer className="mt-8 text-center text-xs text-[#52605B] space-y-1">
+        <p>© {new Date().getFullYear()} Career Button. All rights reserved.</p>
+        <p className="text-[11px] text-[#718096]">
+          Candidate Client Portal •{" "}
+          <a
+            href="https://www.careerbutton.in"
+            className="hover:underline text-[#082F26]"
+          >
+            careerbutton.in
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

@@ -1,7 +1,34 @@
-import { EMAIL_THEME, statusToneStyles, type EmailStatusTone } from "./theme";
+import { EMAIL_THEME, CAREER_BUTTON_EMAIL_THEME, statusToneStyles, type EmailStatusTone } from "./theme";
 import { escapeAttr, escapeHtml } from "./render";
 
-export function BrandHeader(): string {
+export type EmailBrand = "careerbutton" | "oos";
+
+export function BrandHeader(opts?: { brand?: EmailBrand }): string {
+  const isCandidate = opts?.brand === "careerbutton";
+  if (isCandidate) {
+    return `<tr>
+  <td style="padding:28px 32px 20px;border-bottom:1px solid ${CAREER_BUTTON_EMAIL_THEME.borderSoft};background-color:${CAREER_BUTTON_EMAIL_THEME.surface};">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="vertical-align:middle;padding-right:12px;">
+          <div style="width:36px;height:36px;border-radius:10px;background-color:${CAREER_BUTTON_EMAIL_THEME.forestGreen};color:${CAREER_BUTTON_EMAIL_THEME.lime};font-family:${CAREER_BUTTON_EMAIL_THEME.font};font-size:12px;font-weight:700;letter-spacing:0.04em;text-align:center;line-height:36px;">
+            CB
+          </div>
+        </td>
+        <td style="vertical-align:middle;">
+          <div style="font-family:${CAREER_BUTTON_EMAIL_THEME.font};font-size:15px;font-weight:700;color:${CAREER_BUTTON_EMAIL_THEME.forestGreen};line-height:1.2;">
+            Career Button
+          </div>
+          <div style="font-family:${CAREER_BUTTON_EMAIL_THEME.font};font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:${CAREER_BUTTON_EMAIL_THEME.textMuted};margin-top:2px;">
+            Candidate Portal
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>`;
+  }
+
   return `<tr>
   <td style="padding:28px 32px 20px;border-bottom:1px solid ${EMAIL_THEME.borderSoft};background-color:${EMAIL_THEME.surface};">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -60,14 +87,20 @@ export function ContentRow(innerHtml: string, padding = "28px 32px"): string {
 </tr>`;
 }
 
-export function PrimaryButton(label: string, href: string): string {
+export function PrimaryButton(
+  label: string,
+  href: string,
+  opts?: { brand?: EmailBrand }
+): string {
+  const isCandidate = opts?.brand === "careerbutton";
+  const btnColor = isCandidate ? CAREER_BUTTON_EMAIL_THEME.forestGreen : EMAIL_THEME.deepGreen;
   const safeHref = escapeAttr(href);
   const safeLabel = escapeHtml(label);
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px;">
   <tr>
-    <td align="left" bgcolor="${EMAIL_THEME.deepGreen}" style="border-radius:10px;background-color:${EMAIL_THEME.deepGreen};">
+    <td align="left" bgcolor="${btnColor}" style="border-radius:10px;background-color:${btnColor};">
       <!--[if mso]>
-      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref}" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="16%" stroke="f" fillcolor="${EMAIL_THEME.deepGreen}">
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref}" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="16%" stroke="f" fillcolor="${btnColor}">
         <w:anchorlock/>
         <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;">
           ${safeLabel}
@@ -75,7 +108,7 @@ export function PrimaryButton(label: string, href: string): string {
       </v:roundrect>
       <![endif]-->
       <!--[if !mso]><!-- -->
-      <a href="${safeHref}" style="display:inline-block;min-height:48px;line-height:48px;padding:0 22px;font-family:${EMAIL_THEME.font};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;background-color:${EMAIL_THEME.deepGreen};mso-hide:all;">
+      <a href="${safeHref}" style="display:inline-block;min-height:48px;line-height:48px;padding:0 22px;font-family:${EMAIL_THEME.font};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;background-color:${btnColor};mso-hide:all;">
         ${safeLabel}
       </a>
       <!--<![endif]-->
@@ -282,15 +315,33 @@ export function InfoNotice(body: string): string {
   return NoticeBlock("Note", body, "info");
 }
 
-export function SupportBlock(opts?: { email?: string; note?: string }): string {
-  const note =
-    opts?.note ??
-    "If you need help, reply to this email or contact your Operations OS administrator.";
-  const contact = opts?.email
-    ? `<div style="margin-top:6px;font-family:${EMAIL_THEME.font};font-size:13px;color:${EMAIL_THEME.textSecondary};">
-        ${escapeHtml(opts.email)}
-      </div>`
-    : "";
+export function SupportBlock(opts?: {
+  email?: string;
+  note?: string;
+  brand?: EmailBrand;
+}): string {
+  const isCandidate = opts?.brand === "careerbutton";
+  const defaultNote = isCandidate
+    ? "If you need candidate assistance, connect with our support desk on WhatsApp."
+    : "If you need help, reply to this email or contact your Operations OS administrator.";
+  const note = opts?.note ?? defaultNote;
+  const linkColor = isCandidate ? CAREER_BUTTON_EMAIL_THEME.forestGreen : EMAIL_THEME.deepGreen;
+
+  let contact = "";
+  if (isCandidate) {
+    contact = `<div style="margin-top:8px;font-family:${CAREER_BUTTON_EMAIL_THEME.font};font-size:13px;line-height:1.5;color:${CAREER_BUTTON_EMAIL_THEME.textSecondary};">
+      <div>
+        <strong>WhatsApp Support:</strong> <a href="https://wa.me/919110543176" style="color:${linkColor};font-weight:600;text-decoration:underline;">+91 91105 43176</a>
+      </div>
+      <div style="margin-top:4px;font-size:11px;color:${CAREER_BUTTON_EMAIL_THEME.textMuted};">
+        Domain email (support@careerbutton.in) is temporarily undergoing activation — please message via WhatsApp for assistance.
+      </div>
+    </div>`;
+  } else if (opts?.email) {
+    contact = `<div style="margin-top:6px;font-family:${EMAIL_THEME.font};font-size:13px;color:${EMAIL_THEME.textSecondary};">
+        <a href="mailto:${escapeAttr(opts.email)}" style="color:${linkColor};text-decoration:underline;">${escapeHtml(opts.email)}</a>
+      </div>`;
+  }
 
   return `<div style="margin:8px 0 0;">
     <div style="font-family:${EMAIL_THEME.font};font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${EMAIL_THEME.textMuted};margin-bottom:6px;">
@@ -303,8 +354,30 @@ export function SupportBlock(opts?: { email?: string; note?: string }): string {
   </div>`;
 }
 
-export function Footer(opts?: { organizationName?: string | null }): string {
+export function Footer(opts?: {
+  brand?: EmailBrand;
+  organizationName?: string | null;
+}): string {
   const year = new Date().getFullYear();
+  const isCandidate = opts?.brand === "careerbutton";
+
+  if (isCandidate) {
+    const org = opts?.organizationName
+      ? `<div style="margin-top:6px;">In association with ${escapeHtml(opts.organizationName)}</div>`
+      : "";
+
+    return `<tr>
+  <td style="padding:22px 32px 28px;border-top:1px solid ${CAREER_BUTTON_EMAIL_THEME.borderSoft};background-color:${CAREER_BUTTON_EMAIL_THEME.surfaceFooter};">
+    <div style="font-family:${CAREER_BUTTON_EMAIL_THEME.font};font-size:12px;line-height:1.55;color:${CAREER_BUTTON_EMAIL_THEME.textMuted};">
+      <div style="font-weight:600;color:${CAREER_BUTTON_EMAIL_THEME.textSecondary};margin-bottom:4px;">Career Button</div>
+      <div>Candidate Portal · Secure transactional notice</div>
+      ${org}
+      <div style="margin-top:10px;">© ${year} Career Button. All rights reserved.</div>
+    </div>
+  </td>
+</tr>`;
+  }
+
   const org = opts?.organizationName
     ? `<div style="margin-top:6px;">Prepared for ${escapeHtml(opts.organizationName)}</div>`
     : "";
@@ -322,9 +395,18 @@ export function Footer(opts?: { organizationName?: string | null }): string {
 }
 
 /** Fallback plain URL for clients that strip buttons. */
-export function FallbackLink(label: string, href: string): string {
+export function FallbackLink(
+  label: string,
+  href: string,
+  opts?: { brand?: EmailBrand }
+): string {
+  const linkColor =
+    opts?.brand === "careerbutton"
+      ? CAREER_BUTTON_EMAIL_THEME.forestGreen
+      : EMAIL_THEME.deepGreen;
+
   return `<p style="margin:0 0 16px;font-family:${EMAIL_THEME.font};font-size:12px;line-height:1.5;color:${EMAIL_THEME.textMuted};word-break:break-all;">
     ${escapeHtml(label)}<br />
-    <a href="${escapeAttr(href)}" style="color:${EMAIL_THEME.deepGreen};text-decoration:underline;">${escapeHtml(href)}</a>
+    <a href="${escapeAttr(href)}" style="color:${linkColor};text-decoration:underline;">${escapeHtml(href)}</a>
   </p>`;
 }

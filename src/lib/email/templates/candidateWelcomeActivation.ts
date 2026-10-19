@@ -1,6 +1,6 @@
 /**
  * Candidate welcome / activation email template.
- * Uses the shared OOS email design system and components.
+ * Aligned with Career Button candidate portal branding.
  */
 
 import {
@@ -15,6 +15,7 @@ import {
   MetadataRow,
   PrimaryButton,
   SecurityNotice,
+  SupportBlock,
 } from "@/lib/email/components";
 import { renderEmailDocument } from "@/lib/email/render";
 
@@ -41,11 +42,11 @@ export function buildCandidateActivationEmailHtml(
 
   const eyebrow = isResent ? "Candidate Activation" : "Candidate Invitation";
   const headline = isResent
-    ? "Activate your candidate portal account"
-    : "Welcome to the Candidate Portal";
+    ? "Activate your Candidate Account"
+    : "Welcome to Career Button";
   const intro = isResent
-    ? `Hello ${firstName}, your administrator has resent your secure activation link to access the candidate portal.`
-    : `Hello ${firstName}, you have been invited to activate your account on the candidate portal.`;
+    ? `Hello ${firstName}, your administrator has resent your secure activation link to access the Career Button candidate portal.`
+    : `Hello ${firstName}, you have been invited to activate your account on the Career Button candidate portal.`;
 
   const metaItems = [
     { label: "Account Email", value: params.email },
@@ -64,42 +65,44 @@ export function buildCandidateActivationEmailHtml(
           bodyHtml: `
             ${MetadataRow(metaItems)}
             <div style="font-family:Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;color:#66756E;line-height:1.5;margin-top:6px;">
-              Your portal allows you to track application progress, manage interview schedules, review offers, and collaborate with your specialist.
+              Your Career Button portal allows you to track application progress, manage interview schedules, review offers, and collaborate with your specialist.
             </div>
           `,
         })
       : "";
 
   const bodyRowsHtml = [
-    BrandHeader(),
+    BrandHeader({ brand: "careerbutton" }),
     ContentRow(`
       ${Eyebrow(eyebrow)}
       ${EmailTitle(headline)}
       ${EmailBody(intro)}
       ${identityCard}
-      ${PrimaryButton("Activate candidate account →", params.activationUrl)}
+      ${PrimaryButton("Activate candidate account →", params.activationUrl, { brand: "careerbutton" })}
       ${EmailBody("Secure activation · Link expires in 48 hours")}
       ${SecurityNotice(
         "This activation link is unique to you and expires in 48 hours. It can be used only once to set your password. If you did not expect this invitation, please ignore this email or contact support."
       )}
       ${EmailBody(
-        "Once activated, you can sign in anytime to monitor your pipeline status and submit required documentation."
+        "Once activated, you can sign in anytime to monitor your application pipeline and submit required documentation."
       )}
       ${FallbackLink(
         "If the button above does not work, copy and paste this link into your browser:",
-        params.activationUrl
+        params.activationUrl,
+        { brand: "careerbutton" }
       )}
+      ${SupportBlock({ brand: "careerbutton" })}
     `),
-    Footer(),
+    Footer({ brand: "careerbutton", organizationName: params.organizationName }),
   ].join("\n");
 
   return renderEmailDocument({
     title: isResent
-      ? "Activate your candidate portal account"
-      : "Welcome to the Candidate Portal",
+      ? "Activate your Career Button candidate account"
+      : "Welcome to Career Button",
     preheader: isResent
-      ? "Your candidate activation link is ready. Secure activation expires in 48 hours."
-      : "You have been invited to activate your candidate account. Activate within 48 hours.",
+      ? "Your Career Button activation link is ready. Secure activation expires in 48 hours."
+      : "You have been invited to activate your Career Button candidate account. Activate within 48 hours.",
     bodyRowsHtml,
   });
 }
@@ -111,14 +114,14 @@ export function buildCandidateActivationEmailText(
   const firstName = params.firstName || "there";
   const lines = [
     variant === "resent"
-      ? "Activate your candidate portal account"
-      : "Welcome to the Candidate Portal",
+      ? "Activate your Career Button candidate account"
+      : "Welcome to Career Button",
     "",
     `Hello ${firstName},`,
     "",
     variant === "resent"
-      ? "Your candidate activation link has been resent by your administrator."
-      : "You have been invited to activate your account on the candidate portal.",
+      ? "Your candidate activation link has been resent by your administrator to access the Career Button candidate portal."
+      : "You have been invited to activate your account on the Career Button candidate portal.",
     "",
     `Account Email: ${params.email}`,
   ];
@@ -137,19 +140,19 @@ export function buildCandidateActivationEmailText(
     "",
     "This single-use link expires in 48 hours.",
     "",
-    "If you did not expect this invitation, please ignore this email.",
+    "If you did not expect this invitation, please ignore this email or contact Career Button Support via WhatsApp at https://wa.me/919110543176 (support@careerbutton.in is temporarily undergoing activation).",
     "",
-    "Citrux Operations OS",
-    "Candidate Experience Network"
+    "Career Button",
+    "Candidate Portal"
   );
 
   return lines.join("\n");
 }
 
 export function buildCandidateWelcomeEmailSubject(): string {
-  return "OOS — Welcome to the Candidate Portal — Activate your account";
+  return "Career Button — Welcome to the Candidate Portal — Activate your account";
 }
 
 export function buildCandidateResentEmailSubject(): string {
-  return "OOS — Activate your candidate portal account (resent)";
+  return "Career Button — Activate your candidate portal account (resent)";
 }

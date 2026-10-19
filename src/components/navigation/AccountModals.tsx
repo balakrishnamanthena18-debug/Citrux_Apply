@@ -12,7 +12,10 @@ function useIsMounted(): boolean {
   );
 }
 
+import type { Role } from "@/generated/prisma";
+
 export interface AccountModalsProps {
+  role?: Role;
   activeModal: "details" | "help" | null;
   onClose: () => void;
   displayName: string;
@@ -23,15 +26,19 @@ export interface AccountModalsProps {
 }
 
 export function AccountModals({
+  role,
   activeModal,
   onClose,
   displayName,
   email,
   badge,
   designationName,
-  organizationName = "Operations Operating System",
+  organizationName,
 }: AccountModalsProps) {
   const mounted = useIsMounted();
+  const isCandidate = role === "CANDIDATE" || badge.label.toUpperCase() === "CANDIDATE";
+  const defaultOrgName = isCandidate ? "Career Button" : "Operations Operating System";
+  const effectiveOrgName = organizationName || defaultOrgName;
 
   // Escape key handler for modals
   useEffect(() => {
@@ -65,8 +72,15 @@ export function AccountModals({
         <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-[#E5EAE7] bg-white p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between border-b border-[#EDF1EF] pb-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#12A150]/10 text-[#0B3B2C] font-bold text-xs">
-                OOS
+              <div
+                data-testid="modal-brand-badge"
+                className={`flex h-7 w-7 items-center justify-center rounded-lg font-bold text-xs ${
+                  isCandidate
+                    ? "bg-[#082F26]/10 text-[#082F26]"
+                    : "bg-[#12A150]/10 text-[#0B3B2C]"
+                }`}
+              >
+                {isCandidate ? "CB" : "OOS"}
               </div>
               <h3 id="account-details-title" className="text-sm font-bold text-[#0F1720]">
                 Account & Authentication Security
@@ -105,7 +119,7 @@ export function AccountModals({
             )}
             <div className="flex justify-between py-1 border-b border-[#EDF1EF]">
               <span className="text-[#64748B]">Tenant Organization</span>
-              <span className="font-semibold text-[#0F1720]">{organizationName}</span>
+              <span className="font-semibold text-[#0F1720]" data-testid="modal-org-name">{effectiveOrgName}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-[#EDF1EF]">
               <span className="text-[#64748B]">Session Protection</span>
@@ -157,29 +171,73 @@ export function AccountModals({
           </div>
 
           <div className="space-y-3 text-xs text-[#64748B]">
-            <p>
-              Operations Operating System (OOS) technical support and assistance are provided directly through our enterprise operational desk.
+            <p data-testid="modal-help-description">
+              {isCandidate
+                ? "Career Button Client Portal technical assistance is available directly via WhatsApp (+91 91105 43176). Domain support email is temporarily undergoing activation."
+                : "Operations Operating System (OOS) technical support and assistance are provided directly through our enterprise operational desk."}
             </p>
 
             <div className="rounded-xl border border-[#E5EAE7] bg-[#F7F9F8] p-3 space-y-2">
               <div className="text-[11px] font-bold text-[#0F1720] uppercase tracking-wider">
                 Contact Channels
               </div>
-              <div className="flex items-center justify-between">
-                <span>Operational Support</span>
-                <a
-                  href="mailto:support@citrux.in"
-                  className="font-mono text-xs font-medium text-[#12A150] hover:underline"
-                >
-                  support@citrux.in
-                </a>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>System Dispatcher</span>
-                <span className="font-mono text-xs font-medium text-[#64748B]">
-                  notifications@citrux.in
-                </span>
-              </div>
+              {isCandidate ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-[#082F26]">Candidate Support (WhatsApp)</span>
+                    <a
+                      href="https://wa.me/919110543176"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="modal-support-whatsapp"
+                      className="font-mono text-xs font-semibold text-[#082F26] hover:underline"
+                    >
+                      +91 91105 43176
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                    <span>Domain Support Email</span>
+                    <div className="flex items-center space-x-1">
+                      <a
+                        href="mailto:support@careerbutton.in"
+                        data-testid="modal-support-email"
+                        className="font-mono text-xs font-medium text-[#082F26] hover:underline"
+                      >
+                        support@careerbutton.in
+                      </a>
+                      <span className="text-[10px] text-amber-700 font-sans">(under activation)</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                    <span>System Dispatcher</span>
+                    <div className="flex items-center space-x-1">
+                      <span className="font-mono text-xs font-medium text-[#64748B]" data-testid="modal-dispatcher-email">
+                        notifications@careerbutton.in
+                      </span>
+                      <span className="text-[10px] text-amber-700 font-sans">(under activation)</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span>Operational Support</span>
+                    <a
+                      href="mailto:support@citrux.in"
+                      data-testid="modal-support-email"
+                      className="font-mono text-xs font-medium text-[#12A150] hover:underline"
+                    >
+                      support@citrux.in
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>System Dispatcher</span>
+                    <span className="font-mono text-xs font-medium text-[#64748B]" data-testid="modal-dispatcher-email">
+                      notifications@citrux.in
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="rounded-xl border border-[#E5EAE7] bg-white p-3 space-y-1">

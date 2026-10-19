@@ -7,6 +7,7 @@ import {
   signUpCandidateAction,
   resendVerificationEmailAction,
 } from "@/lib/auth/actions";
+import { CareerButtonLogo } from "@/components/brand/CareerButtonLogo";
 
 function RegisterContent() {
   const router = useRouter();
@@ -117,15 +118,15 @@ function RegisterContent() {
 
   if (isSubmitted) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-4 py-12 sm:px-6 lg:px-8">
         {/* Back option to main site */}
         <div className="w-full max-w-md mb-3 flex items-center justify-between">
           <a
             href="https://www.careerbutton.in/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#0B3B2C] transition-colors group"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#52605B] hover:text-[#082F26] transition-colors group"
           >
             <svg
-              className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#94A3B8] group-hover:text-[#0B3B2C]"
+              className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#52605B] group-hover:text-[#082F26]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -133,14 +134,17 @@ function RegisterContent() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Back to CareerButton
+            Back to Career Button
           </a>
+          <span className="text-[11px] font-medium text-[#082F26] bg-[#EBF2ED] px-2.5 py-0.5 rounded-full">
+            Candidate Portal
+          </span>
         </div>
 
-        <div className="w-full max-w-md space-y-6 rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7]">
+        <div className="w-full max-w-md space-y-6 rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_24px_rgba(8,47,38,0.06)] border border-[#E5EAE7]">
           {/* Top Brand & Mail Illustration */}
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[16px] bg-[#E8F8EE] text-[#12A150] border border-[#C3ECD3] relative shadow-2xs">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[16px] bg-[#EBF2ED] text-[#082F26] border border-[#C3ECD3] relative shadow-2xs">
               <svg
                 className="w-7 h-7"
                 fill="none"
@@ -155,63 +159,63 @@ function RegisterContent() {
                   d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
                 />
               </svg>
-              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#12A150] text-white ring-2 ring-white">
+              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#082F26] text-white ring-2 ring-white">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
               </span>
             </div>
 
-            <h2 className="text-center text-2xl font-bold tracking-tight text-[#0F1720]">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-[#082F26]">
               Check your email
             </h2>
-            <p className="mt-1 text-center text-sm text-[#64748B]">
-              You&apos;re one step away from activating your Operations OS account.
+            <p className="mt-1 text-center text-sm text-[#52605B]">
+              You&apos;re one step away from activating your Career Button candidate account.
             </p>
           </div>
 
           {/* Status Badge */}
           <div className="flex items-center justify-center" role="status">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#E8F8EE] px-3.5 py-1.5 text-xs font-semibold text-[#0B3B2C] border border-[#C3ECD3]">
-              <span className="w-2 h-2 rounded-full bg-[#12A150] animate-pulse" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#EBF2ED] px-3.5 py-1.5 text-xs font-semibold text-[#082F26] border border-[#C3ECD3]">
+              <span className="w-2 h-2 rounded-full bg-[#082F26] animate-pulse" />
               <span>Status: Verification email requested.</span>
             </div>
           </div>
 
           {/* Recipient Email Card */}
-          <div className="rounded-[12px] bg-[#F7F9F8] p-3.5 border border-[#E5EAE7] text-center">
-            <span className="text-xs text-[#64748B] block mb-0.5">Verification link dispatched to:</span>
-            <span className="text-sm font-semibold text-[#0F1720] break-all select-all font-mono">
+          <div className="rounded-[12px] bg-[#FAF9F5] p-3.5 border border-[#E5EAE7] text-center">
+            <span className="text-xs text-[#52605B] block mb-0.5">Verification link dispatched to:</span>
+            <span className="text-sm font-semibold text-[#081C15] break-all select-all font-mono">
               {submittedEmail}
             </span>
           </div>
 
           {/* Instructions Card */}
           <div className="rounded-[14px] border border-[#E5EAE7] bg-[#FAFCFB] p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F1720]">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#081C15]">
               Instructions:
             </h3>
             <ol className="space-y-2.5 text-xs text-[#334155]">
               <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E8F8EE] text-[11px] font-bold text-[#0B3B2C]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EBF2ED] text-[11px] font-bold text-[#082F26]">
                   1
                 </span>
                 <span className="pt-0.5">Open the inbox for the email address you registered with.</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E8F8EE] text-[11px] font-bold text-[#0B3B2C]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EBF2ED] text-[11px] font-bold text-[#082F26]">
                   2
                 </span>
-                <span className="pt-0.5">Look for the OOS verification email.</span>
+                <span className="pt-0.5">Look for the Career Button verification email.</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E8F8EE] text-[11px] font-bold text-[#0B3B2C]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EBF2ED] text-[11px] font-bold text-[#082F26]">
                   3
                 </span>
                 <span className="pt-0.5">If it is missing, check Spam, Junk, and Promotions.</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E8F8EE] text-[11px] font-bold text-[#0B3B2C]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EBF2ED] text-[11px] font-bold text-[#082F26]">
                   4
                 </span>
                 <span className="pt-0.5">Follow the instructions in the email to activate your account.</span>
@@ -225,7 +229,7 @@ function RegisterContent() {
               <div
                 className={`rounded-[11px] p-3 text-xs font-medium border ${
                   resendFeedback.type === "success"
-                    ? "bg-[#E8F8EE] text-[#0B3B2C] border-[#C3ECD3]"
+                    ? "bg-[#EBF2ED] text-[#082F26] border-[#C3ECD3]"
                     : "bg-rose-50 text-rose-700 border-rose-200"
                 }`}
                 role="alert"
@@ -239,7 +243,7 @@ function RegisterContent() {
               onClick={handleResend}
               disabled={resending || resendCooldown > 0}
               aria-busy={resending}
-              className="flex w-full items-center justify-center gap-2 rounded-[11px] border border-[#DDE5E0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0F1720] shadow-2xs hover:bg-[#F8FAF9] hover:border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="flex w-full items-center justify-center gap-2 rounded-[11px] border border-[#DDE5E0] bg-white px-4 py-2.5 text-xs font-semibold text-[#081C15] shadow-2xs hover:bg-[#FAF9F5] hover:border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-[#082F26] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {resending ? (
                 <span>Sending new verification email...</span>
@@ -252,27 +256,60 @@ function RegisterContent() {
           </div>
 
           {/* Return to Sign-in */}
-          <div className="text-center text-xs text-[#64748B] pt-2 border-t border-[#F1F5F3]">
+          <div className="text-center text-xs text-[#52605B] pt-2 border-t border-[#F1F5F3]">
             Already confirmed your email?{" "}
-            <Link href="/login" className="font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline">
+            <Link href="/login" className="font-semibold text-[#082F26] hover:text-[#0B3D32] hover:underline">
               Return to sign in
             </Link>
           </div>
+
+          {/* Support Link */}
+          <div className="text-center text-xs text-[#52605B] space-y-1">
+            <div>
+              Need candidate assistance?{" "}
+              <a
+                href="https://wa.me/919110543176"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[#082F26] hover:underline"
+              >
+                Contact on WhatsApp (+91 91105 43176)
+              </a>
+            </div>
+            <div className="text-[11px] text-[#718096]">
+              Email:{" "}
+              <a href="mailto:support@careerbutton.in" className="font-semibold text-[#082F26] hover:underline">
+                support@careerbutton.in
+              </a>{" "}
+              <span className="text-amber-700">(under activation)</span>
+            </div>
+          </div>
         </div>
+
+        {/* Portal footer */}
+        <footer className="mt-8 text-center text-xs text-[#52605B] space-y-1">
+          <p>© {new Date().getFullYear()} Career Button. All rights reserved.</p>
+          <p className="text-[11px] text-[#718096]">
+            Candidate Client Portal •{" "}
+            <a href="https://www.careerbutton.in" className="hover:underline text-[#082F26]">
+              careerbutton.in
+            </a>
+          </p>
+        </footer>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-4 py-12 sm:px-6 lg:px-8">
       {/* Back option to main site */}
       <div className="w-full max-w-md mb-3 flex items-center justify-between">
         <a
           href="https://www.careerbutton.in/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#0B3B2C] transition-colors group"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#52605B] hover:text-[#082F26] transition-colors group"
         >
           <svg
-            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#94A3B8] group-hover:text-[#0B3B2C]"
+            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#52605B] group-hover:text-[#082F26]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -280,26 +317,28 @@ function RegisterContent() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
-          Back to CareerButton
+          Back to Career Button
         </a>
+        <span className="text-[11px] font-medium text-[#082F26] bg-[#EBF2ED] px-2.5 py-0.5 rounded-full">
+          Candidate Portal
+        </span>
       </div>
 
-      <div className="w-full max-w-md space-y-8 rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7]">
+      <div className="w-full max-w-md space-y-7 rounded-[20px] bg-white p-6 sm:p-10 shadow-[0_4px_24px_rgba(8,47,38,0.06)] border border-[#E5EAE7]">
         <div>
           <a
             href="https://www.careerbutton.in/"
-            title="Back to CareerButton (careerbutton.in)"
-            aria-label="Back to CareerButton homepage"
-            className="group mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#0B3B2C] text-white shadow-2xs transition-all duration-200 hover:scale-105 hover:bg-[#0E4735] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 relative cursor-pointer"
+            title="Career Button Homepage"
+            aria-label="Career Button — Return to homepage"
+            className="group mx-auto mb-5 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#082F26] focus-visible:ring-offset-2 rounded-lg py-1 transition-opacity hover:opacity-90"
           >
-            <span className="font-bold text-base transition-transform group-hover:scale-105">C</span>
-            <span className="w-2 h-2 rounded-full bg-[#C6F432] absolute -top-0.5 -right-0.5 ring-2 ring-white transition-transform group-hover:scale-110" />
+            <CareerButtonLogo className="h-7 sm:h-8 w-auto text-[#082F26]" />
           </a>
-          <h2 className="text-center text-2xl font-bold tracking-tight text-[#0F1720]">
+          <h1 className="text-center text-2xl font-bold tracking-tight text-[#082F26]">
             Create your Candidate Account
-          </h2>
-          <p className="mt-1.5 text-center text-xs text-[#64748B] font-medium">
-            Operations Operating System (OOS)
+          </h1>
+          <p className="mt-1.5 text-center text-xs text-[#52605B] font-medium">
+            Career Button Candidate Portal
           </p>
         </div>
 
@@ -313,7 +352,7 @@ function RegisterContent() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3.5">
               <div>
-                <label htmlFor="firstName" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
+                <label htmlFor="firstName" className="block text-xs font-semibold text-[#081C15] uppercase tracking-wider">
                   First Name
                 </label>
                 <input
@@ -322,13 +361,13 @@ function RegisterContent() {
                   type="text"
                   required
                   disabled={loading}
-                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
+                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] text-sm transition disabled:opacity-60"
                   placeholder="Jane"
                 />
               </div>
 
               <div>
-                <label htmlFor="lastName" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
+                <label htmlFor="lastName" className="block text-xs font-semibold text-[#081C15] uppercase tracking-wider">
                   Last Name
                 </label>
                 <input
@@ -337,14 +376,14 @@ function RegisterContent() {
                   type="text"
                   required
                   disabled={loading}
-                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
+                  className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] text-sm transition disabled:opacity-60"
                   placeholder="Doe"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
+              <label htmlFor="email" className="block text-xs font-semibold text-[#081C15] uppercase tracking-wider">
                 Email address
               </label>
               <input
@@ -354,13 +393,13 @@ function RegisterContent() {
                 autoComplete="email"
                 required
                 disabled={loading}
-                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] text-sm transition disabled:opacity-60"
                 placeholder="jane@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-[#0F1720] uppercase tracking-wider">
+              <label htmlFor="password" className="block text-xs font-semibold text-[#081C15] uppercase tracking-wider">
                 Password
               </label>
               <input
@@ -370,7 +409,7 @@ function RegisterContent() {
                 autoComplete="new-password"
                 required
                 disabled={loading}
-                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] text-sm transition disabled:opacity-60"
+                className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-2.5 text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] text-sm transition disabled:opacity-60"
                 placeholder="••••••••"
               />
               <p className="mt-1 text-[11px] text-[#94A3B8]">Minimum 8 characters</p>
@@ -381,20 +420,56 @@ function RegisterContent() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full justify-center rounded-[11px] bg-[#12A150] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 disabled:opacity-50 transition"
+              aria-busy={loading}
+              className="flex w-full justify-center rounded-[11px] bg-[#082F26] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0B3D32] focus:outline-none focus:ring-2 focus:ring-[#082F26] focus:ring-offset-2 disabled:opacity-50 transition active:scale-[0.99] cursor-pointer disabled:cursor-not-allowed"
             >
               {loading ? "Registering..." : "Create account"}
             </button>
           </div>
         </form>
 
-        <div className="text-center text-xs text-[#64748B]">
+        <div className="text-center text-xs text-[#52605B]">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-[#12A150] hover:text-[#0B3B2C] hover:underline">
+          <Link href="/login" className="font-semibold text-[#082F26] hover:text-[#0B3D32] hover:underline">
             Sign in
           </Link>
         </div>
+
+        <div className="pt-4 border-t border-[#E5EAE7] text-center text-xs text-[#52605B] space-y-1">
+          <div>
+            Need candidate assistance?{" "}
+            <a
+              href="https://wa.me/919110543176"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#082F26] hover:underline"
+            >
+              Contact on WhatsApp (+91 91105 43176)
+            </a>
+          </div>
+          <div className="text-[11px] text-[#718096]">
+            Email:{" "}
+            <a
+              href="mailto:support@careerbutton.in"
+              className="font-semibold text-[#082F26] hover:underline"
+            >
+              support@careerbutton.in
+            </a>{" "}
+            <span className="text-amber-700">(under activation)</span>
+          </div>
+        </div>
       </div>
+
+      {/* Portal footer */}
+      <footer className="mt-8 text-center text-xs text-[#52605B] space-y-1">
+        <p>© {new Date().getFullYear()} Career Button. All rights reserved.</p>
+        <p className="text-[11px] text-[#718096]">
+          Candidate Client Portal •{" "}
+          <a href="https://www.careerbutton.in" className="hover:underline text-[#082F26]">
+            careerbutton.in
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }
@@ -403,8 +478,8 @@ export default function RegisterPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#12A150] border-t-transparent" />
+        <div className="flex min-h-screen items-center justify-center bg-[#FAF9F5]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#082F26] border-t-transparent" />
         </div>
       }
     >

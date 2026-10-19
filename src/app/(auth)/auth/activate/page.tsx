@@ -180,7 +180,7 @@ function StaffActivationForm() {
           <p className="mt-1 text-center text-xs text-[#64748B]">
             {tokenData.role === "CANDIDATE"
               ? "Complete your profile activation to access the Candidate Portal."
-              : "Complete your employee onboarding to access the Operations Operating System."}
+              : "Complete your onboarding to access the Career Button portal."}
           </p>
         </div>
 

@@ -15,7 +15,7 @@ import {
 describe("messaging email templates", () => {
   const conversationUrl = "http://localhost:3000/candidate/messages/conv-123";
 
-  it("preserves conversation URL and escapes dynamic content", () => {
+  it("renders Career Button branding when recipient is a candidate", () => {
     const html = buildNewConversationEmailHtml({
       subject: `Q&A <script>`,
       messageBody: `Hello <b>world</b>`,
@@ -26,14 +26,16 @@ describe("messaging email templates", () => {
 
     expect(html).toContain(`href="${conversationUrl}"`);
     expect(html).toContain("Open conversation");
-    expect(html).toContain("Operations OS");
+    expect(html).toContain("Career Button");
+    expect(html).toContain("Candidate Portal");
+    expect(html).not.toContain("Operations OS");
     expect(html).not.toContain("<script>");
     expect(html).toContain("Q&amp;A");
     expect(html).toContain("Alex &amp; Co");
     expect(html).toContain("&lt;b&gt;world&lt;/b&gt;");
   });
 
-  it("builds reply template with subject pattern", () => {
+  it("preserves Operations OS branding when recipient is internal staff", () => {
     const html = buildNewMessageEmailHtml({
       subject: "Interview timing",
       messageBody: "Does Thursday work?",
@@ -45,29 +47,55 @@ describe("messaging email templates", () => {
     expect(html).toContain("New reply");
     expect(html).toContain("Jordan Lee");
     expect(html).toContain("Does Thursday work?");
-    expect(buildNewMessageEmailSubject("Interview timing")).toBe(
+    expect(html).toContain("Operations OS");
+    expect(html).toContain("OOS");
+    expect(buildNewMessageEmailSubject("Interview timing", false)).toBe(
       "OOS — New reply: Interview timing"
     );
   });
 
-  it("builds plaintext with conversation URL", () => {
-    const text = buildNewConversationEmailText({
+  it("builds candidate-aware subject lines and plaintext", () => {
+    // Candidate recipient
+    expect(buildNewConversationEmailSubject("Resume update", true)).toBe(
+      "Career Button — New message: Resume update"
+    );
+    expect(buildNewMessageEmailSubject("Offer letter", true)).toBe(
+      "Career Button — New reply: Offer letter"
+    );
+
+    const candidateText = buildNewConversationEmailText({
       subject: "Resume update",
       messageBody: "Please review the latest draft.",
       conversationUrl,
       recipientIsCandidate: true,
     });
+    expect(candidateText).toContain(conversationUrl);
+    expect(candidateText).toContain("Resume update");
+    expect(candidateText).toContain("Career Button");
+    expect(candidateText).not.toContain("Operations OS");
 
-    expect(text).toContain(conversationUrl);
-    expect(text).toContain("Resume update");
-    expect(buildNewConversationEmailSubject("Resume update")).toMatch(/^OOS — New message:/);
+    // Staff recipient
+    expect(buildNewConversationEmailSubject("Candidate question", false)).toBe(
+      "OOS — New message: Candidate question"
+    );
+    expect(buildNewMessageEmailSubject("Candidate reply", false)).toBe(
+      "OOS — New reply: Candidate reply"
+    );
+
+    const staffText = buildNewConversationEmailText({
+      subject: "Candidate question",
+      messageBody: "What are next steps?",
+      conversationUrl: "http://localhost:3000/employee/messages/conv-789",
+      recipientIsCandidate: false,
+    });
+    expect(staffText).toContain("Operations OS");
   });
 });
 
 describe("application submitted email template", () => {
   const applicationUrl = "http://localhost:3000/candidate/applications/app-789";
 
-  it("preserves application URL and candidate-safe content", () => {
+  it("renders Career Button candidate portal branding and candidate-safe content", () => {
     const html = buildApplicationSubmittedEmailHtml({
       firstName: "Sam",
       jobTitle: "Senior Systems Engineer",
@@ -84,13 +112,16 @@ describe("application submitted email template", () => {
     expect(html).toContain("Linear");
     expect(html).toContain("Submitted");
     expect(html).toContain("REF-100");
+    expect(html).toContain("Career Button");
+    expect(html).toContain("Candidate Portal");
+    expect(html).not.toContain("Operations OS");
     expect(html).not.toContain("storagePath");
     expect(html).not.toContain("confirmationEvidence");
   });
 
-  it("builds subject and plaintext", () => {
+  it("builds Career Button subject and plaintext for application submission", () => {
     expect(buildApplicationSubmittedEmailSubject("SE", "Apple")).toBe(
-      "OOS — Application submitted: SE at Apple"
+      "Career Button — Application submitted: SE at Apple"
     );
     const text = buildApplicationSubmittedEmailText({
       firstName: "Sam",
@@ -101,5 +132,8 @@ describe("application submitted email template", () => {
     });
     expect(text).toContain(applicationUrl);
     expect(text).toContain("REF-1");
+    expect(text).toContain("Career Button — Application submitted");
+    expect(text).toContain("Career Button");
+    expect(text).not.toContain("Operations OS");
   });
 });

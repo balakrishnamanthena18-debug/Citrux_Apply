@@ -17,6 +17,7 @@ import {
   clearPasswordResetEmailSession,
   readPasswordResetEmailFromSession,
 } from "@/lib/auth/password-reset-client";
+import { CareerButtonLogo } from "@/components/brand/CareerButtonLogo";
 import { ResendRecoveryCodeButton } from "./ResendRecoveryCodeButton";
 
 const INITIAL_STATE: VerifyRecoveryOtpState = {
@@ -60,13 +61,13 @@ function VerifyResetOtpForm() {
 
   if (!email) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12">
-        <div className="w-full max-w-md rounded-[20px] bg-white p-8 border border-[#E5EAE7] space-y-4 text-center">
-          <h2 className="text-xl font-bold text-[#0F1720]">Password Reset</h2>
-          <p className="text-sm text-[#64748B]">
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF9F5] px-4 py-12">
+        <div className="w-full max-w-md rounded-[20px] bg-white p-8 border border-[#E5EAE7] shadow-[0_4px_24px_rgba(8,47,38,0.06)] space-y-4 text-center">
+          <h2 className="text-xl font-bold text-[#082F26]">Password Reset</h2>
+          <p className="text-sm text-[#52605B]">
             Start from the forgot password page to receive a verification code.
           </p>
-          <Link href="/forgot-password" className="text-sm font-semibold text-[#12A150]">
+          <Link href="/forgot-password" className="text-sm font-semibold text-[#082F26] hover:text-[#0B3D32] hover:underline">
             Request a code
           </Link>
         </div>
@@ -75,15 +76,15 @@ function VerifyResetOtpForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F7F9F8] px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-4 py-12 sm:px-6 lg:px-8">
       {/* Back option to main site */}
       <div className="w-full max-w-md mb-3 flex items-center justify-between">
         <a
           href="https://www.careerbutton.in/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#0B3B2C] transition-colors group"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#52605B] hover:text-[#082F26] transition-colors group"
         >
           <svg
-            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#94A3B8] group-hover:text-[#0B3B2C]"
+            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#52605B] group-hover:text-[#082F26]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -91,32 +92,34 @@ function VerifyResetOtpForm() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
-          Back to CareerButton
+          Back to Career Button
         </a>
+        <span className="text-[11px] font-medium text-[#082F26] bg-[#EBF2ED] px-2.5 py-0.5 rounded-full">
+          Candidate Portal
+        </span>
       </div>
 
-      <div className="w-full max-w-md space-y-8 rounded-[20px] bg-white p-8 sm:p-10 shadow-[0_4px_18px_rgba(15,23,32,0.04)] border border-[#E5EAE7]">
+      <div className="w-full max-w-md space-y-7 rounded-[20px] bg-white p-6 sm:p-10 shadow-[0_4px_24px_rgba(8,47,38,0.06)] border border-[#E5EAE7]">
         <div>
           <a
             href="https://www.careerbutton.in/"
-            title="Back to CareerButton (careerbutton.in)"
-            aria-label="Back to CareerButton homepage"
-            className="group mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#0B3B2C] text-white shadow-2xs transition-all duration-200 hover:scale-105 hover:bg-[#0E4735] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 relative cursor-pointer"
+            title="Career Button Homepage"
+            aria-label="Career Button — Return to homepage"
+            className="group mx-auto mb-5 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#082F26] focus-visible:ring-offset-2 rounded-lg py-1 transition-opacity hover:opacity-90"
           >
-            <span className="font-bold text-base transition-transform group-hover:scale-105">C</span>
-            <span className="w-2 h-2 rounded-full bg-[#C6F432] absolute -top-0.5 -right-0.5 ring-2 ring-white transition-transform group-hover:scale-110" />
+            <CareerButtonLogo className="h-7 sm:h-8 w-auto text-[#082F26]" />
           </a>
-          <p className="text-center text-[11px] font-bold uppercase tracking-[0.14em] text-[#12A150]">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.14em] text-[#082F26]">
             Security
           </p>
-          <h2 className="mt-2 text-center text-2xl font-bold tracking-tight text-[#0F1720]">
+          <h1 className="mt-2 text-center text-2xl font-bold tracking-tight text-[#082F26]">
             Enter password reset code
-          </h2>
-          <p className="mt-1.5 text-center text-xs text-[#64748B] font-medium">
+          </h1>
+          <p className="mt-1.5 text-center text-xs text-[#52605B] font-medium">
             Enter the 8-digit verification code sent to
           </p>
-          <p className="mt-1 text-center text-sm font-semibold text-[#0F1720]">{masked}</p>
-          <p className="mt-3 text-center text-xs text-[#64748B]">
+          <p className="mt-1 text-center text-sm font-semibold text-[#081C15]">{masked}</p>
+          <p className="mt-3 text-center text-xs text-[#52605B]">
             If an account exists for this email, we&apos;ve sent a verification code.
             You can type or paste the full code.
           </p>
@@ -156,7 +159,7 @@ function VerifyResetOtpForm() {
                 const next = normalizeRecoveryOtpInput(e.target.value);
                 if (next !== null) setToken(next);
               }}
-              className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-3 text-center text-2xl tracking-[0.35em] font-semibold text-[#0F1720] placeholder-[#94A3B8] shadow-2xs focus:border-[#12A150] focus:outline-none focus:ring-1 focus:ring-[#12A150] transition"
+              className="mt-1.5 block w-full rounded-[11px] border border-[#DDE5E0] px-3.5 py-3 text-center text-2xl tracking-[0.35em] font-semibold text-[#081C15] placeholder-[#94A3B8] shadow-2xs focus:border-[#082F26] focus:outline-none focus:ring-1 focus:ring-[#082F26] transition"
               placeholder={OTP_PLACEHOLDER}
             />
             <p id="recovery-otp-hint" className="sr-only">
@@ -167,7 +170,8 @@ function VerifyResetOtpForm() {
           <button
             type="submit"
             disabled={pending || token.length !== RECOVERY_OTP_LENGTH}
-            className="flex w-full justify-center rounded-[11px] bg-[#0B3B2C] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0E8541] focus:outline-none focus:ring-2 focus:ring-[#12A150] focus:ring-offset-2 disabled:opacity-50 transition"
+            aria-busy={pending}
+            className="flex w-full justify-center rounded-[11px] bg-[#082F26] px-4 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#0B3D32] focus:outline-none focus:ring-2 focus:ring-[#082F26] focus:ring-offset-2 disabled:opacity-50 transition active:scale-[0.99] cursor-pointer disabled:cursor-not-allowed"
           >
             {pending ? "Verifying..." : "Verify code"}
           </button>
@@ -179,13 +183,48 @@ function VerifyResetOtpForm() {
             <Link
               href="/forgot-password"
               onClick={() => clearPasswordResetEmailSession()}
-              className="font-semibold text-[#64748B] hover:text-[#0F1720]"
+              className="font-semibold text-[#52605B] hover:text-[#082F26]"
             >
               Use a different email
             </Link>
           </div>
+
+          <div className="pt-2 border-t border-[#E5EAE7] text-center text-xs text-[#52605B] space-y-1">
+            <div>
+              Need candidate assistance?{" "}
+              <a
+                href="https://wa.me/919110543176"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[#082F26] hover:underline"
+              >
+                Contact on WhatsApp (+91 91105 43176)
+              </a>
+            </div>
+            <div className="text-[11px] text-[#718096]">
+              Email:{" "}
+              <a
+                href="mailto:support@careerbutton.in"
+                className="font-semibold text-[#082F26] hover:underline"
+              >
+                support@careerbutton.in
+              </a>{" "}
+              <span className="text-amber-700">(under activation)</span>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Portal footer */}
+      <footer className="mt-8 text-center text-xs text-[#52605B] space-y-1">
+        <p>© {new Date().getFullYear()} Career Button. All rights reserved.</p>
+        <p className="text-[11px] text-[#718096]">
+          Candidate Client Portal •{" "}
+          <a href="https://www.careerbutton.in" className="hover:underline text-[#082F26]">
+            careerbutton.in
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }
@@ -194,8 +233,8 @@ export default function VerifyResetOtpPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#F7F9F8] px-4 py-12">
-          <p className="text-sm text-[#64748B]">Loading verification…</p>
+        <div className="flex min-h-screen items-center justify-center bg-[#FAF9F5] px-4 py-12">
+          <p className="text-sm text-[#52605B]">Loading verification…</p>
         </div>
       }
     >

@@ -41,7 +41,8 @@ describe("Account Management Architecture — Core Unit Verification", () => {
 
       const candidateBadge = getRoleBadgeConfig(Role.CANDIDATE);
       expect(candidateBadge.label).toBe("CANDIDATE");
-      expect(candidateBadge.bg).toContain("emerald");
+      expect(candidateBadge.bg).toBe("bg-[#EBF2ED]");
+      expect(candidateBadge.text).toBe("text-[#082F26]");
     });
   });
 

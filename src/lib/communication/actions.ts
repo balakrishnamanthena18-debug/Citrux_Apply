@@ -247,7 +247,7 @@ export async function createConversationAction(
             organizationId: ctx.organizationId,
             recipientEmail,
             templateId: "new_conversation",
-            subject: buildNewConversationEmailSubject(parsed.data.subject),
+            subject: buildNewConversationEmailSubject(parsed.data.subject, recipientIsCandidate),
             textBody: buildNewConversationEmailText(messageParams),
             htmlBody: buildNewConversationEmailHtml(messageParams),
           })
@@ -410,7 +410,7 @@ export async function sendMessageAction(
             organizationId: ctx.organizationId,
             recipientEmail,
             templateId: "new_message",
-            subject: buildNewMessageEmailSubject(result.conv.subject || "Conversation"),
+            subject: buildNewMessageEmailSubject(result.conv.subject || "Conversation", recipientIsCandidate),
             textBody: buildNewMessageEmailText(messageParams),
             htmlBody: buildNewMessageEmailHtml(messageParams),
           })

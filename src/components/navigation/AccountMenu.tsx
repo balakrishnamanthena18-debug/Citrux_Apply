@@ -22,12 +22,14 @@ export function AccountMenu({
   role,
   email,
   fullName,
-  organizationName = "Operations Operating System",
+  organizationName,
   designationName,
   isTeamLead = false,
   isManager = false,
   membershipId,
 }: AccountMenuProps) {
+  const defaultOrgName = role === "CANDIDATE" ? "Career Button" : "Operations Operating System";
+  const effectiveOrgName = organizationName || defaultOrgName;
   const [isOpen, setIsOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<"details" | "help" | null>(null);
 
@@ -138,7 +140,7 @@ export function AccountMenu({
               role={role}
               email={email}
               fullName={fullName}
-              organizationName={organizationName}
+              organizationName={effectiveOrgName}
               designationName={designationName}
               isTeamLead={isTeamLead}
               isManager={isManager}
@@ -178,13 +180,14 @@ export function AccountMenu({
 
       {/* Account & Session Details & Help Modals rendered via Portal outside header containing block */}
       <AccountModals
+        role={role}
         activeModal={activeModal}
         onClose={() => setActiveModal(null)}
         displayName={displayName}
         email={email}
         badge={badge}
         designationName={designationName}
-        organizationName={organizationName}
+        organizationName={effectiveOrgName}
       />
     </div>
   );

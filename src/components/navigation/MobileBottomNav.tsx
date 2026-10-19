@@ -57,14 +57,22 @@ export function MobileBottomNav({
             >
               <span
                 className={`flex h-8 w-12 items-center justify-center rounded-full transition ${
-                  active ? "bg-[#12A150]/12" : ""
+                  active
+                    ? role === "CANDIDATE"
+                      ? "bg-[#EBF2ED]"
+                      : "bg-[#12A150]/12"
+                    : ""
                 }`}
               >
                 {tab.icon(active)}
               </span>
               <span
                 className={`text-[10px] ${
-                  active ? "font-semibold text-[#0B3B2C]" : "font-medium text-[#94A3B8]"
+                  active
+                    ? role === "CANDIDATE"
+                      ? "font-semibold text-[#082F26]"
+                      : "font-semibold text-[#0B3B2C]"
+                    : "font-medium text-[#94A3B8]"
                 }`}
               >
                 {tab.label}

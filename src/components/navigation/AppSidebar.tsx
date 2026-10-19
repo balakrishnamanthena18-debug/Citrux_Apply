@@ -5,6 +5,7 @@ import type { Role } from "@/generated/prisma";
 import { signOutAction } from "@/lib/auth/actions";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { ResponsiveAccountPanel } from "./ResponsiveAccountPanel";
+import { CareerButtonEmblem } from "@/components/brand/CareerButtonLogo";
 
 function isSidebarItemActive(pathname: string, href: string, searchParams: URLSearchParams): boolean {
   if (href === "/admin/dashboard") {
@@ -65,7 +66,7 @@ export function AppSidebar({
   role,
   email,
   fullName,
-  organizationName = "Operations Operating System",
+  organizationName,
   designationName,
   isTeamLead = false,
   isManager = false,
@@ -73,6 +74,8 @@ export function AppSidebar({
   isMobile = false,
   onClose,
 }: AppSidebarProps) {
+  const defaultOrgName = role === "CANDIDATE" ? "Career Button" : "Operations Operating System";
+  const effectiveOrgName = organizationName || defaultOrgName;
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -330,7 +333,7 @@ export function AppSidebar({
           label: "Dashboard",
           href: "/candidate",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
           ),
@@ -339,7 +342,7 @@ export function AppSidebar({
           label: "My Applications",
           href: "/candidate/applications",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           ),
@@ -348,7 +351,7 @@ export function AppSidebar({
           label: "Interviews",
           href: "/candidate/interviews",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           ),
@@ -357,7 +360,7 @@ export function AppSidebar({
           label: "Job Intelligence",
           href: "/candidate/jobs",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           ),
@@ -366,7 +369,7 @@ export function AppSidebar({
           label: "Messages",
           href: "/candidate/messages",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
           ),
@@ -380,7 +383,7 @@ export function AppSidebar({
           label: "Career Profile",
           href: "/candidate/profile",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           ),
@@ -389,7 +392,7 @@ export function AppSidebar({
           label: "Documents",
           href: "/candidate/profile?section=documents",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
             </svg>
           ),
@@ -398,7 +401,7 @@ export function AppSidebar({
           label: "Job Preferences",
           href: "/candidate/profile?section=preferences",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
           ),
@@ -412,7 +415,7 @@ export function AppSidebar({
           label: "Privacy & Data",
           href: "/candidate/privacy",
           icon: (active) => (
-            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-4 h-4 ${active ? "text-[#082F26]" : "text-slate-400 group-hover:text-[#082F26]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           ),
@@ -444,19 +447,35 @@ export function AppSidebar({
       <div className="flex flex-col flex-1 overflow-y-auto min-h-0">
         {/* Brand Header */}
         <div className="h-14 lg:h-16 flex items-center justify-between px-5 border-b border-[#EDF1EF] flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-[#0B3B2C] text-[#C6F432] flex items-center justify-center font-bold text-xs tracking-wider shadow-sm">
-              OOS
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-[#0F1720] leading-tight tracking-tight">
-                Operations OS
+          {role === "CANDIDATE" ? (
+            <div className="flex items-center space-x-3 min-w-0" data-testid="sidebar-brand-candidate">
+              <div className="w-8 h-8 rounded-lg bg-[#082F26] text-[#D8F971] flex items-center justify-center shadow-xs shrink-0 p-1">
+                <CareerButtonEmblem className="w-full h-full text-[#D8F971]" altText="Career Button" />
               </div>
-              <div className="text-[10px] text-[#94A3B8] font-medium truncate">
-                {organizationName}
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-[#082F26] leading-tight tracking-tight">
+                  Career Button
+                </div>
+                <div className="text-[10px] text-[#52605B] font-medium truncate">
+                  Candidate Portal
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center space-x-3" data-testid="sidebar-brand-internal">
+              <div className="w-8 h-8 rounded-lg bg-[#0B3B2C] text-[#C6F432] flex items-center justify-center font-bold text-xs tracking-wider shadow-sm">
+                OOS
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-[#0F1720] leading-tight tracking-tight">
+                  Operations OS
+                </div>
+                <div className="text-[10px] text-[#94A3B8] font-medium truncate">
+                  {effectiveOrgName}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Close button for mobile drawer */}
           {isMobile && (
@@ -495,7 +514,11 @@ export function AppSidebar({
                     }}
                     className={`group flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-all ${
                       isActive
-                        ? "bg-[#12A150]/[0.08] text-[#0B3B2C] font-semibold shadow-2xs border-l-2 border-[#12A150] pl-2.5"
+                        ? role === "CANDIDATE"
+                          ? "bg-[#EBF2ED] text-[#082F26] font-semibold shadow-2xs border-l-2 border-[#082F26] pl-2.5"
+                          : "bg-[#12A150]/[0.08] text-[#0B3B2C] font-semibold shadow-2xs border-l-2 border-[#12A150] pl-2.5"
+                        : role === "CANDIDATE"
+                        ? "text-[#52605B] hover:text-[#082F26] hover:bg-[#EBF2ED]/50"
                         : "text-[#64748B] hover:text-[#0F1720] hover:bg-[#12A150]/[0.04]"
                     }`}
                   >
@@ -520,7 +543,7 @@ export function AppSidebar({
           role={role}
           email={email}
           fullName={fullName}
-          organizationName={organizationName}
+          organizationName={effectiveOrgName}
           designationName={designationName}
           isTeamLead={isTeamLead}
           isManager={isManager}
@@ -539,7 +562,7 @@ export function AppSidebar({
             role={role}
             email={email}
             fullName={fullName}
-            organizationName={organizationName}
+            organizationName={effectiveOrgName}
             designationName={designationName}
             isTeamLead={isTeamLead}
             isManager={isManager}

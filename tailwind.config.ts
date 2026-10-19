@@ -17,6 +17,15 @@ const config: Config = {
           tint: "rgba(18, 161, 80, 0.08)",
           subtle: "rgba(18, 161, 80, 0.04)",
         },
+        cb: {
+          forest: "#082F26",
+          emerald: "#0B3D32",
+          canvas: "#FAF9F5",
+          sage: "#EBF2ED",
+          lime: "#D8F971",
+          text: "#081C15",
+          muted: "#52605B",
+        },
         surface: {
           DEFAULT: "#FFFFFF",
           canvas: "#F7F9F8",
