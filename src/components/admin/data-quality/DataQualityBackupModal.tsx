@@ -163,17 +163,22 @@ export function DataQualityBackupModal({
         <div className="p-6 space-y-4">
           <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/70 text-amber-900 text-xs flex gap-2.5 items-start">
             <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <strong>Browser-Local State Notice:</strong> Your review statuses (reviewed, needs review)
-              are saved in your browser's LocalStorage only. They are not shared with teammates
-              unless you export this JSON backup.
+            <div className="space-y-1">
+              <strong>Point-in-Time Operational Snapshot:</strong>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Review states, structured dispositions, and attribution metadata are persisted strictly in browser localStorage.
+                This backup is an unsigned, client-side operational snapshot and does not constitute a tamper-proof cryptographic audit log.
+              </p>
             </div>
           </div>
 
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/70 space-y-3">
             <div className="flex justify-between items-center text-xs">
               <span className="text-slate-500 font-medium">Recorded Decisions:</span>
-              <span className="font-bold text-slate-900">{reviewedEntriesCount} records</span>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700">Schema v2.0</span>
+                <span className="font-bold text-slate-900">{reviewedEntriesCount} records</span>
+              </div>
             </div>
 
             <div className="pt-2 border-t border-slate-200/60 flex gap-2">

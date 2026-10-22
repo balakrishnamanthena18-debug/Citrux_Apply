@@ -240,4 +240,31 @@ describe("Login Flow (signInAction) Invariants", () => {
     expect(res.success).toBe(true);
     expect(res.data?.redirectUrl).toBe("/employee");
   });
+
+  it("should process login cleanly when rememberMe parameter is present in formData", async () => {
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+    vi.mocked(withRlsContext).mockImplementation(async (_userId: string, fn: any) => {
+      return fn({
+        membership: {
+          findFirst: vi.fn().mockResolvedValue({
+            organizationId: "org-1",
+            role: "CANDIDATE",
+            status: "ACTIVE",
+          }),
+        },
+      });
+    });
+
+    const formData = new FormData();
+    formData.append("email", "candidate@example.com");
+    formData.append("password", "validPass123!");
+    formData.append("rememberMe", "on");
+
+    const res = await signInAction(formData);
+    expect(res.success).toBe(true);
+    expect(res.data?.redirectUrl).toBe("/candidate");
+  });
 });

@@ -79,6 +79,102 @@ test.describe('Career Button Client Portal Branding & Responsive Remediation', (
     await expect(alert).toContainText(/invalid/i);
   });
 
+  test('Password visibility toggle switches input type, preserves value, and updates accessibility attributes', async ({
+    page,
+  }) => {
+    await page.goto('/login');
+    const passwordInput = page.locator('input#password');
+    const toggleButton = page.locator('button[aria-label="Show password"]');
+
+    // 1. Initial state verification
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+    await expect(passwordInput).toHaveAttribute('autocomplete', 'current-password');
+    await expect(toggleButton).toBeVisible();
+    await expect(toggleButton).toHaveAttribute('aria-pressed', 'false');
+
+    // 2. Type password and toggle to visible
+    await passwordInput.fill('SecretCandidatePassword999!');
+    await toggleButton.click();
+
+    await expect(passwordInput).toHaveAttribute('type', 'text');
+    await expect(passwordInput).toHaveValue('SecretCandidatePassword999!');
+    const hideButton = page.locator('button[aria-label="Hide password"]');
+    await expect(hideButton).toBeVisible();
+    await expect(hideButton).toHaveAttribute('aria-pressed', 'true');
+
+    // 3. Toggle back to hidden and verify value remains intact
+    await hideButton.click();
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+    await expect(passwordInput).toHaveValue('SecretCandidatePassword999!');
+    await expect(toggleButton).toHaveAttribute('aria-label', 'Show password');
+    await expect(toggleButton).toHaveAttribute('aria-pressed', 'false');
+
+    // 4. Keyboard accessibility: toggle via Space / Enter key
+    await toggleButton.focus();
+    await page.keyboard.press('Space');
+    await expect(passwordInput).toHaveAttribute('type', 'text');
+    await page.keyboard.press('Enter');
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+  });
+
+  test('Remember me checkbox restores saved email on mount and updates storage on submission', async ({
+    page,
+  }) => {
+    await page.goto('/login');
+    const emailInput = page.locator('input#email');
+    const rememberCheckbox = page.locator('input#rememberMe');
+    const passwordInput = page.locator('input#password');
+    const submitBtn = page.getByRole('button', { name: /sign in/i });
+
+    await expect(rememberCheckbox).toBeVisible();
+    await expect(rememberCheckbox).not.toBeChecked();
+
+    // Check remember me and submit invalid credentials
+    await emailInput.fill('candidate.prefill@careerbutton.in');
+    await passwordInput.fill('AnyPassword123!');
+    await rememberCheckbox.check();
+    await submitBtn.click();
+
+    // Verify localStorage has saved email
+    const savedEmail = await page.evaluate(() =>
+      localStorage.getItem('cb_candidate_remembered_email')
+    );
+    expect(savedEmail).toBe('candidate.prefill@careerbutton.in');
+
+    // Reload page and verify prefill + checked state
+    await page.reload();
+    await expect(emailInput).toHaveValue('candidate.prefill@careerbutton.in');
+    await expect(rememberCheckbox).toBeChecked();
+
+    // Uncheck remember me and submit to verify storage removal
+    await rememberCheckbox.uncheck();
+    await passwordInput.fill('AnyPassword123!');
+    await submitBtn.click();
+
+    const clearedEmail = await page.evaluate(() =>
+      localStorage.getItem('cb_candidate_remembered_email')
+    );
+    expect(clearedEmail).toBeNull();
+  });
+
+  test('Submitting login form indicates loading state and disables form controls', async ({ page }) => {
+    await page.goto('/login');
+    const emailInput = page.locator('input#email');
+    const passwordInput = page.locator('input#password');
+    const submitBtn = page.locator('button[type="submit"]');
+
+    await emailInput.fill('candidate.speed@careerbutton.in');
+    await passwordInput.fill('WrongPassword123!');
+
+    await submitBtn.click();
+
+    // Verify error alert arrives
+    await expect(page.locator('div.text-rose-700')).toBeVisible({ timeout: 15000 });
+    // After completion, button returns to normal
+    await expect(submitBtn).toBeEnabled();
+    await expect(submitBtn).toContainText(/sign in/i);
+  });
+
   const viewports = [
     { name: 'Mobile 320px', width: 320, height: 640 },
     { name: 'Mobile 375px', width: 375, height: 667 },

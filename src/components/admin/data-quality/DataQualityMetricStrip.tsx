@@ -12,7 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { ValidatedAuditReport } from "@/lib/data-quality/dashboard-schema";
-import type { ReviewStateMap } from "./review-state-store";
+import { resolveFindingReviewStatus, type ReviewStateMap } from "./review-state-store";
 
 interface DataQualityMetricStripProps {
   report: ValidatedAuditReport;
@@ -22,25 +22,38 @@ interface DataQualityMetricStripProps {
 export function DataQualityMetricStrip({ report, reviews }: DataQualityMetricStripProps) {
   const s = report.summary;
 
-  // Reconcile review progress counts from loaded report findings
-  let reviewedCount = 0;
+  // Reconcile review progress counts from loaded report findings using resolved status
+  // so stale fingerprints cannot count as reviewed or verified (DQ-AUDIT-03).
+  let evidenceVerifiedCount = 0;
+  let historicalUnstructuredCount = 0;
   let needsReviewCount = 0;
   let unreviewedCount = 0;
+  let staleCount = 0;
 
   for (const f of report.findings) {
-    const entry = reviews[f.recordId];
-    if (!entry || entry.status === "unreviewed") {
+    const resolved = resolveFindingReviewStatus(reviews, f);
+    if (resolved.isStaleFingerprint) {
+      staleCount++;
       unreviewedCount++;
-    } else if (entry.status === "reviewed") {
-      reviewedCount++;
-    } else if (entry.status === "needs_review") {
+    } else if (resolved.status === "reviewed") {
+      if (resolved.evidenceTier === "EVIDENCE_OBSERVED") {
+        evidenceVerifiedCount++;
+      } else {
+        historicalUnstructuredCount++;
+      }
+    } else if (resolved.status === "needs_review") {
       needsReviewCount++;
+    } else {
+      unreviewedCount++;
     }
   }
 
+  const currentReviewedCount = evidenceVerifiedCount + historicalUnstructuredCount;
+  // Workflow completion = current reviewed + current flagged
+  const workflowCompletedCount = currentReviewedCount + needsReviewCount;
   const reviewProgressPct =
     report.findings.length > 0
-      ? Math.round(((reviewedCount + needsReviewCount) / report.findings.length) * 100)
+      ? Math.round((workflowCompletedCount / report.findings.length) * 100)
       : 0;
 
   return (
@@ -134,17 +147,37 @@ export function DataQualityMetricStrip({ report, reviews }: DataQualityMetricStr
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-slate-900">{reviewProgressPct}%</span>
           <span className="text-xs text-slate-500">
-            ({reviewedCount + needsReviewCount}/{report.findings.length})
+            ({workflowCompletedCount}/{report.findings.length})
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
-          <span className="inline-flex items-center text-emerald-700 font-medium">
-            {reviewedCount} rev
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 mt-1">
+          <span className="inline-flex items-center text-emerald-700 font-semibold" title="Evidence-verified outcomes (EVIDENCE_OBSERVED)">
+            {evidenceVerifiedCount} verified
           </span>
-          <span>•</span>
-          <span className="inline-flex items-center text-amber-700 font-medium">
-            {needsReviewCount} flagged
-          </span>
+          {historicalUnstructuredCount > 0 && (
+            <>
+              <span>•</span>
+              <span className="inline-flex items-center text-slate-600 font-medium" title="Historical reviews (unstructured evidence)">
+                {historicalUnstructuredCount} legacy
+              </span>
+            </>
+          )}
+          {needsReviewCount > 0 && (
+            <>
+              <span>•</span>
+              <span className="inline-flex items-center text-amber-700 font-medium" title="Flagged / Needs Review">
+                {needsReviewCount} flagged
+              </span>
+            </>
+          )}
+          {staleCount > 0 && (
+            <>
+              <span>•</span>
+              <span className="inline-flex items-center text-purple-700 font-semibold" title="Findings changed since review; requires re-verification">
+                {staleCount} stale
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>

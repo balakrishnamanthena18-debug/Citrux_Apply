@@ -28,6 +28,7 @@ import type {
 import {
   loadReviewState,
   resolveFindingReviewStatus,
+  measureLocalStorageUsage,
   type ReviewStateMap,
 } from "./review-state-store";
 import { DataQualityMetricStrip } from "./DataQualityMetricStrip";
@@ -37,6 +38,11 @@ import { DataQualityFindingDetailDrawer } from "./DataQualityFindingDetailDrawer
 
 type FindingCategoryFilter =
   | "ALL"
+  | "P1_GEOGRAPHY"
+  | "P2_DUPLICATES"
+  | "P3_DISTINCT_ROLES"
+  | "P4_LOCATION_DISCREPANCY"
+  | "STALE_REVIEWS"
   | "DUPLICATES"
   | "DISTINCT_ROLES"
   | "GEOGRAPHY"
@@ -90,6 +96,63 @@ export function DataQualityReviewWorkbench({
     setReviews(loadedReviews);
   };
 
+  // Advisory storage usage
+  const storageStats = useMemo(() => {
+    return measureLocalStorageUsage(report?.summary.datasetName);
+  }, [report?.summary.datasetName, reviews]);
+
+  // Priority queue counts
+  const queueCounts = useMemo(() => {
+    if (!report) {
+      return {
+        all: 0,
+        p1: 0,
+        p2: 0,
+        p3: 0,
+        p4: 0,
+        stale: 0,
+      };
+    }
+
+    let p1 = 0;
+    let p2 = 0;
+    let p3 = 0;
+    let p4 = 0;
+    let stale = 0;
+
+    for (const f of report.findings) {
+      if (
+        f.geography.status === "explicit_foreign" ||
+        f.geography.status === "ambiguous" ||
+        f.geography.status === "missing_location"
+      ) {
+        p1++;
+      }
+      if (f.duplicate.isDuplicateCandidate) {
+        p2++;
+      }
+      if (f.duplicate.reasonCode === "SIMILAR_ROLE_DISTINCT_REQUISITION") {
+        p3++;
+      }
+      if (f.geography.status === "metadata_discrepancy" || Boolean(f.geography.isDiscrepancy)) {
+        p4++;
+      }
+      const { isStaleFingerprint } = resolveFindingReviewStatus(reviews, f);
+      if (isStaleFingerprint) {
+        stale++;
+      }
+    }
+
+    return {
+      all: report.findings.length,
+      p1,
+      p2,
+      p3,
+      p4,
+      stale,
+    };
+  }, [report, reviews]);
+
   // Distinct providers for dropdown filter
   const availableProviders = useMemo(() => {
     if (!report) return [];
@@ -102,7 +165,36 @@ export function DataQualityReviewWorkbench({
     if (!report) return [];
 
     return report.findings.filter((f) => {
-      // 1. Category Tab Filter
+      // 1. Category Tab Filter (including Stage 4.1 / Stage 5 priority queues)
+      if (
+        activeCategory === "P1_GEOGRAPHY" &&
+        !(
+          f.geography.status === "explicit_foreign" ||
+          f.geography.status === "ambiguous" ||
+          f.geography.status === "missing_location"
+        )
+      ) {
+        return false;
+      }
+      if (activeCategory === "P2_DUPLICATES" && !f.duplicate.isDuplicateCandidate) {
+        return false;
+      }
+      if (
+        activeCategory === "P3_DISTINCT_ROLES" &&
+        f.duplicate.reasonCode !== "SIMILAR_ROLE_DISTINCT_REQUISITION"
+      ) {
+        return false;
+      }
+      if (
+        activeCategory === "P4_LOCATION_DISCREPANCY" &&
+        !(f.geography.status === "metadata_discrepancy" || Boolean(f.geography.isDiscrepancy))
+      ) {
+        return false;
+      }
+      if (activeCategory === "STALE_REVIEWS") {
+        const { isStaleFingerprint } = resolveFindingReviewStatus(reviews, f);
+        if (!isStaleFingerprint) return false;
+      }
       if (activeCategory === "DUPLICATES" && !f.duplicate.isDuplicateCandidate) return false;
       if (
         activeCategory === "DISTINCT_ROLES" &&
@@ -214,6 +306,27 @@ export function DataQualityReviewWorkbench({
         {/* Global Toolbar Actions */}
         <div className="flex items-center gap-2 self-stretch sm:self-auto">
           {report && (
+            <div
+              className={`px-3 py-1.5 rounded-xl text-xs font-mono flex items-center gap-1.5 border transition ${
+                storageStats.isNearQuota
+                  ? "bg-rose-50 text-rose-800 border-rose-300"
+                  : "bg-white text-slate-600 border-slate-200 shadow-2xs"
+              }`}
+              title={`Local Storage Quota: ~${Math.round(storageStats.quotaEstimateBytes / (1024 * 1024))} MB limit. Advisory only.`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  storageStats.isNearQuota ? "bg-rose-500 animate-pulse" : "bg-emerald-500"
+                }`}
+              />
+              <span>Storage: {Math.round(storageStats.bytesUsed / 1024)} KB</span>
+              {storageStats.isNearQuota && (
+                <span className="text-[10px] text-rose-600 font-bold ml-1 uppercase">Near Quota</span>
+              )}
+            </div>
+          )}
+
+          {report && (
             <button
               type="button"
               onClick={() => setIsBackupModalOpen(true)}
@@ -273,35 +386,14 @@ export function DataQualityReviewWorkbench({
             {/* Category Tabs */}
             <div className="flex border-b border-slate-200/80 overflow-x-auto bg-slate-50/50 p-1 gap-1">
               {[
-                { id: "ALL", label: "All Findings", count: report.findings.length },
-                {
-                  id: "DUPLICATES",
-                  label: "Duplicate Candidates",
-                  count: report.summary.duplicates.totalDuplicateCandidateRecords,
-                },
-                {
-                  id: "DISTINCT_ROLES",
-                  label: "Distinct Same-Role",
-                  count: report.summary.duplicates.distinctSameRoleGroups,
-                },
-                {
-                  id: "GEOGRAPHY",
-                  label: "Geography Issues",
-                  count:
-                    report.summary.geography.explicitForeign +
-                    report.summary.geography.metadataDiscrepancy +
-                    report.summary.geography.missingLocation,
-                },
-                {
-                  id: "TIMESTAMP_ANOMALIES",
-                  label: "Batch Timestamps",
-                  count: report.summary.freshness.suspectedIngestionBatchTimestamps,
-                },
-                {
-                  id: "REVIEW_NEEDED",
-                  label: "Flagged Review Needed",
-                  count: report.summary.aiReview.recordsNeedingHumanReview,
-                },
+                { id: "ALL", label: "All Findings", count: queueCounts.all },
+                { id: "P1_GEOGRAPHY", label: "P1: Geography Issues", count: queueCounts.p1 },
+                { id: "P2_DUPLICATES", label: "P2: Duplicate Candidates", count: queueCounts.p2 },
+                { id: "P3_DISTINCT_ROLES", label: "P3: Distinct Same-Role", count: queueCounts.p3 },
+                { id: "P4_LOCATION_DISCREPANCY", label: "P4: Location Discrepancies", count: queueCounts.p4 },
+                ...(queueCounts.stale > 0
+                  ? [{ id: "STALE_REVIEWS", label: "Stale Reviews", count: queueCounts.stale }]
+                  : []),
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -319,7 +411,9 @@ export function DataQualityReviewWorkbench({
                   <span>{tab.label}</span>
                   <span
                     className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                      activeCategory === tab.id
+                      tab.id === "STALE_REVIEWS"
+                        ? "bg-amber-100 text-amber-800 font-bold"
+                        : activeCategory === tab.id
                         ? "bg-slate-100 text-slate-800"
                         : "bg-slate-200/70 text-slate-600"
                     }`}

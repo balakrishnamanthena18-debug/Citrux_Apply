@@ -100,14 +100,14 @@ CREATE POLICY "application_qa_reviews_staff_select"
 ON "public"."application_qa_reviews"
 FOR SELECT
 USING (
-  public.is_org_privileged_member("organizationId")
+  public.is_org_privileged_member("organizationId", public.current_user_id())
 );
 
 CREATE POLICY "application_qa_reviews_staff_insert"
 ON "public"."application_qa_reviews"
 FOR INSERT
 WITH CHECK (
-  public.is_org_privileged_member("organizationId")
+  public.is_org_privileged_member("organizationId", public.current_user_id())
 );
 
 -- Policies for application_qa_checklists (Staff-Only, Parent-Scoped)
