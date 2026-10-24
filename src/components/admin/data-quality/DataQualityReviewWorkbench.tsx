@@ -19,6 +19,7 @@ import {
   ExternalLink,
   RotateCcw,
   Tag,
+  FileSpreadsheet,
 } from "lucide-react";
 import type {
   ValidatedAuditReport,
@@ -34,10 +35,13 @@ import {
 import { DataQualityMetricStrip } from "./DataQualityMetricStrip";
 import { DataQualityImportModal } from "./DataQualityImportModal";
 import { DataQualityBackupModal } from "./DataQualityBackupModal";
+import { DataQualityExportReportModal } from "./DataQualityExportReportModal";
 import { DataQualityFindingDetailDrawer } from "./DataQualityFindingDetailDrawer";
 
 type FindingCategoryFilter =
   | "ALL"
+  | "SEV_CRITICAL"
+  | "SEV_HIGH"
   | "P1_GEOGRAPHY"
   | "P2_DUPLICATES"
   | "P3_DISTINCT_ROLES"
@@ -48,6 +52,34 @@ type FindingCategoryFilter =
   | "GEOGRAPHY"
   | "TIMESTAMP_ANOMALIES"
   | "REVIEW_NEEDED";
+
+/**
+ * Calculates safe pagination bounds to prevent out-of-range pages and transient empty states
+ * when dynamic filtering or reviews reduce the filtered item count.
+ */
+export function calculateSafePagination(
+  totalItems: number,
+  pageSize: number,
+  requestedPage: number
+): {
+  totalPages: number;
+  safePage: number;
+  startIndex: number;
+  endIndex: number;
+} {
+  const safePageSize = Math.max(1, pageSize);
+  const totalPages = Math.ceil(totalItems / safePageSize) || 1;
+  const safePage = Math.min(Math.max(1, requestedPage), totalPages);
+  const startIndex = (safePage - 1) * safePageSize;
+  const endIndex = Math.min(startIndex + safePageSize, totalItems);
+
+  return {
+    totalPages,
+    safePage,
+    startIndex,
+    endIndex,
+  };
+}
 
 interface DataQualityReviewWorkbenchProps {
   initialReport?: ValidatedAuditReport | null;
@@ -61,9 +93,21 @@ export function DataQualityReviewWorkbench({
     initialReport ? initialReport.summary.datasetName : ""
   );
 
-  const [reviews, setReviews] = useState<ReviewStateMap>({});
+  const [reviews, setReviews] = useState<ReviewStateMap>(() =>
+    initialReport ? loadReviewState(initialReport.summary.datasetName) : {}
+  );
+  const [prevInitialDataset, setPrevInitialDataset] = useState<string | undefined>(
+    initialReport?.summary.datasetName
+  );
+  if (initialReport && initialReport.summary.datasetName !== prevInitialDataset) {
+    setPrevInitialDataset(initialReport.summary.datasetName);
+    setReport(initialReport);
+    setFilename(initialReport.summary.datasetName);
+    setReviews(loadReviewState(initialReport.summary.datasetName));
+  }
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedFinding, setSelectedFinding] = useState<ValidatedJobFinding | null>(null);
 
   // Filters & Search
@@ -80,14 +124,6 @@ export function DataQualityReviewWorkbench({
 
   const [isPending, startTransition] = useTransition();
 
-  // Load reviews whenever report or dataset changes
-  useEffect(() => {
-    if (report?.summary.datasetName) {
-      const saved = loadReviewState(report.summary.datasetName);
-      setReviews(saved);
-    }
-  }, [report?.summary.datasetName]);
-
   const handleReportLoaded = (newReport: ValidatedAuditReport, name: string) => {
     setReport(newReport);
     setFilename(name);
@@ -98,6 +134,7 @@ export function DataQualityReviewWorkbench({
 
   // Advisory storage usage
   const storageStats = useMemo(() => {
+    void reviews;
     return measureLocalStorageUsage(report?.summary.datasetName);
   }, [report?.summary.datasetName, reviews]);
 
@@ -106,6 +143,8 @@ export function DataQualityReviewWorkbench({
     if (!report) {
       return {
         all: 0,
+        sevCritical: 0,
+        sevHigh: 0,
         p1: 0,
         p2: 0,
         p3: 0,
@@ -119,8 +158,16 @@ export function DataQualityReviewWorkbench({
     let p3 = 0;
     let p4 = 0;
     let stale = 0;
+    let sevCritical = 0;
+    let sevHigh = 0;
 
     for (const f of report.findings) {
+      if (f.severity === "Critical") {
+        sevCritical++;
+      }
+      if (f.severity === "High") {
+        sevHigh++;
+      }
       if (
         f.geography.status === "explicit_foreign" ||
         f.geography.status === "ambiguous" ||
@@ -145,6 +192,8 @@ export function DataQualityReviewWorkbench({
 
     return {
       all: report.findings.length,
+      sevCritical,
+      sevHigh,
       p1,
       p2,
       p3,
@@ -165,7 +214,13 @@ export function DataQualityReviewWorkbench({
     if (!report) return [];
 
     return report.findings.filter((f) => {
-      // 1. Category Tab Filter (including Stage 4.1 / Stage 5 priority queues)
+      // 1. Category Tab Filter (including Stage 4.1 / Stage 5 priority queues & Severity)
+      if (activeCategory === "SEV_CRITICAL" && f.severity !== "Critical") {
+        return false;
+      }
+      if (activeCategory === "SEV_HIGH" && f.severity !== "High") {
+        return false;
+      }
       if (
         activeCategory === "P1_GEOGRAPHY" &&
         !(
@@ -260,13 +315,20 @@ export function DataQualityReviewWorkbench({
     });
   }, [filteredFindings, sortField, sortDirection, reviews]);
 
-  // Pagination slice
-  const paginatedFindings = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedFindings.slice(start, start + pageSize);
-  }, [sortedFindings, currentPage, pageSize]);
+  // Pagination calculation
+  const { totalPages, safePage, startIndex, endIndex } = useMemo(() => {
+    return calculateSafePagination(sortedFindings.length, pageSize, currentPage);
+  }, [sortedFindings.length, pageSize, currentPage]);
 
-  const totalPages = Math.ceil(sortedFindings.length / pageSize) || 1;
+  // Synchronize currentPage state when filtered items decrease
+  if (currentPage > totalPages) {
+    setCurrentPage(totalPages);
+  }
+
+  // Pagination slice using safe bounds
+  const paginatedFindings = useMemo(() => {
+    return sortedFindings.slice(startIndex, startIndex + pageSize);
+  }, [sortedFindings, startIndex, pageSize]);
 
   const handleToggleSort = (field: "recordId" | "title" | "company" | "status") => {
     if (sortField === field) {
@@ -337,6 +399,19 @@ export function DataQualityReviewWorkbench({
             </button>
           )}
 
+          {report && (
+            <button
+              type="button"
+              onClick={() => setIsExportModalOpen(true)}
+              disabled={!report.summary.datasetName?.trim()}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Export Reconciled Report"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Export Report</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
@@ -387,6 +462,12 @@ export function DataQualityReviewWorkbench({
             <div className="flex border-b border-slate-200/80 overflow-x-auto bg-slate-50/50 p-1 gap-1">
               {[
                 { id: "ALL", label: "All Findings", count: queueCounts.all },
+                ...(queueCounts.sevCritical > 0
+                  ? [{ id: "SEV_CRITICAL", label: "Critical Severity", count: queueCounts.sevCritical }]
+                  : []),
+                ...(queueCounts.sevHigh > 0
+                  ? [{ id: "SEV_HIGH", label: "High Severity", count: queueCounts.sevHigh }]
+                  : []),
                 { id: "P1_GEOGRAPHY", label: "P1: Geography Issues", count: queueCounts.p1 },
                 { id: "P2_DUPLICATES", label: "P2: Duplicate Candidates", count: queueCounts.p2 },
                 { id: "P3_DISTINCT_ROLES", label: "P3: Distinct Same-Role", count: queueCounts.p3 },
@@ -604,34 +685,53 @@ export function DataQualityReviewWorkbench({
                             </div>
                           </td>
 
-                          {/* Col 4: Audit Category / Finding */}
+                          {/* Col 4: Audit Category & Severity */}
                           <td className="py-3 px-4">
-                            {finding.duplicate.isDuplicateCandidate ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                <Copy className="w-3 h-3 shrink-0" />
-                                <span>Duplicate ({finding.duplicate.candidateCountInGroup} in group)</span>
-                              </span>
-                            ) : finding.duplicate.reasonCode === "SIMILAR_ROLE_DISTINCT_REQUISITION" ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                <Layers className="w-3 h-3 shrink-0" />
-                                <span>Distinct Same-Role Cluster</span>
-                              </span>
-                            ) : finding.geography.status !== "valid_us" ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                <MapPin className="w-3 h-3 shrink-0" />
-                                <span>{finding.geography.status}</span>
-                              </span>
-                            ) : finding.freshness.suspectedIngestionBatch ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
-                                <Clock className="w-3 h-3 shrink-0" />
-                                <span>Batch Timestamp</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                <CheckCircle2 className="w-3 h-3 shrink-0" />
-                                <span>Unique Vacancy</span>
-                              </span>
-                            )}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {finding.severity && (
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                    finding.severity === "Critical"
+                                      ? "bg-rose-600 text-white"
+                                      : finding.severity === "High"
+                                      ? "bg-orange-500 text-white"
+                                      : finding.severity === "Medium"
+                                      ? "bg-amber-500 text-white"
+                                      : finding.severity === "Low"
+                                      ? "bg-sky-600 text-white"
+                                      : "bg-slate-500 text-white"
+                                  }`}
+                                >
+                                  {finding.severity}
+                                </span>
+                              )}
+                              {finding.duplicate.isDuplicateCandidate ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                  <Copy className="w-3 h-3 shrink-0" />
+                                  <span>Duplicate ({finding.duplicate.candidateCountInGroup} in group)</span>
+                                </span>
+                              ) : finding.duplicate.reasonCode === "SIMILAR_ROLE_DISTINCT_REQUISITION" ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <Layers className="w-3 h-3 shrink-0" />
+                                  <span>Distinct Same-Role Cluster</span>
+                                </span>
+                              ) : finding.geography.status !== "valid_us" ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                  <MapPin className="w-3 h-3 shrink-0" />
+                                  <span>{finding.geography.status}</span>
+                                </span>
+                              ) : finding.freshness.suspectedIngestionBatch ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+                                  <Clock className="w-3 h-3 shrink-0" />
+                                  <span>Batch Timestamp</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                  <span>Unique Vacancy</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Col 5: Review Status */}
@@ -682,11 +782,11 @@ export function DataQualityReviewWorkbench({
               <div>
                 Showing{" "}
                 <span className="font-semibold text-slate-800">
-                  {sortedFindings.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                  {sortedFindings.length === 0 ? 0 : startIndex + 1}
                 </span>{" "}
                 to{" "}
                 <span className="font-semibold text-slate-800">
-                  {Math.min(currentPage * pageSize, sortedFindings.length)}
+                  {endIndex}
                 </span>{" "}
                 of{" "}
                 <span className="font-semibold text-slate-800">
@@ -712,19 +812,19 @@ export function DataQualityReviewWorkbench({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
                     className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition"
                   >
                     Previous
                   </button>
                   <span className="px-2 font-mono text-slate-700">
-                    {currentPage} / {totalPages}
+                    {safePage} / {totalPages}
                   </span>
                   <button
                     type="button"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
                     className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition"
                   >
                     Next
@@ -750,6 +850,15 @@ export function DataQualityReviewWorkbench({
           datasetName={report.summary.datasetName}
           reviews={reviews}
           onReviewsUpdated={(updated) => setReviews(updated)}
+        />
+      )}
+
+      {report && (
+        <DataQualityExportReportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          report={report}
+          reviews={reviews}
         />
       )}
 

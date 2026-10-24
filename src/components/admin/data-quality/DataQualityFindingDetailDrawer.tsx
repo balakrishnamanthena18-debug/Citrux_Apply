@@ -88,7 +88,10 @@ export function DataQualityFindingDetailDrawer({
     ? resolveFindingReviewStatus(reviews, finding)
     : { status: "unreviewed" as ReviewStatus, disposition: undefined, evidenceTier: undefined, entry: undefined, isStaleFingerprint: false };
 
-  useEffect(() => {
+  const [prevFindingId, setPrevFindingId] = useState<string | null>(null);
+
+  if (finding && finding.recordId !== prevFindingId) {
+    setPrevFindingId(finding.recordId);
     if (entry && !isStaleFingerprint) {
       setNotes(entry.notes || "");
       if (entry.evidenceTier && entry.evidenceTier !== "EVIDENCE_HISTORICAL_UNSTRUCTURED") {
@@ -122,7 +125,9 @@ export function DataQualityFindingDetailDrawer({
       setChecklist({});
     }
     setPersistenceError(null);
-  }, [entry, finding, isStaleFingerprint]);
+  } else if (!finding && prevFindingId !== null) {
+    setPrevFindingId(null);
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -218,6 +223,28 @@ export function DataQualityFindingDetailDrawer({
               <span className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-slate-200/80 text-slate-700">
                 {finding.source || finding.ats.provider}
               </span>
+              {finding.severity && (
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                    finding.severity === "Critical"
+                      ? "bg-rose-600 text-white"
+                      : finding.severity === "High"
+                      ? "bg-orange-500 text-white"
+                      : finding.severity === "Medium"
+                      ? "bg-amber-500 text-white"
+                      : finding.severity === "Low"
+                      ? "bg-sky-600 text-white"
+                      : "bg-slate-500 text-white"
+                  }`}
+                >
+                  {finding.severity}
+                </span>
+              )}
+              {finding.findingCategory && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-100">
+                  {finding.findingCategory}
+                </span>
+              )}
               <span className="text-xs text-slate-400 font-mono">
                 {finding.recordId}
               </span>
@@ -928,6 +955,154 @@ export function DataQualityFindingDetailDrawer({
               )}
             </div>
           </div>
+
+          {/* Section: Source & Ingestion Quality */}
+          {finding.sourceQuality && (
+            <div className="space-y-2.5">
+              <h3 className="font-semibold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <FileCheck className="w-3.5 h-3.5 text-slate-500" />
+                <span>Source & Ingestion Quality</span>
+              </h3>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Source Status:</span>
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] bg-slate-100 text-slate-700 capitalize">
+                    {finding.sourceQuality.status.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Reliability Tier:</span>
+                  <span className="font-semibold text-slate-800 capitalize">
+                    {finding.sourceQuality.sourceReliability}
+                  </span>
+                </div>
+                {finding.sourceQuality.missingFields.length > 0 && (
+                  <div>
+                    <span className="text-slate-500 font-medium">Missing Schema Fields:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {finding.sourceQuality.missingFields.map((fld) => (
+                        <span key={fld} className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-mono text-[10px]">
+                          {fld}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {finding.sourceQuality.notes && (
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-700">
+                    {finding.sourceQuality.notes}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Section: Application URL Quality */}
+          {finding.urlQuality && (
+            <div className="space-y-2.5">
+              <h3 className="font-semibold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                <span>Application Link & Live Connectivity</span>
+              </h3>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">URL Syntax:</span>
+                  <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold ${
+                    finding.urlQuality.syntaxValid
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}>
+                    {finding.urlQuality.syntaxValid ? "Valid Syntax" : "Malformed"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Live Probe Reachability:</span>
+                  <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold ${
+                    finding.urlQuality.liveCheckStatus === "reachable"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : finding.urlQuality.liveCheckStatus === "untested"
+                      ? "bg-slate-100 text-slate-600"
+                      : "bg-rose-50 text-rose-700"
+                  }`}>
+                    {finding.urlQuality.liveCheckStatus}
+                  </span>
+                </div>
+                {finding.urlQuality.httpStatus !== null && finding.urlQuality.httpStatus !== undefined && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">HTTP Outcome:</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      HTTP {finding.urlQuality.httpStatus}
+                    </span>
+                  </div>
+                )}
+                {finding.urlQuality.titleMatchScore !== null && finding.urlQuality.titleMatchScore !== undefined && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">Title Match Score:</span>
+                    <span className="font-semibold text-slate-800">
+                      {(finding.urlQuality.titleMatchScore * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                )}
+                {finding.urlQuality.notes && (
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-700">
+                    {finding.urlQuality.notes}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Section: Structured Evidence & Remediation Items */}
+          {finding.evidenceItems && finding.evidenceItems.length > 0 && (
+            <div className="space-y-2.5">
+              <h3 className="font-semibold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
+                <span>Evidence-Based Audit Findings ({finding.evidenceItems.length})</span>
+              </h3>
+
+              <div className="space-y-2">
+                {finding.evidenceItems.map((ev) => (
+                  <div key={ev.findingId} className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-[10px] text-slate-400">{ev.findingId}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          ev.severity === "Critical"
+                            ? "bg-rose-600 text-white"
+                            : ev.severity === "High"
+                            ? "bg-orange-500 text-white"
+                            : ev.severity === "Medium"
+                            ? "bg-amber-500 text-white"
+                            : ev.severity === "Low"
+                            ? "bg-sky-600 text-white"
+                            : "bg-slate-500 text-white"
+                        }`}>
+                          {ev.severity}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-mono">
+                          {ev.category}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium text-[11px]">Reason Flagged:</span>
+                      <p className="text-slate-800 font-medium text-xs mt-0.5">{ev.reasonFlagged}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium text-[11px]">Observed Evidence:</span>
+                      <p className="p-2 rounded bg-slate-50 text-slate-700 font-mono text-[11px] mt-0.5">{ev.observedEvidence}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium text-[11px]">Recommended Action:</span>
+                      <p className="text-emerald-800 bg-emerald-50/70 p-2 rounded text-[11px] font-medium border border-emerald-100 mt-0.5">{ev.recommendedAction}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

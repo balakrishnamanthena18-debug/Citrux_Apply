@@ -29,6 +29,7 @@ import {
   measureLocalStorageUsage,
   getStorageKey,
 } from "@/components/admin/data-quality/review-state-store";
+import { calculateSafePagination } from "@/components/admin/data-quality/DataQualityReviewWorkbench";
 
 describe("OOS Data Quality & Intelligence — Dashboard & Review State Unit Tests (Phase 2)", () => {
   const sampleFinding: ValidatedJobFinding = {
@@ -1178,6 +1179,184 @@ describe("OOS Data Quality & Intelligence — Dashboard & Review State Unit Test
         // Historical audit log entries preserved
         expect(quarantinedEntry?.history?.length).toBe(1);
       });
+    });
+  });
+
+  describe("13. Stage 6.1 Pagination Regression Suite (PAG-01 through PAG-05)", () => {
+    it("PAG-01: reviewer on last page marks final finding reviewed; dynamic filter removes it and page remains valid", () => {
+      // Setup: 51 findings, pageSize = 25 -> initially 3 pages (25, 25, 1)
+      const findings = Array.from({ length: 51 }, (_, i) => ({
+        ...sampleFinding,
+        recordId: `rec_test_${String(i).padStart(3, "0")}`,
+      }));
+
+      // Reviewer navigates to last page (page 3)
+      const initialPagination = calculateSafePagination(findings.length, 25, 3);
+      expect(initialPagination.totalPages).toBe(3);
+      expect(initialPagination.safePage).toBe(3);
+      expect(initialPagination.startIndex).toBe(50);
+      expect(initialPagination.endIndex).toBe(51);
+
+      const initialPageSlice = findings.slice(
+        initialPagination.startIndex,
+        initialPagination.startIndex + 25
+      );
+      expect(initialPageSlice.length).toBe(1);
+      expect(initialPageSlice[0]?.recordId).toBe("rec_test_050");
+
+      // Reviewer marks the single finding on page 3 as reviewed
+      // Dynamic filter (e.g. reviewStatus === "unreviewed") removes it, reducing count to 50
+      const remainingUnreviewed = findings.filter((f) => f.recordId !== "rec_test_050");
+      expect(remainingUnreviewed.length).toBe(50);
+
+      // Component re-evaluates pagination with requestedPage = 3
+      const updatedPagination = calculateSafePagination(remainingUnreviewed.length, 25, 3);
+      expect(updatedPagination.totalPages).toBe(2);
+      expect(updatedPagination.safePage).toBe(2); // Automatically clamps to valid page 2!
+      expect(updatedPagination.startIndex).toBe(25);
+      expect(updatedPagination.endIndex).toBe(50);
+
+      // Valid items rendered on page 2 - NO empty page or out-of-bounds index
+      const updatedPageSlice = remainingUnreviewed.slice(
+        updatedPagination.startIndex,
+        updatedPagination.startIndex + 25
+      );
+      expect(updatedPageSlice.length).toBe(25);
+      expect(updatedPageSlice[0]?.recordId).toBe("rec_test_025");
+      expect(updatedPageSlice[24]?.recordId).toBe("rec_test_049");
+    });
+
+    it("PAG-02: removing enough findings reduces total page count by more than one", () => {
+      // Setup: 101 findings, pageSize = 25 -> 5 pages (25, 25, 25, 25, 1)
+      const totalInitial = 101;
+      const initialPagination = calculateSafePagination(totalInitial, 25, 5);
+      expect(initialPagination.totalPages).toBe(5);
+      expect(initialPagination.safePage).toBe(5);
+      expect(initialPagination.startIndex).toBe(100);
+      expect(initialPagination.endIndex).toBe(101);
+
+      // Multiple findings reviewed/filtered out simultaneously, dropping total count to 45 (2 pages)
+      // Total pages drops by 3 (from 5 down to 2)
+      const updatedCount = 45;
+      const updatedPagination = calculateSafePagination(updatedCount, 25, 5);
+      expect(updatedPagination.totalPages).toBe(2);
+      expect(updatedPagination.safePage).toBe(2); // Directly clamped to page 2
+      expect(updatedPagination.startIndex).toBe(25);
+      expect(updatedPagination.endIndex).toBe(45);
+
+      const items = Array.from({ length: updatedCount }, (_, i) => `item_${i}`);
+      const pageSlice = items.slice(
+        updatedPagination.startIndex,
+        updatedPagination.startIndex + 25
+      );
+      expect(pageSlice.length).toBe(20);
+      expect(pageSlice[0]).toBe("item_25");
+      expect(pageSlice[19]).toBe("item_44");
+    });
+
+    it("PAG-03: filtered result becomes empty without invalid index, negative offset, or NaN", () => {
+      // Reviewer was on page 3
+      const requestedPage = 3;
+      const emptyResult = calculateSafePagination(0, 25, requestedPage);
+
+      expect(emptyResult.totalPages).toBe(1);
+      expect(emptyResult.safePage).toBe(1);
+      expect(emptyResult.startIndex).toBe(0);
+      expect(emptyResult.endIndex).toBe(0);
+
+      // Display calculations
+      const showingFrom = 0 === 0 ? 0 : emptyResult.startIndex + 1;
+      const showingTo = emptyResult.endIndex;
+      expect(showingFrom).toBe(0);
+      expect(showingTo).toBe(0);
+
+      // Slice should be cleanly empty
+      const emptySlice = [].slice(emptyResult.startIndex, emptyResult.startIndex + 25);
+      expect(emptySlice).toEqual([]);
+
+      // Button states
+      const prevDisabled = emptyResult.safePage <= 1;
+      const nextDisabled = emptyResult.safePage >= emptyResult.totalPages;
+      expect(prevDisabled).toBe(true);
+      expect(nextDisabled).toBe(true);
+    });
+
+    it("PAG-04: filter change reduces result set while reviewer is on a later page", () => {
+      // 100 findings across all ATS providers, reviewer is on page 4
+      const initialPagination = calculateSafePagination(100, 25, 4);
+      expect(initialPagination.totalPages).toBe(4);
+      expect(initialPagination.safePage).toBe(4);
+      expect(initialPagination.startIndex).toBe(75);
+      expect(initialPagination.endIndex).toBe(100);
+
+      // Reviewer selects provider filter matching only 12 findings
+      const providerFilteredCount = 12;
+      const updatedPagination = calculateSafePagination(providerFilteredCount, 25, 4);
+      expect(updatedPagination.totalPages).toBe(1);
+      expect(updatedPagination.safePage).toBe(1);
+      expect(updatedPagination.startIndex).toBe(0);
+      expect(updatedPagination.endIndex).toBe(12);
+
+      const items = Array.from({ length: 12 }, (_, i) => `filtered_${i}`);
+      const slice = items.slice(
+        updatedPagination.startIndex,
+        updatedPagination.startIndex + 25
+      );
+      expect(slice.length).toBe(12);
+      expect(slice[0]).toBe("filtered_0");
+      expect(slice[11]).toBe("filtered_11");
+    });
+
+    it("PAG-05: normal pagination and sorting continue to work across all valid pages", () => {
+      const items = Array.from({ length: 75 }, (_, i) => ({
+        id: i,
+        title: `Role ${String.fromCharCode(65 + (i % 26))}_${i}`,
+      }));
+
+      // Sort items descending by title
+      const sorted = [...items].sort((a, b) => b.title.localeCompare(a.title));
+
+      // Page 1
+      const p1 = calculateSafePagination(sorted.length, 25, 1);
+      expect(p1.safePage).toBe(1);
+      expect(p1.totalPages).toBe(3);
+      expect(p1.startIndex).toBe(0);
+      expect(p1.endIndex).toBe(25);
+      const slice1 = sorted.slice(p1.startIndex, p1.startIndex + 25);
+      expect(slice1.length).toBe(25);
+      expect(slice1[0]?.title && slice1[24]?.title && slice1[0].title > slice1[24].title).toBe(
+        true
+      ); // sorted correctly
+
+      // Page 2
+      const p2 = calculateSafePagination(sorted.length, 25, 2);
+      expect(p2.safePage).toBe(2);
+      expect(p2.startIndex).toBe(25);
+      expect(p2.endIndex).toBe(50);
+      const slice2 = sorted.slice(p2.startIndex, p2.startIndex + 25);
+      expect(slice2.length).toBe(25);
+
+      // Page 3
+      const p3 = calculateSafePagination(sorted.length, 25, 3);
+      expect(p3.safePage).toBe(3);
+      expect(p3.startIndex).toBe(50);
+      expect(p3.endIndex).toBe(75);
+      const slice3 = sorted.slice(p3.startIndex, p3.startIndex + 25);
+      expect(slice3.length).toBe(25);
+
+      // Boundary handling: out-of-range low requests clamp to 1
+      const pLow = calculateSafePagination(sorted.length, 25, 0);
+      expect(pLow.safePage).toBe(1);
+      expect(pLow.startIndex).toBe(0);
+
+      const pNegative = calculateSafePagination(sorted.length, 25, -10);
+      expect(pNegative.safePage).toBe(1);
+      expect(pNegative.startIndex).toBe(0);
+
+      // Boundary handling: out-of-range high requests clamp to totalPages
+      const pHigh = calculateSafePagination(sorted.length, 25, 999);
+      expect(pHigh.safePage).toBe(3);
+      expect(pHigh.startIndex).toBe(50);
     });
   });
 });

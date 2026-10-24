@@ -72,6 +72,75 @@ export const aiReviewAssessmentSchema = z.object({
   reason: z.string().default(""),
 });
 
+export const findingSeveritySchema = z.enum([
+  "Critical",
+  "High",
+  "Medium",
+  "Low",
+  "Informational",
+]);
+
+export const findingCategorySchema = z.enum([
+  "confirmed_finding",
+  "suspected_anomaly",
+  "recommendation",
+  "limitation",
+]);
+
+export const auditDimensionSchema = z.enum([
+  "duplicate_detection",
+  "geographic_quality",
+  "freshness_and_vacancy",
+  "source_and_ingestion_quality",
+  "application_url_quality",
+  "unsupported_fields",
+]);
+
+export const findingEvidenceItemSchema = z.object({
+  findingId: z.string(),
+  dimension: auditDimensionSchema,
+  severity: findingSeveritySchema,
+  category: findingCategorySchema,
+  confidence: z.enum(["high", "medium", "low", "distinct"]),
+  affectedRecordIds: z.array(z.string()).default([]),
+  observedEvidence: z.string(),
+  reasonFlagged: z.string(),
+  recommendedAction: z.string(),
+  verificationStatus: z.enum(["confirmed", "needs_review", "unverified"]),
+});
+
+export const sourceQualityFindingSchema = z.object({
+  status: z.enum([
+    "healthy",
+    "missing_required_fields",
+    "malformed_record",
+    "anomalous_ingestion",
+  ]),
+  source: z.string(),
+  missingFields: z.array(z.string()).default([]),
+  malformedFields: z.array(z.string()).default([]),
+  sourceReliability: z.enum(["high", "moderate", "low"]),
+  notes: z.string().default(""),
+});
+
+export const urlQualityFindingSchema = z.object({
+  status: z.enum(["valid_syntax", "malformed_syntax", "missing_url"]),
+  syntaxValid: z.boolean(),
+  liveCheckStatus: z.enum([
+    "untested",
+    "reachable",
+    "redirected",
+    "unavailable",
+    "blocked",
+    "connection_error",
+  ]),
+  httpStatus: z.number().nullable().optional(),
+  titleMatchScore: z.number().nullable().optional(),
+  closureSignals: z.array(z.string()).default([]),
+  checkedAt: z.string().nullable().optional(),
+  notes: z.string().default(""),
+});
+
 export const jobAuditFindingSchema = z.object({
   recordId: z.string(),
   publicSlug: z.string().default(""),
@@ -80,6 +149,7 @@ export const jobAuditFindingSchema = z.object({
   company: z.string().default(""),
   title: z.string().default(""),
   location: z.string().nullable().optional(),
+  normalizedLocation: z.string().optional(),
   rawUrl: z.string().default(""),
   canonicalUrl: z.string().default(""),
   ats: atsIdentifierInfoSchema,
@@ -87,6 +157,13 @@ export const jobAuditFindingSchema = z.object({
   geography: geographyFindingSchema,
   freshness: freshnessFindingSchema,
   aiReview: aiReviewAssessmentSchema,
+  // Extended audit dimensions (optional with defaults for backwards-compatibility)
+  sourceQuality: sourceQualityFindingSchema.optional(),
+  urlQuality: urlQualityFindingSchema.optional(),
+  severity: findingSeveritySchema.optional(),
+  findingCategory: findingCategorySchema.optional(),
+  evidenceItems: z.array(findingEvidenceItemSchema).optional(),
+  unsupportedFieldsPresent: z.array(z.string()).optional(),
 });
 
 export const auditSummarySchema = z.object({
@@ -118,6 +195,57 @@ export const auditSummarySchema = z.object({
     networkCallsBlocked: z.number(),
     recordsNeedingHumanReview: z.number(),
   }),
+  // Extended summaries (optional for backwards-compatibility)
+  severityCounts: z
+    .object({
+      critical: z.number(),
+      high: z.number(),
+      medium: z.number(),
+      low: z.number(),
+      informational: z.number(),
+    })
+    .optional(),
+  categoryCounts: z
+    .object({
+      confirmedFindings: z.number(),
+      suspectedAnomalies: z.number(),
+      recommendations: z.number(),
+      limitations: z.number(),
+    })
+    .optional(),
+  sourceQuality: z
+    .object({
+      healthy: z.number(),
+      missingFields: z.number(),
+      malformedRecords: z.number(),
+      anomalousIngestion: z.number(),
+      sourceBreakdown: z.record(z.number()),
+    })
+    .optional(),
+  urlQuality: z
+    .object({
+      validSyntax: z.number(),
+      malformedSyntax: z.number(),
+      missingUrl: z.number(),
+      liveTested: z.number(),
+      reachable: z.number(),
+      closureDetected: z.number(),
+      unavailable: z.number(),
+      connectionError: z.number(),
+      untested: z.number(),
+    })
+    .optional(),
+  unsupportedFieldsObserved: z.array(z.string()).optional(),
+  domainFilter: z.string().optional(),
+  domainFilterStats: z
+    .object({
+      domain: z.string(),
+      totalInspected: z.number(),
+      matchedRecords: z.number(),
+      excludedRecords: z.number(),
+      moduleBreakdown: z.record(z.number()).optional(),
+    })
+    .optional(),
 });
 
 export const fullAuditReportSchema = z.object({

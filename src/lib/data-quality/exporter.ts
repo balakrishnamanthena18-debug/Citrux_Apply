@@ -11,13 +11,20 @@
 import type { FullAuditReport, JobAuditFinding } from "./types";
 
 /**
- * Escapes a cell value for standard CSV formatting (RFC 4180).
+ * Escapes a cell value for standard CSV formatting (RFC 4180),
+ * with spreadsheet formula injection protection.
  */
 export function escapeCsvCell(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
-  const str = String(value);
+  let str = String(value);
+
+  // Neutralize spreadsheet formula injection (=, +, -, @, \t, \r)
+  if (/^[\s\u0000-\u001F]*[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+
   if (
     str.includes(",") ||
     str.includes('"') ||
@@ -36,6 +43,77 @@ export function formatCsv(headers: string[], rows: (string | number | boolean | 
   const headerLine = headers.map(escapeCsvCell).join(",");
   const rowLines = rows.map((row) => row.map(escapeCsvCell).join(","));
   return [headerLine, ...rowLines].join("\n");
+}
+
+/**
+ * Exports prioritized actionable findings to CSV format.
+ * Focuses on Critical, High, and Medium severity items requiring engineering or operational action.
+ */
+export function exportActionableFindingsToCsv(findings: JobAuditFinding[]): string {
+  const headers = [
+    "finding_id",
+    "record_id",
+    "severity",
+    "category",
+    "dimension",
+    "company",
+    "title",
+    "location",
+    "ats_provider",
+    "ats_requisition_id",
+    "reason_flagged",
+    "observed_evidence",
+    "recommended_action",
+    "verification_status",
+    "canonical_url",
+    "raw_url",
+  ];
+
+  // Filter to actionable records (Critical, High, Medium, or flagged duplicate/geo/freshness items)
+  const actionable = findings.filter((f) => {
+    if (f.severity === "Critical" || f.severity === "High" || f.severity === "Medium") {
+      return true;
+    }
+    return (
+      f.duplicate.isDuplicateCandidate ||
+      f.geography.status !== "valid_us" ||
+      f.freshness.status === "closure_detected" ||
+      f.freshness.suspectedIngestionBatch
+    );
+  });
+
+  const rows = actionable.map((f) => {
+    const primaryEvidence = f.evidenceItems?.[0];
+    const findingId = primaryEvidence?.findingId || `act-${f.recordId}`;
+    const severity = f.severity || (f.duplicate.isDuplicateCandidate ? "High" : "Medium");
+    const category = f.findingCategory || "confirmed_finding";
+    const dimension = primaryEvidence?.dimension || "data_quality";
+    const reasonFlagged = primaryEvidence?.reasonFlagged || f.duplicate.evidence || f.geography.notes || "";
+    const observedEvidence = primaryEvidence?.observedEvidence || f.freshness.notes || f.geography.notes || "";
+    const recommendedAction = primaryEvidence?.recommendedAction || "Review for upstream correction.";
+    const verificationStatus = primaryEvidence?.verificationStatus || "confirmed";
+
+    return [
+      findingId,
+      f.recordId,
+      severity,
+      category,
+      dimension,
+      f.company,
+      f.title,
+      f.location,
+      f.ats.provider,
+      f.ats.requisitionId,
+      reasonFlagged,
+      observedEvidence,
+      recommendedAction,
+      verificationStatus,
+      f.canonicalUrl,
+      f.rawUrl,
+    ];
+  });
+
+  return formatCsv(headers, rows);
 }
 
 /**

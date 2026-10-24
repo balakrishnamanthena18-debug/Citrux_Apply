@@ -265,7 +265,7 @@ export function DataQualityImportModal({
           <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/60 text-[11px] text-slate-500 flex gap-2 items-center">
             <ShieldAlert className="w-4 h-4 text-slate-400 shrink-0" />
             <span>
-              <strong>Zero Server Upload:</strong> This file is read directly in your browser's
+              <strong>Zero Server Upload:</strong> This file is read directly in your browser&apos;s
               memory. Records are never sent over the network or saved to a database.
             </span>
           </div>

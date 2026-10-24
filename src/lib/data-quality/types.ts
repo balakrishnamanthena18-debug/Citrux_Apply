@@ -132,6 +132,85 @@ export interface AiReviewAssessment {
   reason: string;
 }
 
+export type FindingSeverity =
+  | "Critical"
+  | "High"
+  | "Medium"
+  | "Low"
+  | "Informational";
+
+export type FindingCategory =
+  | "confirmed_finding"
+  | "suspected_anomaly"
+  | "recommendation"
+  | "limitation";
+
+export type AuditDimension =
+  | "duplicate_detection"
+  | "geographic_quality"
+  | "freshness_and_vacancy"
+  | "source_and_ingestion_quality"
+  | "application_url_quality"
+  | "unsupported_fields";
+
+export interface FindingEvidenceItem {
+  findingId: string;
+  dimension: AuditDimension;
+  severity: FindingSeverity;
+  category: FindingCategory;
+  confidence: DuplicateConfidence;
+  affectedRecordIds: string[];
+  observedEvidence: string;
+  reasonFlagged: string;
+  recommendedAction: string;
+  verificationStatus: "confirmed" | "needs_review" | "unverified";
+}
+
+export type SourceQualityStatus =
+  | "healthy"
+  | "missing_required_fields"
+  | "malformed_record"
+  | "anomalous_ingestion";
+
+export interface SourceQualityFinding {
+  status: SourceQualityStatus;
+  source: string;
+  missingFields: string[];
+  malformedFields: string[];
+  sourceReliability: "high" | "moderate" | "low";
+  notes: string;
+}
+
+export type UrlLiveCheckStatus =
+  | "untested"
+  | "reachable"
+  | "redirected"
+  | "unavailable"
+  | "blocked"
+  | "connection_error";
+
+export interface UrlQualityFinding {
+  status: "valid_syntax" | "malformed_syntax" | "missing_url";
+  syntaxValid: boolean;
+  liveCheckStatus: UrlLiveCheckStatus;
+  httpStatus: number | null;
+  titleMatchScore: number | null;
+  closureSignals: string[];
+  checkedAt: string | null;
+  notes: string;
+}
+
+export interface LiveUrlCheckResult {
+  title?: string;
+  company?: string;
+  url: string;
+  http?: number | null;
+  title_match?: number | null;
+  closure?: string[];
+  error?: string | null;
+  checked_at?: string;
+}
+
 export interface JobAuditFinding {
   recordId: string;
   publicSlug: string;
@@ -140,6 +219,7 @@ export interface JobAuditFinding {
   company: string;
   title: string;
   location: string | null;
+  normalizedLocation?: string;
   rawUrl: string;
   canonicalUrl: string;
   ats: AtsIdentifierInfo;
@@ -147,6 +227,13 @@ export interface JobAuditFinding {
   geography: GeographyFinding;
   freshness: FreshnessFinding;
   aiReview: AiReviewAssessment;
+  // Extended dimensions & evidence (optional for backward compatibility)
+  sourceQuality?: SourceQualityFinding;
+  urlQuality?: UrlQualityFinding;
+  severity?: FindingSeverity;
+  findingCategory?: FindingCategory;
+  evidenceItems?: FindingEvidenceItem[];
+  unsupportedFieldsPresent?: string[];
 }
 
 export interface AuditSummary {
@@ -178,6 +265,39 @@ export interface AuditSummary {
     networkCallsBlocked: 0;
     recordsNeedingHumanReview: number;
   };
+  // Extended dimension summaries (optional for backward compatibility)
+  severityCounts?: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    informational: number;
+  };
+  categoryCounts?: {
+    confirmedFindings: number;
+    suspectedAnomalies: number;
+    recommendations: number;
+    limitations: number;
+  };
+  sourceQuality?: {
+    healthy: number;
+    missingFields: number;
+    malformedRecords: number;
+    anomalousIngestion: number;
+    sourceBreakdown: Record<string, number>;
+  };
+  urlQuality?: {
+    validSyntax: number;
+    malformedSyntax: number;
+    missingUrl: number;
+    liveTested: number;
+    reachable: number;
+    closureDetected: number;
+    unavailable: number;
+    connectionError: number;
+    untested: number;
+  };
+  unsupportedFieldsObserved?: string[];
 }
 
 export interface FullAuditReport {

@@ -53,3 +53,9 @@ storage-verify-report.json
 /tmp-migrate/
 .vercel
 .env*
+
+# Audit and probe artifacts
+audit-reports/
+__pycache__/
+freehire-*.json
+freehire_*.py
