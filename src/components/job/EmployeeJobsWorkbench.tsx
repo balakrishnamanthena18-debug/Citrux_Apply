@@ -5,6 +5,8 @@ import { InstantSearch } from "@/components/workbench/InstantSearch";
 import { TablePagination } from "@/components/workbench/TablePagination";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { formatSalary } from "@/lib/utils/status-presenter";
+import { Sparkles, Compass } from "lucide-react";
+import { GlobalJobDiscoveryWorkbench } from "./GlobalJobDiscoveryWorkbench";
 
 export interface JobListItem {
   id: string;
@@ -44,7 +46,7 @@ interface Props {
   canShareToCatalog?: boolean;
   returnToDesk?: boolean;
   returnCandidateId?: string;
-  initialTab?: "catalog" | "leads";
+  initialTab?: "discovery" | "catalog" | "leads";
 }
 
 export function EmployeeJobsWorkbench({
@@ -55,9 +57,9 @@ export function EmployeeJobsWorkbench({
   canShareToCatalog = false,
   returnToDesk = false,
   returnCandidateId = "",
-  initialTab = "catalog",
+  initialTab = "discovery",
 }: Props) {
-  const [tab, setTab] = useState<"catalog" | "leads">(initialTab);
+  const [tab, setTab] = useState<"discovery" | "catalog" | "leads">(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [sourceFilter, setSourceFilter] = useState("ALL");
   const [remoteOnly, setRemoteOnly] = useState(false);
@@ -119,7 +121,22 @@ export function EmployeeJobsWorkbench({
             </span>
           </div>
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setTab("discovery");
+              setPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-[12px] text-xs font-semibold border flex items-center gap-1.5 transition ${
+              tab === "discovery"
+                ? "bg-[#12A150]/10 border-[#12A150]/30 text-[#0B3B2C] shadow-2xs"
+                : "bg-white border-[#E5EAE7] text-[#64748B] hover:bg-slate-50"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#12A150]" />
+            Global Job Discovery
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -132,7 +149,7 @@ export function EmployeeJobsWorkbench({
                 : "bg-white border-[#E5EAE7] text-[#64748B]"
             }`}
           >
-            Job Catalog
+            Job Catalog ({catalogJobs.length})
           </button>
           <button
             type="button"
@@ -146,11 +163,14 @@ export function EmployeeJobsWorkbench({
                 : "bg-white border-[#E5EAE7] text-[#64748B]"
             }`}
           >
-            My Candidate Job Leads
+            My Candidate Job Leads ({leadJobs.length})
           </button>
         </div>
       </div>
 
+      {tab === "discovery" ? (
+        <GlobalJobDiscoveryWorkbench onPromoted={() => setTab("catalog")} />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Job Creation Form */}
         <div className="lg:col-span-1 bg-white p-5 rounded-[16px] border border-[#E5EAE7] shadow-2xs space-y-4">
@@ -472,6 +492,7 @@ export function EmployeeJobsWorkbench({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

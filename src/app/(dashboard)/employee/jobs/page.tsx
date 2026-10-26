@@ -21,7 +21,12 @@ export default async function EmployeeJobsPage({ searchParams }: Props) {
   const returnToDesk =
     resolved.returnTo === "application-log" || resolved.returnTo === "/employee/application-log";
   const returnCandidateId = resolved.candidateId || "";
-  const initialTab = resolved.tab === "leads" ? "leads" : "catalog";
+  const initialTab =
+    resolved.tab === "leads"
+      ? "leads"
+      : resolved.tab === "catalog"
+      ? "catalog"
+      : "discovery";
 
   const { catalogJobs, leadJobs } = await withRlsContext(ctx.userId, async (tx) => {
     const catalog = await tx.job.findMany({

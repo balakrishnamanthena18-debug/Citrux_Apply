@@ -221,6 +221,15 @@ export function AppSidebar({
             </svg>
           ),
         },
+        {
+          label: "Job Collection Engine",
+          href: "/admin/job-collection",
+          icon: (active) => (
+            <svg className={`w-4 h-4 ${active ? "text-[#12A150]" : "text-slate-400 group-hover:text-slate-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3V7c0-2-1.5-3-3.5-3h-9C5.5 4 4 5 4 7zm0 4h16M8 4v4m8-4v4" />
+            </svg>
+          ),
+        },
       ],
     },
     {

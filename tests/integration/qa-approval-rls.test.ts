@@ -31,7 +31,7 @@ describe("Phase 5 QA & Approval PostgreSQL RLS & Schema Contract (tests/integrat
 
   it("4. Verifies staff-only isolation policies are present on QA tables", () => {
     expect(migrationSql).toContain('CREATE POLICY "application_qa_reviews_staff_select"');
-    expect(migrationSql).toContain('public.is_org_privileged_member("organizationId")');
+    expect(migrationSql).toContain('public.is_org_privileged_member("organizationId"');
     expect(migrationSql).toContain('CREATE POLICY "application_qa_checklists_staff_select"');
     expect(migrationSql).toContain('public.is_qa_review_org_privileged_member("qaReviewId")');
   });

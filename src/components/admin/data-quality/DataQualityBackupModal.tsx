@@ -18,6 +18,7 @@ import {
   loadReviewState,
   type ReviewStateMap,
 } from "./review-state-store";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 interface DataQualityBackupModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export function DataQualityBackupModal({
     fileContent: string;
     backupDatasetName: string;
   } | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -118,14 +120,17 @@ export function DataQualityBackupModal({
   };
 
   const handleClearState = () => {
-    if (window.confirm("Are you sure you want to clear all local review decisions for this dataset? This cannot be undone unless you have downloaded a backup.")) {
-      clearDatasetReviewState(datasetName);
-      onReviewsUpdated({});
-      setImportStatus({
-        success: true,
-        message: "Cleared local review state for this dataset.",
-      });
-    }
+    setShowClearConfirm(true);
+  };
+
+  const handleConfirmClear = () => {
+    setShowClearConfirm(false);
+    clearDatasetReviewState(datasetName);
+    onReviewsUpdated({});
+    setImportStatus({
+      success: true,
+      message: "Cleared local review state for this dataset.",
+    });
   };
 
   return (
@@ -282,6 +287,17 @@ export function DataQualityBackupModal({
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Clear Local Review Decisions?"
+        description="Are you sure you want to clear all local review decisions for this dataset? This cannot be undone unless you have downloaded a backup."
+        confirmLabel="Clear Reviews"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={handleConfirmClear}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 }

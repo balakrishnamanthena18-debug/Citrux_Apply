@@ -119,6 +119,35 @@ enum JobEmploymentType {
   TEMPORARY
 }
 
+enum JobVerificationStatus {
+  NEWLY_DISCOVERED
+  SOURCE_CONFIRMED
+  NEEDS_VERIFICATION
+  STALE
+  CLOSED
+  EXPIRED
+  COLLECTION_FAILED
+}
+
+enum JobWorkArrangement {
+  REMOTE
+  HYBRID
+  ONSITE
+  UNSPECIFIED
+}
+
+enum CollectionRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+enum CollectionTriggerType {
+  MANUAL
+  SCHEDULED
+}
+
 enum ApplicationApprovalStatus {
   PENDING
   APPROVED
@@ -414,6 +443,12 @@ enum AuditAction {
   WCOS_CAPACITY_OVERLOADED
   WCOS_MANAGER_OVERRIDE
   WCOS_WORK_ITEM_COMPLETED
+
+  // Global Job Discovery & Collection Engine Actions
+  JOB_DISCOVERY_COLLECTION_TRIGGERED
+  JOB_DISCOVERY_COLLECTION_COMPLETED
+  JOB_DISCOVERY_PROVIDER_UPDATED
+  JOB_DISCOVERED_PROMOTED_TO_CATALOG
 }
 
 enum DesignationStatus {
@@ -612,6 +647,8 @@ model User {
   wcosAuthoredEscalations         WcosEscalationRecord[]    @relation("WcosEscalationActor")
   wcosAcknowledgedEscalations     WcosEscalationRecord[]    @relation("WcosEscalationAcknowledger")
   wcosResolvedEscalations         WcosEscalationRecord[]    @relation("WcosEscalationResolver")
+  savedJobs                       SavedJob[]                @relation("UserSavedJobs")
+  collectionRuns                  JobCollectionRun[]        @relation("CollectionRunTriggerer")
 
   @@map("users")
 }
@@ -946,6 +983,7 @@ model Job {
   jobMatches           CandidateJobMatch[]
   interviews           Interview[]
   offers               Offer[]
+  discoveredJobs       DiscoveredJob[]              @relation("DiscoveredJobPromotion")
 
   @@index([organizationId, status])
   @@index([organizationId, visibility, status])
@@ -3345,3 +3383,124 @@ model WcosEscalationRecord {
   @@unique([organizationId, idempotencyKey], name: "uq_wcos_escalation_idemp")
   @@map("wcos_escalation_records")
 }
+
+// ============================================================================
+// GLOBAL JOB DISCOVERY & COLLECTION ENGINE MODELS
+// ============================================================================
+
+model DiscoveredJob {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId           String                @db.VarChar(64)
+  externalId           String                @db.VarChar(255)
+  title                String                @db.VarChar(255)
+  normalizedTitle      String                @db.VarChar(255)
+  companyName          String                @db.VarChar(255)
+  normalizedCompany    String                @db.VarChar(255)
+  jobDescription       String                @db.Text
+  requiredSkills       String[]              @default([])
+  preferredSkills      String[]              @default([])
+  industry             String?               @db.VarChar(64)
+  employmentType       JobEmploymentType     @default(FULL_TIME)
+  seniorityLevel       String?               @db.VarChar(32)
+  experienceMin        Int?
+  experienceMax        Int?
+  salaryMin            Int?
+  salaryMax            Int?
+  salaryCurrency       String?               @default("USD") @db.VarChar(10)
+  salaryPeriod         String?               @default("YEARLY") @db.VarChar(20)
+  country              String?               @db.VarChar(10)
+  state                String?               @db.VarChar(100)
+  city                 String?               @db.VarChar(100)
+  workArrangement      JobWorkArrangement    @default(UNSPECIFIED)
+  postedAt             DateTime?             @db.Timestamptz(6)
+  closingDate          DateTime?             @db.Timestamptz(6)
+  lastSeenAt           DateTime              @default(now()) @db.Timestamptz(6)
+  firstCollectedAt     DateTime              @default(now()) @db.Timestamptz(6)
+  lastCheckedAt        DateTime              @default(now()) @db.Timestamptz(6)
+  externalUrl          String                @db.VarChar(2048)
+  canonicalUrl         String                @db.VarChar(2048)
+  sourceAttribution    String                @db.VarChar(255)
+  verificationStatus   JobVerificationStatus @default(NEWLY_DISCOVERED)
+  availabilityStatus   JobStatus             @default(OPEN)
+  contentFingerprint   String                @db.VarChar(64)
+  duplicateGroupId     String?               @db.VarChar(64)
+  isDuplicate          Boolean               @default(false)
+  duplicateReason      String?               @db.VarChar(255)
+  qualityScore         Float                 @default(100.0)
+  rawMetadata          Json?                 @db.JsonB
+  promotedToJobId      String?               @db.Uuid
+  promotedToJob        Job?                  @relation("DiscoveredJobPromotion", fields: [promotedToJobId], references: [id], onDelete: SetNull)
+  savedByUsers         SavedJob[]
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([providerId, externalId])
+  @@index([canonicalUrl])
+  @@index([contentFingerprint])
+  @@index([verificationStatus, availabilityStatus])
+  @@index([country, workArrangement])
+  @@index([industry, seniorityLevel])
+  @@index([postedAt])
+  @@index([promotedToJobId])
+  @@map("discovered_jobs")
+}
+
+model JobCollectionRun {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId           String                @db.VarChar(64)
+  status               CollectionRunStatus   @default(RUNNING)
+  triggerType          CollectionTriggerType @default(MANUAL)
+  triggeredById        String?               @db.Uuid
+  triggeredBy          User?                 @relation("CollectionRunTriggerer", fields: [triggeredById], references: [id], onDelete: SetNull)
+  queryFilters         Json?                 @db.JsonB
+  jobsDiscovered       Int                   @default(0)
+  jobsUpdated          Int                   @default(0)
+  duplicatesDetected   Int                   @default(0)
+  failedCount          Int                   @default(0)
+  durationMs           Int                   @default(0)
+  errorMessage         String?               @db.Text
+  startedAt            DateTime              @default(now()) @db.Timestamptz(6)
+  completedAt          DateTime?             @db.Timestamptz(6)
+  metadata             Json?                 @db.JsonB
+
+  @@index([providerId, startedAt])
+  @@index([status])
+  @@map("job_collection_runs")
+}
+
+model JobProviderConfig {
+  providerId           String                @id @db.VarChar(64)
+  name                 String                @db.VarChar(128)
+  category             String                @db.VarChar(64)
+  baseUrl              String                @db.VarChar(512)
+  isEnabled            Boolean               @default(true)
+  isConfigured         Boolean               @default(true)
+  rateLimitPerMinute   Int                   @default(60)
+  rateLimitDaily       Int                   @default(5000)
+  lastRunAt            DateTime?             @db.Timestamptz(6)
+  lastSuccessAt        DateTime?             @db.Timestamptz(6)
+  consecutiveFailures  Int                   @default(0)
+  statusMessage        String?               @db.VarChar(512)
+  documentation        Json?                 @db.JsonB
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("job_provider_configs")
+}
+
+model SavedJob {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String                @db.Uuid
+  discoveredJobId      String                @db.Uuid
+  notes                String?               @db.Text
+  savedAt              DateTime              @default(now()) @db.Timestamptz(6)
+
+  user                 User                  @relation("UserSavedJobs", fields: [userId], references: [id], onDelete: Cascade)
+  discoveredJob        DiscoveredJob         @relation(fields: [discoveredJobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, discoveredJobId])
+  @@index([userId])
+  @@index([discoveredJobId])
+  @@map("saved_jobs")
+}
+

@@ -1113,6 +1113,31 @@ export const ACTION_CATALOG: Record<AuditAction, { category: AuditCategory; labe
     tone: "emerald",
     description: "External email notification sent via SMTP.",
   },
+  // Global Job Discovery & Collection Engine Actions
+  [AuditAction.JOB_DISCOVERY_COLLECTION_TRIGGERED]: {
+    category: "JOB_APPLICATION",
+    label: "Job Collection Triggered",
+    tone: "blue",
+    description: "Global job discovery collection run initiated.",
+  },
+  [AuditAction.JOB_DISCOVERY_COLLECTION_COMPLETED]: {
+    category: "JOB_APPLICATION",
+    label: "Job Collection Completed",
+    tone: "emerald",
+    description: "Global job discovery collection run finished successfully.",
+  },
+  [AuditAction.JOB_DISCOVERY_PROVIDER_UPDATED]: {
+    category: "JOB_APPLICATION",
+    label: "Job Provider Updated",
+    tone: "blue",
+    description: "Discovery provider configuration or status modified.",
+  },
+  [AuditAction.JOB_DISCOVERED_PROMOTED_TO_CATALOG]: {
+    category: "JOB_APPLICATION",
+    label: "Discovered Job Promoted",
+    tone: "emerald",
+    description: "Discovered job imported to canonical OOS job catalog.",
+  },
 };
 
 export function getActionMetadata(action: string): ActionMetadata {
