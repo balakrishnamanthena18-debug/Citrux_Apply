@@ -36,6 +36,10 @@ export class JobProviderRegistry {
     this.providers.set(provider.id, provider);
   }
 
+  public unregister(id: string): void {
+    this.providers.delete(id);
+  }
+
   public getProvider(id: string): JobProviderAdapter | null {
     return this.providers.get(id) ?? null;
   }

@@ -11,6 +11,9 @@ describe("Job Discovery Provider Adapters", () => {
       const adapter = new FreeHireAdapter();
       expect(adapter.isConfigured()).toBe(true);
 
+      // Force network offline so snapshot fallback executes deterministically in unit test
+      vi.spyOn(adapter as any, "safeFetch").mockRejectedValue(new Error("Network unreachable in unit test"));
+
       const result = await adapter.fetchJobs({ pageSize: 5 });
       expect(result.jobs.length).toBeGreaterThan(0);
       expect(result.providerId).toBe("freehire");

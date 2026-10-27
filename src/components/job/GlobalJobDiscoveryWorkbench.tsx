@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useTransition, useId } from "react";
+import React, { useState, useEffect, useCallback, useTransition, useId, useRef } from "react";
 import {
   Search,
   Filter,
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertCircle,
+  AlertTriangle,
   Building,
   MapPin,
   Clock,
@@ -26,6 +27,7 @@ import {
   Trash2,
   Globe,
   Check,
+  Loader2,
 } from "lucide-react";
 import {
   searchDiscoveredJobsAction,
@@ -40,7 +42,18 @@ import type {
   JobWorkArrangement,
   JobEmploymentType,
   LiveProviderExecutionStatus,
+  SearchTraceData,
 } from "@/lib/job-discovery/types";
+import { LocationAwareAutocomplete } from "./LocationAwareAutocomplete";
+import {
+  JobSearchProgressBar,
+  JobSearchStatusBanner,
+  JobSearchSkeletonGrid,
+  JobSearchErrorState,
+  JobSearchPartialFailureAlert,
+  JobSearchEmptyState,
+  type SearchLifecyclePhase,
+} from "./JobSearchFeedback";
 
 const INDUSTRIES = [
   { value: "technology", label: "Technology & Software" },
@@ -193,6 +206,9 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [estimatedTotal, setEstimatedTotal] = useState<number | undefined>(undefined);
+  const [totalScope, setTotalScope] = useState<"CITY" | "STATE" | "COUNTRY" | "GLOBAL" | undefined>(undefined);
+  const [returnedBatchCount, setReturnedBatchCount] = useState<number | undefined>(undefined);
+  const [verifiedMatchingCount, setVerifiedMatchingCount] = useState<number | undefined>(undefined);
   const [isExactTotal, setIsExactTotal] = useState(false);
   const [uniqueCount, setUniqueCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -203,6 +219,28 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     inMemory: string[];
   }>({ providerSide: [], inMemory: [] });
   const [isLiveSearch, setIsLiveSearch] = useState(true);
+  const [interpretedPlan, setInterpretedPlan] = useState<{
+    intentSummary: string;
+    role?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    workArrangement?: string;
+    salaryMin?: number;
+    salaryCurrency?: string;
+    isAiInterpreted: boolean;
+  } | undefined>(undefined);
+
+  // Track the actual committed search parameters that produced the current results
+  const [executedQuery, setExecutedQuery] = useState("");
+  const [executedCity, setExecutedCity] = useState("");
+  const [executedCountry, setExecutedCountry] = useState("ALL");
+
+  // Search Lifecycle & Latency Feedback
+  const [searchPhase, setSearchPhase] = useState<SearchLifecyclePhase>("COMPLETED");
+  const [activeSubmittedQuery, setActiveSubmittedQuery] = useState("");
+  const [activeSubmittedLocation, setActiveSubmittedLocation] = useState<string | undefined>(undefined);
+  const [searchDurationMs, setSearchDurationMs] = useState<number | undefined>(undefined);
 
   // Modals
   const [detailJob, setDetailJob] = useState<DiscoveredJobSearchResult | null>(null);
@@ -248,9 +286,41 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     selectedProviders.length > 0,
   ].filter(Boolean).length;
 
-  const fetchJobs = useCallback(async () => {
+  const queryRef = useRef(query);
+  queryRef.current = query;
+  const searchRequestIdRef = useRef(0);
+  const [currentTrace, setCurrentTrace] = useState<SearchTraceData | null>(null);
+  const latestTraceRef = useRef<SearchTraceData | null>(null);
+
+  const fetchJobs = useCallback(async (overrideFilters?: Partial<JobSearchFilters>) => {
+    const requestId = ++searchRequestIdRef.current;
+    const browserSubmissionMs = Date.now();
+    const correlationId = `srch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
     setLoading(true);
+    setSearchPhase("PREPARING");
     setError(null);
+    setJobs([]);
+    setEstimatedTotal(undefined);
+    setTotalScope(undefined);
+    setReturnedBatchCount(undefined);
+    setVerifiedMatchingCount(undefined);
+    setSearchDurationMs(undefined);
+
+    const activeQuery = overrideFilters?.query !== undefined ? overrideFilters.query : queryRef.current;
+    const activeCity = overrideFilters?.cities !== undefined ? (overrideFilters.cities[0] || "") : selectedCity;
+    const activeCountry = overrideFilters?.countries !== undefined ? (overrideFilters.countries[0] || "ALL") : selectedCountry;
+    const activePage = overrideFilters?.page !== undefined ? overrideFilters.page : page;
+
+    setActiveSubmittedQuery(activeQuery);
+    const locString = activeCity
+      ? activeCountry !== "ALL"
+        ? `${activeCity}, ${activeCountry}`
+        : activeCity
+      : activeCountry !== "ALL"
+      ? activeCountry
+      : undefined;
+    setActiveSubmittedLocation(locString);
 
     const excludedKeywords = excludedKeywordsInput
       ? excludedKeywordsInput.split(",").map((s) => s.trim()).filter(Boolean)
@@ -265,16 +335,16 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
       : undefined;
 
     const filters: JobSearchFilters = {
-      query: query.trim() || undefined,
+      query: activeQuery.trim() || undefined,
       exactPhrase: exactPhrase.trim() || undefined,
       excludedKeywords,
       companyName: companyName.trim() || undefined,
       requiredSkills,
       preferredSkills,
       industries: selectedIndustry !== "ALL" ? [selectedIndustry] : undefined,
-      countries: selectedCountry !== "ALL" ? [selectedCountry] : undefined,
+      countries: activeCountry !== "ALL" ? [activeCountry] : undefined,
       states: selectedState.trim() ? [selectedState.trim()] : undefined,
-      cities: selectedCity.trim() ? [selectedCity.trim()] : undefined,
+      cities: activeCity.trim() ? [activeCity.trim()] : undefined,
       workArrangements: selectedArrangement !== "ALL" ? [selectedArrangement as JobWorkArrangement] : undefined,
       seniorityLevels: selectedSeniority !== "ALL" ? [selectedSeniority] : undefined,
       employmentTypes: selectedEmploymentType !== "ALL" ? [selectedEmploymentType as JobEmploymentType] : undefined,
@@ -291,18 +361,31 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
       savedOnly,
       hideSaved: hideSaved || undefined,
       sortBy,
-      page,
+      page: activePage,
       pageSize,
+      correlationId,
+      clientSubmittedAtMs: browserSubmissionMs,
     };
+
+    setSearchPhase("QUERYING");
 
     try {
       const result = await searchDiscoveredJobsAction(filters);
+      const browserReceivedAtMs = Date.now();
+
+      if (requestId !== searchRequestIdRef.current) {
+        return;
+      }
       if (result.success && result.data) {
+        setSearchPhase("FINALIZING");
         setJobs(result.data.jobs);
         setTotal(result.data.total);
         setTotalPages(result.data.totalPages);
         setHasMore(Boolean(result.data.hasMore));
         setEstimatedTotal(result.data.estimatedTotal);
+        setTotalScope(result.data.totalScope);
+        setReturnedBatchCount(result.data.returnedBatchCount);
+        setVerifiedMatchingCount(result.data.verifiedMatchingCount);
         setIsExactTotal(Boolean(result.data.isExactTotal));
         setUniqueCount(result.data.uniqueCount || result.data.jobs.length);
         setProviderStatuses(result.data.providerStatuses || []);
@@ -310,16 +393,48 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
           result.data.appliedFiltersSummary || { providerSide: [], inMemory: [] }
         );
         setIsLiveSearch(Boolean(result.data.isLive));
+        setInterpretedPlan(result.data.interpretedPlan);
+        setExecutedQuery(activeQuery);
+        setExecutedCity(activeCity);
+        setExecutedCountry(activeCountry);
+        setSearchDurationMs(result.data.searchDurationMs);
+        setSearchPhase("COMPLETED");
+
+        const trace = result.data.trace;
+        if (trace) {
+          trace.browserReceivedAtMs = browserReceivedAtMs;
+          trace.checkpoints.push({
+            checkpoint: "BROWSER_RESPONSE_RECEIVED",
+            timestampMs: browserReceivedAtMs,
+          });
+
+          requestAnimationFrame(() => {
+            const firstRenderedAtMs = Date.now();
+            trace.firstRenderedAtMs = firstRenderedAtMs;
+            trace.browserToResultMs = firstRenderedAtMs - browserSubmissionMs;
+            trace.checkpoints.push({
+              checkpoint: "FIRST_USABLE_RENDER",
+              timestampMs: firstRenderedAtMs,
+            });
+            latestTraceRef.current = trace;
+            setCurrentTrace(trace);
+          });
+        }
       } else {
         setError(result.error || "Failed to load discovered jobs.");
+        setSearchPhase("ERROR");
       }
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred.");
+      if (requestId === searchRequestIdRef.current) {
+        setError(err?.message || "An unexpected error occurred.");
+        setSearchPhase("ERROR");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [
-    query,
     exactPhrase,
     excludedKeywordsInput,
     companyName,
@@ -437,27 +552,36 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     setSavedOnly(false);
     setSortBy("relevance");
     setPage(1);
+    fetchJobs({ query: "", cities: [], countries: ["ALL"], page: 1 });
   };
 
   const applyPreset = (preset: SearchPreset) => {
-    resetAllFilters();
-    if (preset.filters.query) setQuery(preset.filters.query);
-    if (preset.filters.exactPhrase) setExactPhrase(preset.filters.exactPhrase);
-    if (preset.filters.companyName) setCompanyName(preset.filters.companyName);
-    if (preset.filters.industries && preset.filters.industries[0]) {
-      setSelectedIndustry(preset.filters.industries[0]);
-    }
-    if (preset.filters.countries && preset.filters.countries[0]) {
-      setSelectedCountry(preset.filters.countries[0]);
-    }
-    if (preset.filters.workArrangements && preset.filters.workArrangements[0]) {
-      setSelectedArrangement(preset.filters.workArrangements[0]);
-    }
-    if (preset.filters.seniorityLevels && preset.filters.seniorityLevels[0]) {
-      setSelectedSeniority(preset.filters.seniorityLevels[0]);
-    }
-    if (preset.filters.sortBy) setSortBy(preset.filters.sortBy);
+    setQuery(preset.filters.query || "");
+    setExactPhrase(preset.filters.exactPhrase || "");
+    setExcludedKeywordsInput(preset.filters.excludedKeywords?.join(", ") || "");
+    setCompanyName(preset.filters.companyName || "");
+    setRequiredSkillsInput(preset.filters.requiredSkills?.join(", ") || "");
+    setPreferredSkillsInput(preset.filters.preferredSkills?.join(", ") || "");
+    setSelectedIndustry(preset.filters.industries?.[0] || "ALL");
+    setSelectedCountry(preset.filters.countries?.[0] || "ALL");
+    setSelectedState(preset.filters.states?.[0] || "");
+    setSelectedCity(preset.filters.cities?.[0] || "");
+    setSelectedArrangement(preset.filters.workArrangements?.[0] || "ALL");
+    setSelectedSeniority(preset.filters.seniorityLevels?.[0] || "ALL");
+    setSelectedEmploymentType(preset.filters.employmentTypes?.[0] || "ALL");
+    setSelectedVerification(preset.filters.verificationStatuses?.[0] || "ALL");
+    setExperienceMin(preset.filters.experienceMin ? String(preset.filters.experienceMin) : "");
+    setExperienceMax(preset.filters.experienceMax ? String(preset.filters.experienceMax) : "");
+    setSalaryMin(preset.filters.salaryMin ? String(preset.filters.salaryMin) : "");
+    setSalaryMax(preset.filters.salaryMax ? String(preset.filters.salaryMax) : "");
+    setPostedWithinDays(preset.filters.postedWithinDays ? String(preset.filters.postedWithinDays) : "ALL");
+    setVisaSponsored(Boolean(preset.filters.visaSponsored));
+    setHideSaved(Boolean(preset.filters.hideSaved));
+    setSelectedProviders(preset.filters.providerIds || []);
+    setSavedOnly(Boolean(preset.filters.savedOnly));
+    setSortBy(preset.filters.sortBy || "relevance");
     setPage(1);
+    fetchJobs({ ...preset.filters, page: 1 });
   };
 
   const saveCurrentPreset = () => {
@@ -547,7 +671,14 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     const chips: Array<{ label: string; onRemove: () => void }> = [];
 
     if (query) {
-      chips.push({ label: `Keywords: "${query}"`, onRemove: () => setQuery("") });
+      chips.push({
+        label: `Keywords: "${query}"`,
+        onRemove: () => {
+          setQuery("");
+          setPage(1);
+          fetchJobs({ query: "", page: 1 });
+        },
+      });
     }
     if (exactPhrase) {
       chips.push({ label: `Exact: "${exactPhrase}"`, onRemove: () => setExactPhrase("") });
@@ -648,6 +779,9 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
 
   return (
     <div className="space-y-6">
+      {/* Top Indeterminate Progress Bar */}
+      <JobSearchProgressBar loading={loading} />
+
       {/* Search Header & Presets Bar */}
       <div className="bg-white p-5 rounded-[16px] border border-[#E5EAE7] shadow-2xs space-y-4">
         {/* Presets Quick Picker */}
@@ -689,32 +823,64 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
         </div>
 
         {/* Primary Search Input Row */}
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
+            <LocationAwareAutocomplete
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
+              onChange={(val) => {
+                setQuery(val);
               }}
-              placeholder='Search keywords, title, skills, or tokens (e.g. "Staff Engineer", React -crypto)...'
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-[#DDE5E0] rounded-[12px] text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#12A150]/30 transition"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => {
+              onSelect={(suggestion) => {
+                if (suggestion.category === "city") {
+                  setSelectedCity(suggestion.text);
                   setQuery("");
                   setPage(1);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
-              >
-                Clear
-              </button>
-            )}
+                  fetchJobs({ cities: [suggestion.text], query: "", page: 1 });
+                } else {
+                  setQuery(suggestion.text);
+                  setPage(1);
+                  fetchJobs({ query: suggestion.text, page: 1 });
+                }
+              }}
+              onSubmit={() => {
+                if (loading) return;
+                setPage(1);
+                fetchJobs({ query, page: 1 });
+              }}
+              onClear={() => {
+                setQuery("");
+                setPage(1);
+                fetchJobs({ query: "", page: 1 });
+              }}
+              placeholder='Search keywords, title, skills, or tokens (e.g. "Staff Engineer", React -crypto)...'
+              type="main"
+              country={selectedCountry}
+              icon={<Search className="w-4 h-4" />}
+              inputClassName="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-[#DDE5E0] rounded-[12px] text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#12A150]/30 transition"
+            />
           </div>
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              if (loading) return;
+              setPage(1);
+              fetchJobs({ query, page: 1 });
+            }}
+            className={`px-4 py-2.5 bg-[#0B3B2C] hover:bg-[#12A150] text-white rounded-[12px] text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-2xs whitespace-nowrap cursor-pointer ${
+              loading ? "opacity-75 cursor-not-allowed" : ""
+            }`}
+            id="job-discovery-search-btn"
+            aria-busy={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Search className="w-3.5 h-3.5" />
+            )}
+            <span>{loading ? "Searching…" : "Search"}</span>
+          </button>
 
           {/* Quick Filter: Country */}
           <div className="w-full sm:w-40">
@@ -964,15 +1130,20 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   State / Region
                 </label>
-                <input
-                  type="text"
+                <LocationAwareAutocomplete
                   value={selectedState}
-                  onChange={(e) => {
-                    setSelectedState(e.target.value);
+                  onChange={(val) => {
+                    setSelectedState(val);
+                    setPage(1);
+                  }}
+                  onSelect={(suggestion) => {
+                    setSelectedState(suggestion.text);
                     setPage(1);
                   }}
                   placeholder="e.g. California, Karnataka"
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium text-slate-800"
+                  type="state"
+                  country={selectedCountry}
+                  inputClassName="w-full px-2.5 py-1.5 bg-slate-50 border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#12A150]/30 transition"
                 />
               </div>
 
@@ -981,15 +1152,21 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   City
                 </label>
-                <input
-                  type="text"
+                <LocationAwareAutocomplete
                   value={selectedCity}
-                  onChange={(e) => {
-                    setSelectedCity(e.target.value);
+                  onChange={(val) => {
+                    setSelectedCity(val);
+                    setPage(1);
+                  }}
+                  onSelect={(suggestion) => {
+                    setSelectedCity(suggestion.text);
                     setPage(1);
                   }}
                   placeholder="e.g. San Francisco, Bengaluru"
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium text-slate-800"
+                  type="city"
+                  country={selectedCountry}
+                  state={selectedState}
+                  inputClassName="w-full px-2.5 py-1.5 bg-slate-50 border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#12A150]/30 transition"
                 />
               </div>
 
@@ -1166,6 +1343,16 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
         {renderFilterChips()}
       </div>
 
+      {/* Search Lifecycle, Active Scope & Provider Diagnostics Status Banner */}
+      <JobSearchStatusBanner
+        loading={loading}
+        phase={searchPhase}
+        activeSubmittedQuery={activeSubmittedQuery || executedQuery}
+        activeLocation={activeSubmittedLocation || (executedCity ? `${executedCity}${executedCountry !== "ALL" ? `, ${executedCountry}` : ""}` : (executedCountry !== "ALL" ? executedCountry : undefined))}
+        providerStatuses={providerStatuses}
+        searchDurationMs={searchDurationMs}
+      />
+
       {/* Diagnostics, Accuracy & Pagination Status Line */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 px-1 gap-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -1177,13 +1364,37 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
           )}
 
           <span>
-            Showing <span className="font-bold text-slate-800">{jobs.length}</span>{" "}
-            {isExactTotal ? `of ${total} total leads (exact)` : "opportunities on this page"}
-            {!isExactTotal && estimatedTotal && (
-              <span className="text-slate-400"> • ~{estimatedTotal.toLocaleString()}+ estimated across sources</span>
-            )}
-            {uniqueCount > 0 && (
-              <span className="text-slate-400"> • {uniqueCount} unique in memory</span>
+            {loading ? (
+              <span className="text-slate-400 font-medium animate-pulse">Searching live job providers...</span>
+            ) : (
+              <>
+                Showing <span className="font-bold text-slate-800">{jobs.length}</span>{" "}
+                {isExactTotal ? `of ${total} total leads (exact)` : "opportunities on this page"}
+                {verifiedMatchingCount !== undefined && (
+                  <span className="text-slate-500 font-medium">
+                    {" "}• {verifiedMatchingCount} verified in {executedCity || interpretedPlan?.city || (executedCountry !== "ALL" ? (executedCountry === "IN" ? "India" : executedCountry === "US" ? "United States" : executedCountry) : interpretedPlan?.country === "IN" ? "India" : executedQuery.trim() || "search criteria")}
+                  </span>
+                )}
+                {returnedBatchCount !== undefined && returnedBatchCount !== jobs.length && (!verifiedMatchingCount || (!executedCity && !interpretedPlan?.city && executedCountry === "ALL" && !interpretedPlan?.country)) && (
+                  <span className="text-slate-400"> • {returnedBatchCount} returned in batch</span>
+                )}
+                {!isExactTotal && estimatedTotal && (
+                  <span className="text-slate-400">
+                    {" "}• ~{estimatedTotal >= 100000 ? `${(estimatedTotal / 100000).toFixed(0)} Lakhs (${(estimatedTotal / 1000000).toFixed(1)}M+)` : estimatedTotal.toLocaleString()} available upstream ({
+                      totalScope === "CITY"
+                        ? (executedCity || interpretedPlan?.city || (executedQuery && (executedQuery.toLowerCase().includes("bengaluru") || executedQuery.toLowerCase().includes("bangalore")) ? "Bengaluru" : executedQuery && executedQuery.toLowerCase().includes("hyderabad") ? "Hyderabad" : "city scope"))
+                        : totalScope === "COUNTRY"
+                        ? (executedCountry !== "ALL" ? (executedCountry === "IN" ? "India" : executedCountry === "US" ? "United States" : executedCountry) : interpretedPlan?.country === "IN" ? "India" : "country scope")
+                        : totalScope === "GLOBAL" && !executedCity && !interpretedPlan?.city && executedCountry === "ALL" && !interpretedPlan?.country
+                        ? "all regions"
+                        : "provider reported"
+                    })
+                  </span>
+                )}
+                {!isExactTotal && !estimatedTotal && (
+                  <span className="text-slate-400"> • {hasMore ? "More results available" : "End of results"}</span>
+                )}
+              </>
             )}
           </span>
         </div>
@@ -1225,68 +1436,65 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
 
       {/* Error State */}
       {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600" />
-            <span>{error}</span>
+        <JobSearchErrorState error={error} onRetry={() => fetchJobs()} />
+      )}
+
+      {/* Partial Provider Failure Warning */}
+      <JobSearchPartialFailureAlert
+        providerStatuses={providerStatuses}
+        onRetry={() => fetchJobs()}
+      />
+
+      {/* AI Interpreted Search Intent Banner */}
+      {interpretedPlan && (interpretedPlan.role || interpretedPlan.city || interpretedPlan.workArrangement || interpretedPlan.salaryMin) && (
+        <div className="bg-gradient-to-r from-emerald-50/80 via-white to-blue-50/50 border border-emerald-200/80 rounded-[14px] p-3 text-xs flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800">
+              {interpretedPlan.isAiInterpreted ? (
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-600" />
+              )}
+              <span>Interpreted Search Intent:</span>
+            </div>
+            {interpretedPlan.role && (
+              <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px]">
+                Role: <strong className="text-slate-900">{interpretedPlan.role}</strong>
+              </span>
+            )}
+            {(interpretedPlan.city || interpretedPlan.country) && (
+              <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px]">
+                Location: <strong className="text-slate-900">{[interpretedPlan.city, interpretedPlan.state, interpretedPlan.country].filter(Boolean).join(", ")}</strong>
+              </span>
+            )}
+            {interpretedPlan.workArrangement && (
+              <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px]">
+                Mode: <strong className="text-slate-900">{interpretedPlan.workArrangement}</strong>
+              </span>
+            )}
+            {interpretedPlan.salaryMin && (
+              <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px]">
+                Min Salary: <strong className="text-slate-900">{interpretedPlan.salaryCurrency === "INR" ? `₹${(interpretedPlan.salaryMin / 100000).toFixed(0)} LPA` : `$${(interpretedPlan.salaryMin / 1000).toFixed(0)}k`}</strong>
+              </span>
+            )}
+            <span className="text-[10px] text-slate-500 font-medium">
+              ({interpretedPlan.isAiInterpreted ? "DeepSeek Interpreted" : "Deterministic Fallback"})
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={fetchJobs}
-            className="px-2.5 py-1 bg-white border border-rose-200 rounded-md font-semibold text-rose-700 hover:bg-rose-50 transition"
-          >
-            Retry
-          </button>
         </div>
       )}
 
       {/* Loading Skeletons */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="p-5 bg-white rounded-2xl border border-slate-100 shadow-2xs space-y-3 animate-pulse"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-24 h-4 bg-slate-200 rounded-full" />
-                <div className="w-16 h-4 bg-slate-100 rounded-full" />
-              </div>
-              <div className="w-3/4 h-5 bg-slate-200 rounded-md" />
-              <div className="w-1/2 h-4 bg-slate-100 rounded-md" />
-              <div className="space-y-1.5 pt-2">
-                <div className="w-full h-3 bg-slate-100 rounded" />
-                <div className="w-5/6 h-3 bg-slate-100 rounded" />
-              </div>
-              <div className="flex gap-2 pt-3">
-                <div className="w-16 h-6 bg-slate-100 rounded-lg" />
-                <div className="w-16 h-6 bg-slate-100 rounded-lg" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <JobSearchSkeletonGrid count={6} />
       ) : jobs.length === 0 ? (
         /* Empty State */
-        <div className="bg-white p-12 rounded-[16px] border border-[#E5EAE7] text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
-            <Search className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800">No matching job opportunities found</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            {savedOnly
-              ? "You haven't bookmarked any job leads yet. Uncheck 'Saved Only' to search live opportunities across external providers."
-              : "Try broadening your query keywords, removing negative filters, or selecting 'All Countries' and 'All Industries'."}
-          </p>
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={resetAllFilters}
-              className="px-4 py-2 bg-[#0B3B2C] text-white rounded-xl text-xs font-semibold hover:bg-[#082F26] transition"
-            >
-              Reset all filters
-            </button>
-          </div>
-        </div>
+        <JobSearchEmptyState
+          query={executedQuery}
+          location={executedCity || (executedCountry !== "ALL" ? executedCountry : undefined)}
+          savedOnly={savedOnly}
+          onResetFilters={resetAllFilters}
+        />
       ) : (
         /* Job Result Cards */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1376,12 +1584,22 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
                 )}
 
                 {/* Explainable Relevance Pill */}
-                {job.relevance && job.relevance.reasons.length > 0 && (
-                  <div className="rounded-lg bg-emerald-50/60 border border-emerald-100 p-2 text-[10px] text-emerald-800 space-y-0.5">
+                {job.relevance && (
+                  <div className="rounded-lg bg-emerald-50/60 border border-emerald-100 p-2 text-[10px] text-emerald-800 space-y-1">
                     <div className="font-semibold flex items-center justify-between">
-                      <span>Relevance Match: {job.relevance.overallScore}%</span>
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        Relevance Match: {job.relevance.overallScore}%
+                      </span>
+                      {job.relevance.aiEvidence?.aiAssisted && (
+                        <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
+                          AI Analyzed
+                        </span>
+                      )}
                     </div>
-                    <p className="truncate text-emerald-700">{job.relevance.reasons[0]}</p>
+                    <p className="line-clamp-2 text-emerald-700 leading-snug">
+                      {job.relevance.aiEvidence?.matchExplanation || job.relevance.reasons[0]}
+                    </p>
                   </div>
                 )}
               </div>
@@ -1444,7 +1662,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-600">
-            Page {page} {totalPages > 1 ? `of ${totalPages}` : ""}
+            Page {page} {isExactTotal ? (totalPages > 1 ? `of ${totalPages}` : "") : (totalPages > 1 ? `of ${totalPages}+` : "")}
           </span>
           {hasMore && !isExactTotal && (
             <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">

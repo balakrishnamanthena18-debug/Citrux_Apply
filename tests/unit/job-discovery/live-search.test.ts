@@ -210,7 +210,9 @@ describe("Live Job Search Engine (Zero-Bulk-Storage)", () => {
       rawCount: 1,
     });
 
-    const response = await engine.searchLiveJobs({});
+    const response = await engine.searchLiveJobs({
+      providerIds: ["freehire"],
+    });
     const jsonString = JSON.stringify(response);
 
     expect(jsonString).not.toContain("fhk_");

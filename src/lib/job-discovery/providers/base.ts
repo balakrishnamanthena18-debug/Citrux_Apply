@@ -24,7 +24,7 @@ export abstract class BaseJobProvider implements JobProviderAdapter {
   abstract readonly attributionNotice: string;
   abstract readonly permittedTermsUrl?: string;
 
-  protected timeoutMs = 12000;
+  protected timeoutMs = 5000;
   protected maxResponseBytes = 10 * 1024 * 1024; // 10MB limit
 
   abstract isConfigured(): boolean;
@@ -48,6 +48,16 @@ export abstract class BaseJobProvider implements JobProviderAdapter {
     while (attempt <= retries) {
       attempt++;
       const controller = new AbortController();
+
+      // Connect upstream AbortSignal if provided
+      if (options.signal) {
+        if (options.signal.aborted) {
+          controller.abort();
+        } else {
+          options.signal.addEventListener("abort", () => controller.abort(), { once: true });
+        }
+      }
+
       const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
       try {

@@ -74,6 +74,7 @@ export interface NormalizedDiscoveredJob {
   country?: string | null; // ISO 2-letter or standard name
   state?: string | null;
   city?: string | null;
+  allCities?: string[];
   workArrangement: JobWorkArrangement;
   postedAt?: Date | string | null;
   closingDate?: Date | string | null;
@@ -111,6 +112,7 @@ export interface ProviderSearchParams {
   page?: number;
   pageSize?: number;
   cursor?: string;
+  signal?: AbortSignal;
 }
 
 /** Normalized batch result returned by provider adapters */
@@ -123,6 +125,9 @@ export interface ProviderFetchResult {
   rateLimitRemaining?: number;
   rateLimitResetSeconds?: number;
   rawCount: number;
+  ignoredParams?: Array<{ param: string; did_you_mean?: string }>;
+  appliedFilters?: Record<string, string | number | boolean>;
+  totalScope?: "CITY" | "STATE" | "COUNTRY" | "GLOBAL";
 }
 
 /** Provider health & availability report */
@@ -184,6 +189,8 @@ export interface JobSearchFilters {
   sortBy?: "relevance" | "newest" | "salary_desc" | "quality";
   page?: number;
   pageSize?: number;
+  correlationId?: string;
+  clientSubmittedAtMs?: number;
 }
 
 /** Relevance breakdown explanation */
@@ -196,6 +203,15 @@ export interface RelevanceExplanation {
   locationScore: number;
   freshnessScore: number;
   reasons: string[];
+  scoringVersion?: string;
+  aiEvidence?: {
+    matchExplanation: string;
+    matchedSkills: string[];
+    missingSkills: string[];
+    locationCompatibility: string;
+    confidence: number;
+    aiAssisted: boolean;
+  };
 }
 
 /** Search result item returned to UI */
@@ -220,6 +236,7 @@ export interface DiscoveredJobSearchResult {
   country: string | null;
   state: string | null;
   city: string | null;
+  allCities?: string[];
   workArrangement: JobWorkArrangement;
   postedAt: Date | string | null;
   closingDate: Date | string | null;
@@ -249,6 +266,9 @@ export interface LiveProviderExecutionStatus {
   totalReported?: number;
   hasMore?: boolean;
   error?: string;
+  ignoredParams?: Array<{ param: string; did_you_mean?: string }>;
+  appliedFilters?: Record<string, string | number | boolean>;
+  totalScope?: "CITY" | "STATE" | "COUNTRY" | "GLOBAL";
 }
 
 /** Paginated Search Response */
@@ -260,11 +280,27 @@ export interface PaginatedJobSearchResponse {
   totalPages: number;
   hasMore: boolean;
   estimatedTotal?: number;
+  providerReportedTotal?: number;
+  totalScope?: "CITY" | "STATE" | "COUNTRY" | "GLOBAL";
+  returnedBatchCount?: number;
+  verifiedMatchingCount?: number;
   isExactTotal: boolean;
   isLive?: boolean;
+  searchDurationMs?: number;
   providerStatuses?: LiveProviderExecutionStatus[];
   rawProviderCounts?: Record<string, number>;
   uniqueCount: number;
+  interpretedPlan?: {
+    intentSummary: string;
+    role?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    workArrangement?: string;
+    salaryMin?: number;
+    salaryCurrency?: string;
+    isAiInterpreted: boolean;
+  };
   appliedFiltersSummary?: {
     providerSide: string[];
     inMemory: string[];
@@ -276,6 +312,38 @@ export interface PaginatedJobSearchResponse {
     verificationStatuses: Record<string, number>;
     providers: Record<string, number>;
   };
+  trace?: SearchTraceData;
+}
+
+/** Non-sensitive end-to-end search trace checkpoints */
+export type SearchTraceCheckpointName =
+  | "BROWSER_SUBMISSION"
+  | "API_ENTRY"
+  | "QUERY_INTERPRETATION_COMPLETED"
+  | "PROVIDER_STARTED"
+  | "PROVIDER_COMPLETED"
+  | "AGGREGATION_RANKING_COMPLETED"
+  | "API_RESPONSE_COMPLETED"
+  | "BROWSER_RESPONSE_RECEIVED"
+  | "FIRST_USABLE_RENDER";
+
+export interface SearchTraceCheckpoint {
+  checkpoint: SearchTraceCheckpointName;
+  timestampMs: number;
+  providerId?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface SearchTraceData {
+  correlationId: string;
+  clientSubmittedAtMs?: number;
+  apiEntryMs?: number;
+  apiCompletedAtMs?: number;
+  browserReceivedAtMs?: number;
+  firstRenderedAtMs?: number;
+  serverDurationMs?: number;
+  browserToResultMs?: number;
+  checkpoints: SearchTraceCheckpoint[];
 }
 
 /** Collection run trigger options */

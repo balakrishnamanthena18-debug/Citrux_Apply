@@ -73,19 +73,30 @@ export class DirectAtsAdapter extends BaseJobProvider {
   async fetchJobs(params: ProviderSearchParams): Promise<ProviderFetchResult> {
     const results: NormalizedDiscoveredJob[] = [];
 
-    for (const board of this.sampleBoards) {
+    // Concurrently query sample boards with summary payloads (~600KB vs 9.2MB) to avoid network bottleneck
+    const boardPromises = this.sampleBoards.map(async (board) => {
       try {
-        const res = await this.safeFetch(`${this.defaultBaseUrl}/${board.token}/jobs?content=true`, {}, 1);
+        const res = await this.safeFetch(
+          `${this.defaultBaseUrl}/${board.token}/jobs`,
+          { signal: params.signal },
+          1
+        );
         if (res.ok) {
           const json = await res.json();
           const jobs = Array.isArray(json.jobs) ? json.jobs : [];
-          for (const raw of jobs.slice(0, 15)) {
-            results.push(this.normalizeGreenhouseRecord(raw, board.name, board.industry));
-          }
+          return jobs
+            .slice(0, 15)
+            .map((raw: any) => this.normalizeGreenhouseRecord(raw, board.name, board.industry));
         }
       } catch {
-        continue;
+        return [];
       }
+      return [];
+    });
+
+    const boardResults = await Promise.all(boardPromises);
+    for (const batch of boardResults) {
+      results.push(...batch);
     }
 
     let filtered = results;
@@ -101,7 +112,8 @@ export class DirectAtsAdapter extends BaseJobProvider {
 
     return {
       jobs: filtered,
-      totalAvailable: filtered.length,
+      // Direct ATS sample boards do not represent total matching jobs across sources
+      totalAvailable: undefined,
       hasMore: false,
       providerId: this.id,
       rawCount: results.length,
@@ -115,7 +127,7 @@ export class DirectAtsAdapter extends BaseJobProvider {
 
     const title = raw.title || "Untitled Position";
     const location = raw.location?.name || "";
-    const description = raw.content || "";
+    const description = raw.content || `${title} at ${employer} (${location || "Multiple locations"})`;
 
     const normTitle = normalizeJobTitle(title);
     const normCompany = normalizeCompanyName(employer);

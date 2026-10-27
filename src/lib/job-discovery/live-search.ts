@@ -13,6 +13,9 @@ import { prisma } from "@/lib/db/prisma";
 import { jobProviderRegistry } from "./registry";
 import { evaluateDeduplication } from "./deduplication";
 import { calculateRelevance } from "./relevance";
+import { calculateDeterministicRelevance, enrichJobsWithDeepSeek } from "./ai-relevance";
+import { interpretJobSearchQuery, type InterpretedSearchPlan } from "./query-interpreter";
+import { matchCityWithAliases, CITY_ALIASES } from "./normalizer";
 import { JobSearchQuerySchema } from "./contracts";
 import type {
   JobSearchFilters,
@@ -22,10 +25,25 @@ import type {
   LiveProviderExecutionStatus,
   JobProviderAdapter,
   ProviderSearchParams,
+  SearchTraceData,
+  SearchTraceCheckpoint,
 } from "./types";
 import { logger } from "@/lib/logger";
 
-const PROVIDER_TIMEOUT_MS = 8000;
+const PROVIDER_TIMEOUT_MS = 5000;
+
+/** Set of recognized location words for distinguishing location tokens from skill/role keywords */
+const KNOWN_LOCATION_WORDS = new Set([
+  ...Object.keys(CITY_ALIASES),
+  ...Object.values(CITY_ALIASES).flat(),
+  "karnataka", "telangana", "maharashtra", "delhi", "haryana", "tamil", "nadu",
+  "california", "texas", "washington", "florida", "illinois", "york",
+  "india", "usa", "us", "uk", "germany", "canada", "remote"
+]);
+
+function isLocationWord(word: string): boolean {
+  return KNOWN_LOCATION_WORDS.has(word.toLowerCase().trim());
+}
 
 export class LiveJobSearchEngine {
   /**
@@ -33,8 +51,36 @@ export class LiveJobSearchEngine {
    */
   async searchLiveJobs(
     rawFilters: JobSearchFilters,
-    userId?: string
+    userId?: string,
+    traceContext?: {
+      apiEntryMs?: number;
+      correlationId?: string;
+      clientSubmittedAtMs?: number;
+    }
   ): Promise<PaginatedJobSearchResponse> {
+    const searchStartMs = Date.now();
+    const correlationId =
+      traceContext?.correlationId ||
+      rawFilters.correlationId ||
+      `srch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const checkpoints: SearchTraceCheckpoint[] = [];
+
+    const clientSubmittedAtMs =
+      traceContext?.clientSubmittedAtMs || rawFilters.clientSubmittedAtMs;
+    if (clientSubmittedAtMs) {
+      checkpoints.push({
+        checkpoint: "BROWSER_SUBMISSION",
+        timestampMs: clientSubmittedAtMs,
+      });
+    }
+
+    const apiEntryMs = traceContext?.apiEntryMs || searchStartMs;
+    checkpoints.push({
+      checkpoint: "API_ENTRY",
+      timestampMs: apiEntryMs,
+    });
+
     const validated = JobSearchQuerySchema.parse(rawFilters);
     const page = validated.page || 1;
     const pageSize = validated.pageSize || 20;
@@ -74,15 +120,38 @@ export class LiveJobSearchEngine {
           providerSide: [],
           inMemory: [],
         },
+        trace: {
+          correlationId,
+          clientSubmittedAtMs,
+          apiEntryMs,
+          serverDurationMs: Date.now() - apiEntryMs,
+          checkpoints,
+        },
       };
     }
 
-    // 3. Parse Advanced Tokens (Quotes for exact phrase, -term for negative keywords)
-    let cleanQuery = validated.query?.trim() || "";
+    // 3. Interpret query using DeepSeek Query Interpreter (with immediate deterministic fallback)
+    const interpretedPlan = await interpretJobSearchQuery(validated.query || "");
+
+    checkpoints.push({
+      checkpoint: "QUERY_INTERPRETATION_COMPLETED",
+      timestampMs: Date.now(),
+      details: {
+        isAiInterpreted: interpretedPlan.isAiInterpreted,
+        role: interpretedPlan.role,
+        city: interpretedPlan.city,
+      },
+    });
+
+    // Effective search terms: use extracted role if query had location/salary expressions embedded
+    let cleanQuery = interpretedPlan.role || validated.query?.trim() || "";
     let exactPhrase = validated.exactPhrase?.trim() || "";
-    const excludedKeywords: string[] = validated.excludedKeywords
-      ? [...validated.excludedKeywords]
-      : [];
+    const excludedKeywords: string[] = Array.from(
+      new Set([
+        ...(validated.excludedKeywords || []),
+        ...interpretedPlan.excludedKeywords,
+      ])
+    );
 
     if (cleanQuery.includes('"') && !exactPhrase) {
       const quoteMatch = cleanQuery.match(/"([^"]+)"/);
@@ -104,16 +173,55 @@ export class LiveJobSearchEngine {
     }
     cleanQuery = cleanQuery.replace(/\s+/g, " ").trim();
 
+    // Determine effective location & arrangements (UI selections override interpreted defaults)
+    const effectiveCountries =
+      validated.countries && validated.countries.length > 0 && validated.countries[0] !== "ALL"
+        ? validated.countries
+        : interpretedPlan.country
+        ? [interpretedPlan.country]
+        : undefined;
+
+    const effectiveCities =
+      validated.cities && validated.cities.length > 0
+        ? validated.cities
+        : interpretedPlan.city
+        ? [interpretedPlan.city]
+        : undefined;
+
+    const effectiveStates =
+      validated.states && validated.states.length > 0
+        ? validated.states
+        : interpretedPlan.state
+        ? [interpretedPlan.state]
+        : undefined;
+
+    const effectiveWorkArrangements =
+      validated.workArrangements && validated.workArrangements.length > 0
+        ? validated.workArrangements
+        : interpretedPlan.workArrangement
+        ? [interpretedPlan.workArrangement]
+        : undefined;
+
+    const effectiveSeniority =
+      validated.seniorityLevels && validated.seniorityLevels.length > 0
+        ? validated.seniorityLevels
+        : interpretedPlan.seniority
+        ? [interpretedPlan.seniority]
+        : undefined;
+
     // 4. Map search criteria to provider search params & record filter locations
     const providerSideFilters: string[] = [];
     const inMemoryFilters: string[] = [];
 
     if (cleanQuery) providerSideFilters.push(`Keywords: "${cleanQuery}"`);
-    if (validated.countries && validated.countries.length === 1) {
-      providerSideFilters.push(`Country: ${validated.countries[0]}`);
+    if (effectiveCountries && effectiveCountries.length === 1) {
+      providerSideFilters.push(`Country: ${effectiveCountries[0]}`);
     }
-    if (validated.workArrangements && validated.workArrangements.length === 1) {
-      providerSideFilters.push(`Work Mode: ${validated.workArrangements[0]}`);
+    if (effectiveCities && effectiveCities.length === 1) {
+      providerSideFilters.push(`City: ${effectiveCities[0]}`);
+    }
+    if (effectiveWorkArrangements && effectiveWorkArrangements.length === 1) {
+      providerSideFilters.push(`Work Mode: ${effectiveWorkArrangements[0]}`);
     }
 
     if (exactPhrase) inMemoryFilters.push(`Exact Phrase: "${exactPhrase}"`);
@@ -161,23 +269,27 @@ export class LiveJobSearchEngine {
     const providerSearchParams: ProviderSearchParams = {
       keywords: cleanQuery || exactPhrase || undefined,
       country:
-        validated.countries && validated.countries.length === 1
-          ? validated.countries[0]
+        effectiveCountries && effectiveCountries.length === 1
+          ? effectiveCountries[0]
+          : undefined,
+      city:
+        effectiveCities && effectiveCities.length === 1 && effectiveCities[0]
+          ? effectiveCities[0].split(",")[0]?.trim()
           : undefined,
       workArrangement:
-        validated.workArrangements && validated.workArrangements.length === 1
-          ? validated.workArrangements[0]
+        effectiveWorkArrangements && effectiveWorkArrangements.length === 1
+          ? effectiveWorkArrangements[0]
           : undefined,
       seniority:
-        validated.seniorityLevels && validated.seniorityLevels.length === 1
-          ? validated.seniorityLevels[0]
+        effectiveSeniority && effectiveSeniority.length === 1
+          ? effectiveSeniority[0]
           : undefined,
       industry:
         validated.industries && validated.industries.length === 1
           ? validated.industries[0]
           : undefined,
       page,
-      pageSize: Math.max(pageSize, 25), // Request a sufficient window for in-memory deduplication & filtering
+      pageSize,
     };
 
     // 5. Query configured providers in parallel with bounded timeouts
@@ -189,17 +301,52 @@ export class LiveJobSearchEngine {
 
     const queryPromises = targetProviders.map(async (provider) => {
       const start = Date.now();
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Timeout after ${PROVIDER_TIMEOUT_MS}ms`)),
-            PROVIDER_TIMEOUT_MS
-          )
-        );
+      checkpoints.push({
+        checkpoint: "PROVIDER_STARTED",
+        timestampMs: start,
+        providerId: provider.id,
+      });
 
-        const fetchPromise = provider.fetchJobs(providerSearchParams);
+      const abortController = new AbortController();
+      let timer: NodeJS.Timeout | null = setTimeout(() => {
+        abortController.abort();
+      }, PROVIDER_TIMEOUT_MS);
+
+      try {
+        const fetchPromise = provider.fetchJobs({
+          ...providerSearchParams,
+          signal: abortController.signal,
+        });
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          if (abortController.signal.aborted) {
+            reject(new Error(`Timeout after ${PROVIDER_TIMEOUT_MS}ms`));
+          } else {
+            abortController.signal.addEventListener(
+              "abort",
+              () => reject(new Error(`Timeout after ${PROVIDER_TIMEOUT_MS}ms`)),
+              { once: true }
+            );
+          }
+        });
+
         const result = await Promise.race([fetchPromise, timeoutPromise]);
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
         const latencyMs = Date.now() - start;
+
+        checkpoints.push({
+          checkpoint: "PROVIDER_COMPLETED",
+          timestampMs: Date.now(),
+          providerId: provider.id,
+          details: {
+            status: "SUCCESS",
+            latencyMs,
+            count: result.jobs.length,
+          },
+        });
 
         rawProviderCounts[provider.id] = result.jobs.length;
         if (result.hasMore) {
@@ -214,6 +361,9 @@ export class LiveJobSearchEngine {
           count: result.jobs.length,
           totalReported: result.totalAvailable,
           hasMore: result.hasMore,
+          ignoredParams: result.ignoredParams,
+          appliedFilters: result.appliedFilters,
+          totalScope: result.totalScope,
         });
 
         if (result.totalAvailable && result.totalAvailable > combinedTotal) {
@@ -224,6 +374,17 @@ export class LiveJobSearchEngine {
       } catch (err: any) {
         const latencyMs = Date.now() - start;
         const isTimeout = /timeout/i.test(err?.message || "");
+
+        checkpoints.push({
+          checkpoint: "PROVIDER_COMPLETED",
+          timestampMs: Date.now(),
+          providerId: provider.id,
+          details: {
+            status: isTimeout ? "TIMEOUT" : "FAILED",
+            latencyMs,
+            error: isTimeout ? `Request timed out after ${PROVIDER_TIMEOUT_MS}ms` : "Upstream provider error",
+          },
+        });
 
         logger.warn(
           `[LiveSearch] Provider ${provider.id} failed during live search`,
@@ -238,7 +399,7 @@ export class LiveJobSearchEngine {
           latencyMs,
           count: 0,
           hasMore: false,
-          error: isTimeout ? "Request timed out after 8000ms" : "Upstream provider error",
+          error: isTimeout ? `Request timed out after ${PROVIDER_TIMEOUT_MS}ms` : "Upstream provider error",
         });
 
         return [] as NormalizedDiscoveredJob[];
@@ -318,16 +479,40 @@ export class LiveJobSearchEngine {
         if (hasExcluded) return false;
       }
 
-      // Keyword query match (must match at least one keyword in title, description, or company)
+      // Keyword query match
       if (cleanQuery) {
+        // Strip punctuation from query words so commas, hyphens, etc. don't break token matching
         const qWords = cleanQuery
           .toLowerCase()
+          .replace(/[^\w\s]/g, " ")
           .split(/\s+/)
           .filter((w) => w.length > 2);
+
         if (qWords.length > 0) {
-          const matchesKeyword = qWords.some(
-            (w) => titleLower.includes(w) || descLower.includes(w) || companyLower.includes(w)
-          );
+          const matchesKeyword = qWords.some((w) => {
+            // Match title or company
+            if (titleLower.includes(w) || companyLower.includes(w)) {
+              return true;
+            }
+
+            // Match location fields using normalized data and aliases
+            if (
+              (job.city && matchCityWithAliases(job.city, w)) ||
+              (job.state && job.state.toLowerCase().includes(w)) ||
+              (job.country && job.country.toLowerCase().includes(w))
+            ) {
+              return true;
+            }
+
+            // Only allow matching in job description for non-location tokens.
+            // This prevents false positives where a job in another city merely mentions "Bengaluru" in passing.
+            if (!isLocationWord(w) && descLower.includes(w)) {
+              return true;
+            }
+
+            return false;
+          });
+
           if (!matchesKeyword) return false;
         }
       }
@@ -363,31 +548,57 @@ export class LiveJobSearchEngine {
       }
 
       // Country filter
-      if (validated.countries && validated.countries.length > 0) {
-        const jobCountry = (job.country || "").toUpperCase();
-        const matchesCountry = validated.countries.some((c) => {
-          const upperC = c.toUpperCase();
+      const targetCountries =
+        validated.countries && validated.countries.length > 0
+          ? validated.countries
+          : effectiveCountries || [];
+
+      if (targetCountries.length > 0 && targetCountries[0] !== "ALL") {
+        const jobCountry = (job.country || "").toUpperCase().trim();
+        const matchesCountry = targetCountries.some((c) => {
+          const upperC = c.toUpperCase().trim();
           if (upperC === "REMOTE") return job.workArrangement === "REMOTE";
-          return jobCountry === upperC;
+          if (jobCountry === upperC) return true;
+          if ((upperC === "US" || upperC === "USA") && (jobCountry === "US" || jobCountry === "USA" || jobCountry === "UNITED STATES")) return true;
+          if ((upperC === "IN" || upperC === "IND") && (jobCountry === "IN" || jobCountry === "INDIA")) return true;
+          return false;
         });
         if (!matchesCountry) return false;
       }
 
       // State / Region filter
-      if (validated.states && validated.states.length > 0) {
-        const jobState = (job.state || "").toLowerCase();
-        const matchesState = validated.states.some((st) =>
-          jobState.includes(st.toLowerCase())
-        );
+      const targetStates =
+        validated.states && validated.states.length > 0
+          ? validated.states
+          : effectiveStates || [];
+
+      if (targetStates.length > 0) {
+        const jobState = (job.state || "").toLowerCase().trim();
+        const matchesState = targetStates.some((st) => {
+          const stLower = st.toLowerCase().trim();
+          return (
+            jobState === stLower ||
+            (jobState.length > 0 && (jobState.includes(stLower) || stLower.includes(jobState)))
+          );
+        });
         if (!matchesState) return false;
       }
 
-      // City filter
-      if (validated.cities && validated.cities.length > 0) {
-        const jobCity = (job.city || "").toLowerCase();
-        const matchesCity = validated.cities.some((ct) =>
-          jobCity.includes(ct.toLowerCase())
-        );
+      // City filter (matches structured location data, accounting for aliases, multi-location postings, and title locations)
+      const targetCities =
+        validated.cities && validated.cities.length > 0
+          ? validated.cities
+          : effectiveCities || [];
+
+      if (targetCities.length > 0) {
+        const candidateCities = [job.city, ...(job.allCities || [])].filter(Boolean) as string[];
+        const matchesCity = targetCities.some((ct) => {
+          const ctClean = ct.split(",")[0]?.trim() || ct.trim();
+          return (
+            candidateCities.some((c) => matchCityWithAliases(c, ctClean) || matchCityWithAliases(c, ct)) ||
+            matchCityWithAliases(job.title, ctClean)
+          );
+        });
         if (!matchesCity) return false;
       }
 
@@ -479,14 +690,18 @@ export class LiveJobSearchEngine {
       return true;
     });
 
-    // 8. Relevance Scoring (Explainable & Factual)
+    // 8. Relevance Scoring (Calibrated Hybrid Model)
     const scoredJobs = filteredJobs.map((job) => {
-      const relevance = calculateRelevance(job, {
+      const relevance = calculateDeterministicRelevance(job, {
         ...validated,
         exactPhrase,
         companyName: validated.companyName,
-        requiredSkills: validated.requiredSkills,
-        preferredSkills: validated.preferredSkills,
+        requiredSkills: validated.requiredSkills || interpretedPlan.requiredSkills,
+        preferredSkills: validated.preferredSkills || interpretedPlan.preferredSkills,
+        workArrangements: effectiveWorkArrangements,
+        cities: effectiveCities,
+        states: effectiveStates,
+        countries: effectiveCountries,
       });
       return { job, relevance };
     });
@@ -583,6 +798,7 @@ export class LiveJobSearchEngine {
         country: job.country || null,
         state: job.state || null,
         city: job.city || null,
+        allCities: job.allCities || (job.city ? [job.city] : []),
         workArrangement: job.workArrangement,
         postedAt: job.postedAt || null,
         closingDate: job.closingDate || null,
@@ -608,42 +824,131 @@ export class LiveJobSearchEngine {
       uiResults = uiResults.filter((j) => !j.isSaved);
     }
 
-    // 11. Accurate Pagination Calculation (Fixes the "Page 1 of 428717" bug)
-    // External providers were already queried for page `page`.
-    // We take the bounded slice for this page:
-    const pagedResults = uiResults.slice(0, pageSize);
-    const hasMore = uiResults.length > pageSize || anyProviderHasMore;
+    checkpoints.push({
+      checkpoint: "AGGREGATION_RANKING_COMPLETED",
+      timestampMs: Date.now(),
+      details: {
+        deduplicatedCount: deduplicatedJobs.length,
+        verifiedMatchingCount: uiResults.length,
+      },
+    });
 
-    // Report estimated upstream totals accurately without fabricating exact local counts
-    const estimatedTotal = combinedTotal > 0 ? combinedTotal : undefined;
+    // 11. Accurate Pagination Calculation & Semantic Enrichment
+    const pagedResults = uiResults.slice(0, pageSize);
+    let enrichedResults = pagedResults;
+    if (interpretedPlan.isAiInterpreted) {
+      enrichedResults = await enrichJobsWithDeepSeek(
+        pagedResults,
+        interpretedPlan.intentSummary
+      );
+    }
+
+    const isCitySearch = Boolean(effectiveCities && effectiveCities.length > 0);
+    const isCountrySearch = Boolean(effectiveCountries && effectiveCountries.length > 0 && !isCitySearch);
+
+    let authoritativeTotal: number | undefined = undefined;
+    let totalScope: "CITY" | "STATE" | "COUNTRY" | "GLOBAL" = isCitySearch
+      ? "CITY"
+      : isCountrySearch
+      ? "COUNTRY"
+      : "GLOBAL";
+
+    if (isCitySearch) {
+      // For city queries, only take totals from providers that verified and applied the city filter
+      const cityStatus = providerStatuses.find(
+        (ps) => ps.status === "SUCCESS" && typeof ps.totalReported === "number" && ps.totalScope === "CITY"
+      );
+      if (cityStatus) {
+        authoritativeTotal = cityStatus.totalReported;
+        totalScope = "CITY";
+      }
+    } else if (isCountrySearch) {
+      // For country queries, only take totals from providers that applied the country filter
+      const countryStatus = providerStatuses.find(
+        (ps) => ps.status === "SUCCESS" && typeof ps.totalReported === "number" && (ps.totalScope === "COUNTRY" || ps.totalScope === "STATE")
+      );
+      if (countryStatus) {
+        authoritativeTotal = countryStatus.totalReported;
+        totalScope = countryStatus.totalScope || "COUNTRY";
+      }
+    } else {
+      // Global query: take the reported total across providers (global scope)
+      const globalStatus = providerStatuses.find(
+        (ps) => ps.status === "SUCCESS" && typeof ps.totalReported === "number" && (ps.totalScope === "GLOBAL" || !ps.totalScope)
+      );
+      if (globalStatus) {
+        authoritativeTotal = globalStatus.totalReported;
+        totalScope = "GLOBAL";
+      }
+    }
+
+    const estimatedTotal = authoritativeTotal;
     const isExactTotal = false;
+
+    // hasMore logic: more matching in memory OR providers report more upstream within bounds
+    const hasMoreInMemory = uiResults.length > pageSize;
+    const hasMoreUpstream = anyProviderHasMore && (authoritativeTotal ? (page * pageSize < authoritativeTotal) : true);
+    const hasMore = hasMoreInMemory || hasMoreUpstream;
 
     // Calculate realistic page count (bound max page count to prevent unpageable 400k pages)
     let totalPages = 1;
     if (estimatedTotal && estimatedTotal > 0) {
-      totalPages = Math.min(Math.ceil(estimatedTotal / pageSize), 100);
+      totalPages = Math.max(Math.ceil(estimatedTotal / pageSize), hasMore ? page + 1 : page);
+      totalPages = Math.min(totalPages, 50);
     } else {
       totalPages = hasMore ? page + 1 : page;
     }
 
-    return {
-      jobs: pagedResults,
-      total: pagedResults.length,
+    const response: PaginatedJobSearchResponse = {
+      jobs: enrichedResults,
+      total: enrichedResults.length,
       page,
       pageSize,
       totalPages,
       hasMore,
       estimatedTotal,
+      providerReportedTotal: authoritativeTotal,
+      totalScope,
+      returnedBatchCount: deduplicatedJobs.length,
+      verifiedMatchingCount: uiResults.length,
       isExactTotal,
       isLive: true,
+      searchDurationMs: Date.now() - searchStartMs,
       providerStatuses,
       rawProviderCounts,
       uniqueCount: deduplicatedJobs.length,
+      interpretedPlan: {
+        intentSummary: interpretedPlan.intentSummary,
+        role: interpretedPlan.role,
+        city: interpretedPlan.city,
+        state: interpretedPlan.state,
+        country: interpretedPlan.country,
+        workArrangement: interpretedPlan.workArrangement,
+        salaryMin: interpretedPlan.salaryMin,
+        salaryCurrency: interpretedPlan.salaryCurrency,
+        isAiInterpreted: interpretedPlan.isAiInterpreted,
+      },
       appliedFiltersSummary: {
         providerSide: providerSideFilters,
         inMemory: inMemoryFilters,
       },
+      trace: {
+        correlationId,
+        clientSubmittedAtMs,
+        apiEntryMs,
+        serverDurationMs: Date.now() - apiEntryMs,
+        checkpoints,
+      },
     };
+
+    logger.info("[LiveSearch] Completed live job search", {
+      durationMs: Date.now() - searchStartMs,
+      jobsFound: uiResults.length,
+      page,
+      hasMore,
+    });
+
+    return response;
   }
 
   /**

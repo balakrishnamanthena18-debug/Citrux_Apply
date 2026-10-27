@@ -20,7 +20,9 @@ import {
   SaveJobSchema,
   PromoteToCatalogSchema,
   ProviderConfigUpdateSchema,
+  JobAutocompleteQuerySchema,
 } from "./contracts";
+import { jobDiscoveryAutocompleteEngine, type AutocompleteSuggestion } from "./autocomplete";
 import type {
   JobSearchFilters,
   PaginatedJobSearchResponse,
@@ -33,12 +35,27 @@ import { AuditAction } from "@/generated/prisma";
 export async function searchDiscoveredJobsAction(
   rawFilters: JobSearchFilters
 ): Promise<{ success: boolean; data?: PaginatedJobSearchResponse; error?: string }> {
+  const apiEntryMs = Date.now();
   try {
     const ctx = await getAuthenticatedContext();
     const validated = JobSearchQuerySchema.parse(rawFilters);
 
     // Execute live multi-provider search in request memory (Zero-Bulk-Storage)
-    const result = await liveJobSearchEngine.searchLiveJobs(validated, ctx.userId);
+    const result = await liveJobSearchEngine.searchLiveJobs(validated, ctx.userId, {
+      apiEntryMs,
+      correlationId: validated.correlationId,
+      clientSubmittedAtMs: validated.clientSubmittedAtMs,
+    });
+
+    const apiCompletedAtMs = Date.now();
+    if (result.trace) {
+      result.trace.apiCompletedAtMs = apiCompletedAtMs;
+      result.trace.serverDurationMs = apiCompletedAtMs - apiEntryMs;
+      result.trace.checkpoints.push({
+        checkpoint: "API_RESPONSE_COMPLETED",
+        timestampMs: apiCompletedAtMs,
+      });
+    }
 
     return {
       success: true,
@@ -480,5 +497,28 @@ export async function updateProviderConfigAction(params: {
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || "Failed to update provider" };
+  }
+}
+
+/** Location-Aware Autocomplete Suggestions */
+export async function getJobAutocompleteSuggestionsAction(params: {
+  query?: string;
+  type?: "all" | "main" | "state" | "city" | "title" | "skill" | "employer" | "location";
+  country?: string;
+  state?: string;
+  limit?: number;
+}): Promise<{ success: boolean; data?: AutocompleteSuggestion[]; error?: string; unauthorized?: boolean }> {
+  try {
+    const ctx = await getAuthenticatedContext();
+    requireEmployeeOrAdmin(ctx);
+
+    const validated = JobAutocompleteQuerySchema.parse(params);
+    const suggestions = await jobDiscoveryAutocompleteEngine.searchAutocomplete(validated);
+    return { success: true, data: suggestions };
+  } catch (err: any) {
+    if (err?.name === "AuthenticationError" || err?.name === "AuthorizationError") {
+      return { success: false, error: "Unauthorized access", unauthorized: true };
+    }
+    return { success: false, error: err?.message || "Autocomplete lookup failed" };
   }
 }

@@ -21,6 +21,7 @@ import {
   normalizeEmploymentType,
   parseLocation,
   extractSkills,
+  matchCityWithAliases,
 } from "../normalizer";
 import { computeContentFingerprint } from "../deduplication";
 import { assessJobQuality } from "../quality";
@@ -105,56 +106,132 @@ export class FreeHireAdapter extends BaseJobProvider {
 
   async fetchJobs(params: ProviderSearchParams): Promise<ProviderFetchResult> {
     const page = params.page || 1;
-    const pageSize = params.pageSize || 20;
+    const requestedSize = params.pageSize || 20;
+    // Bounded fetch window: fetch a buffer (minimum 25, maximum 50) so deduplication and filtering retain full requestedSize
+    const limit = Math.min(Math.max(requestedSize, 25), 50);
+    const offset = (page - 1) * requestedSize;
+
     const apiKey = this.getApiKey();
     const headers: Record<string, string> = {};
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
+    // Clean and normalize target city
+    const cleanCity = params.city
+      ? params.city.split(",")[0]?.trim()
+      : undefined;
+
+    // Determine target country
+    let countryParam: string | undefined =
+      params.country && params.country !== "ALL" && params.country !== "REMOTE"
+        ? params.country.toLowerCase()
+        : undefined;
+
+    // Detect country if needed when no city or country is set
+    if (!countryParam && !cleanCity && params.keywords) {
+      const kwLower = params.keywords.toLowerCase();
+      if (
+        kwLower.includes("bengaluru") ||
+        kwLower.includes("bangalore") ||
+        kwLower.includes("hyderabad") ||
+        kwLower.includes("karnataka") ||
+        kwLower.includes("telangana") ||
+        kwLower.includes("mumbai") ||
+        kwLower.includes("delhi") ||
+        kwLower.includes("pune") ||
+        kwLower.includes("chennai")
+      ) {
+        countryParam = "in";
+      } else if (
+        kwLower.includes("california") ||
+        kwLower.includes("san francisco") ||
+        kwLower.includes("new york") ||
+        kwLower.includes("seattle") ||
+        kwLower.includes("austin")
+      ) {
+        countryParam = "us";
+      }
+    }
+
+    // Role / keyword query (clean of city if city is already structured)
+    let cleanKeywords = params.keywords?.trim() || "";
+    if (cleanCity && cleanKeywords.toLowerCase() === cleanCity.toLowerCase()) {
+      cleanKeywords = "";
+    }
+
     // Try live API first
     try {
       const url = new URL(this.defaultBaseUrl);
-      const hasSearchFilters = Boolean(
-        params.keywords || (params.country && params.country !== "ALL") || params.workArrangement
-      );
+      url.pathname = `${url.pathname}/jobs/search`.replace(/\/+/g, "/");
 
-      if (hasSearchFilters) {
-        url.pathname = `${url.pathname}/jobs/search`.replace(/\/+/g, "/");
-        if (params.keywords) {
-          url.searchParams.set("q", params.keywords);
-        }
-        if (params.country && params.country !== "ALL" && params.country !== "REMOTE") {
-          url.searchParams.set("countries", params.country.toLowerCase());
-        }
-        if (
-          params.workArrangement &&
-          ["REMOTE", "HYBRID", "ONSITE"].includes(params.workArrangement)
-        ) {
-          url.searchParams.set("work_mode", params.workArrangement.toLowerCase());
-        }
-        url.searchParams.set("limit", String(pageSize));
-        url.searchParams.set("offset", String((page - 1) * pageSize));
-        url.searchParams.set("sort", "posted_at");
-        url.searchParams.set("order", "desc");
-      } else {
-        url.pathname = `${url.pathname}/jobs`.replace(/\/+/g, "/");
-        url.searchParams.set("page", String(page));
-        url.searchParams.set("page_size", String(pageSize));
+      const appliedFilters: Record<string, string | number | boolean> = {};
+
+      if (cleanKeywords) {
+        url.searchParams.set("q", cleanKeywords);
+        appliedFilters["q"] = cleanKeywords;
       }
 
-      const res = await this.safeFetch(url.toString(), { headers }, 1);
+      // FreeHire Geography rule: regions, countries, cities join as an OR-group.
+      // "To search one place, name only that place."
+      // If city is specified, use structured cities facet and DO NOT combine with countries (which widens to entire country).
+      if (cleanCity) {
+        url.searchParams.set("cities", cleanCity);
+        appliedFilters["cities"] = cleanCity;
+      } else if (countryParam) {
+        url.searchParams.set("countries", countryParam);
+        appliedFilters["countries"] = countryParam;
+      }
+
+      if (
+        params.workArrangement &&
+        ["REMOTE", "HYBRID", "ONSITE"].includes(params.workArrangement)
+      ) {
+        const mode = params.workArrangement.toLowerCase();
+        url.searchParams.set("work_mode", mode);
+        appliedFilters["work_mode"] = mode;
+      }
+
+      url.searchParams.set("limit", String(limit));
+      url.searchParams.set("offset", String(offset));
+      url.searchParams.set("sort", "posted_at");
+      url.searchParams.set("order", "desc");
+
+      const res = await this.safeFetch(url.toString(), { headers, signal: params.signal }, 1);
       if (res.ok) {
         const json = await res.json();
         const rawList = Array.isArray(json.data) ? json.data : [];
         const normalized = rawList.map((item: any) => this.normalizeRecord(item));
 
+        // json.meta.total is the authoritative matching count calculated by FreeHire
+        const totalAvailable = typeof json.meta?.total === "number" ? json.meta.total : undefined;
+
+        // Inspect meta.ignored_params per FreeHire API documentation
+        const ignoredParams: Array<{ param: string; did_you_mean?: string }> =
+          Array.isArray(json.meta?.ignored_params) ? json.meta.ignored_params : [];
+
+        // Verify which requested filters were actually applied vs ignored
+        if (ignoredParams.length > 0) {
+          for (const ign of ignoredParams) {
+            delete appliedFilters[ign.param];
+          }
+        }
+
+        const totalScope: "CITY" | "STATE" | "COUNTRY" | "GLOBAL" = cleanCity && !ignoredParams.some(p => p.param === "cities")
+          ? "CITY"
+          : countryParam && !ignoredParams.some(p => p.param === "countries")
+          ? "COUNTRY"
+          : "GLOBAL";
+
         return {
           jobs: normalized,
-          totalAvailable: json.meta?.total !== undefined ? json.meta.total : rawList.length,
-          hasMore: rawList.length >= pageSize,
+          totalAvailable,
+          hasMore: rawList.length >= limit,
           providerId: this.id,
           rawCount: rawList.length,
+          ignoredParams: ignoredParams.length > 0 ? ignoredParams : undefined,
+          appliedFilters,
+          totalScope,
         };
       }
     } catch {
@@ -197,13 +274,26 @@ export class FreeHireAdapter extends BaseJobProvider {
 
     // Filter in-memory
     let filtered = rawList;
-    if (params.keywords) {
-      const q = params.keywords.toLowerCase();
+    const searchTerms: string[] = [];
+    if (params.keywords) searchTerms.push(params.keywords.trim());
+    if (params.city && !params.keywords?.toLowerCase().includes(params.city.toLowerCase())) {
+      searchTerms.push(params.city.trim());
+    }
+    const effectiveQuery = searchTerms.join(" ").trim().toLowerCase();
+
+    if (effectiveQuery) {
       filtered = filtered.filter((r) => {
         const title = (r.title || "").toLowerCase();
         const company = (r.company || "").toLowerCase();
         const desc = (r.description || "").toLowerCase();
-        return title.includes(q) || company.includes(q) || desc.includes(q);
+        const loc = (r.location || "").toLowerCase();
+        return (
+          title.includes(effectiveQuery) ||
+          company.includes(effectiveQuery) ||
+          desc.includes(effectiveQuery) ||
+          loc.includes(effectiveQuery) ||
+          matchCityWithAliases(loc, effectiveQuery)
+        );
       });
     }
 
@@ -294,9 +384,10 @@ export class FreeHireAdapter extends BaseJobProvider {
       salaryMax: null,
       salaryCurrency: "USD",
       salaryPeriod: "YEARLY",
-      country: parsedLoc.country || (Array.isArray(raw.countries) ? raw.countries[0]?.toUpperCase() : null),
+      country: (Array.isArray(raw.countries) && raw.countries[0] ? raw.countries[0].toUpperCase() : null) || parsedLoc.country || null,
       state: parsedLoc.state || null,
       city: parsedLoc.city || null,
+      allCities: parsedLoc.allCities || (parsedLoc.city ? [parsedLoc.city] : []),
       workArrangement,
       postedAt: raw.posted_at ? new Date(raw.posted_at) : null,
       closingDate: raw.closed_at ? new Date(raw.closed_at) : null,

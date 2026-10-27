@@ -72,7 +72,7 @@ export class ArbeitnowAdapter extends BaseJobProvider {
     url.searchParams.set("page", String(page));
 
     try {
-      const res = await this.safeFetch(url.toString(), {}, 1);
+      const res = await this.safeFetch(url.toString(), { signal: params.signal }, 1);
       if (!res.ok) {
         return {
           jobs: [],
@@ -101,7 +101,8 @@ export class ArbeitnowAdapter extends BaseJobProvider {
 
       return {
         jobs: normalized,
-        totalAvailable: json.meta?.total || rawList.length,
+        // Arbeitnow json.meta.total is the entire job board catalog size, not query-filtered results
+        totalAvailable: undefined,
         hasMore: !!json.links?.next,
         providerId: this.id,
         rawCount: rawList.length,

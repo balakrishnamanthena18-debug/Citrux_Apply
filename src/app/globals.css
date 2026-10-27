@@ -78,3 +78,31 @@ html {
   outline: 2px solid #12A150;
   outline-offset: 2px;
 }
+
+/* Indeterminate progress bar for live discovery operations */
+@keyframes indeterminateProgress {
+  0% {
+    left: -35%;
+    width: 35%;
+  }
+  50% {
+    left: 40%;
+    width: 50%;
+  }
+  100% {
+    left: 100%;
+    width: 35%;
+  }
+}
+
+.animate-indeterminate-progress {
+  animation: indeterminateProgress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-indeterminate-progress {
+    animation: none;
+    left: 0 !important;
+    width: 100% !important;
+  }
+}

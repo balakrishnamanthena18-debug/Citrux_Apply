@@ -66,6 +66,8 @@ export const JobSearchQuerySchema = z.object({
   sortBy: z.enum(["relevance", "newest", "salary_desc", "quality"]).default("newest"),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
+  correlationId: z.string().max(100).optional(),
+  clientSubmittedAtMs: z.number().optional(),
 });
 
 export type ValidatedJobSearchQuery = z.infer<typeof JobSearchQuerySchema>;
@@ -102,3 +104,16 @@ export const ProviderConfigUpdateSchema = z.object({
   rateLimitPerMinute: z.number().int().min(1).max(1000).optional(),
   rateLimitDaily: z.number().int().min(10).max(100000).optional(),
 });
+
+/** Location-Aware Autocomplete Query Schema */
+export const JobAutocompleteQuerySchema = z.object({
+  query: z.string().max(100).default(""),
+  type: z
+    .enum(["all", "main", "state", "city", "title", "skill", "employer", "location"])
+    .default("all"),
+  country: z.string().max(20).optional(),
+  state: z.string().max(100).optional(),
+  limit: z.number().int().min(1).max(25).default(8),
+});
+
+export type ValidatedJobAutocompleteQuery = z.infer<typeof JobAutocompleteQuerySchema>;

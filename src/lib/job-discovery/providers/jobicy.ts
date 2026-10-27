@@ -77,7 +77,7 @@ export class JobicyAdapter extends BaseJobProvider {
     }
 
     try {
-      const res = await this.safeFetch(url.toString(), {}, 1);
+      const res = await this.safeFetch(url.toString(), { signal: params.signal }, 1);
       if (!res.ok) {
         return {
           jobs: [],
@@ -106,7 +106,8 @@ export class JobicyAdapter extends BaseJobProvider {
 
       return {
         jobs: normalized,
-        totalAvailable: json.jobCount || rawList.length,
+        // Jobicy does not return server-side query search match totals
+        totalAvailable: undefined,
         hasMore: false, // Jobicy provides snapshot feeds
         providerId: this.id,
         rawCount: rawList.length,
