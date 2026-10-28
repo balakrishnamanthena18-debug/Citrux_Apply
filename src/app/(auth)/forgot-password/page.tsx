@@ -149,8 +149,7 @@ export default function ForgotPasswordPage() {
                 className="font-semibold text-[#082F26] hover:underline"
               >
                 support@careerbutton.in
-              </a>{" "}
-              <span className="text-amber-700">(under activation)</span>
+              </a>
             </div>
           </div>
         </form>

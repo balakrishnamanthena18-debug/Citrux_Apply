@@ -280,8 +280,7 @@ function RegisterContent() {
               Email:{" "}
               <a href="mailto:support@careerbutton.in" className="font-semibold text-[#082F26] hover:underline">
                 support@careerbutton.in
-              </a>{" "}
-              <span className="text-amber-700">(under activation)</span>
+              </a>
             </div>
           </div>
         </div>
@@ -454,8 +453,7 @@ function RegisterContent() {
               className="font-semibold text-[#082F26] hover:underline"
             >
               support@careerbutton.in
-            </a>{" "}
-            <span className="text-amber-700">(under activation)</span>
+            </a>
           </div>
         </div>
       </div>

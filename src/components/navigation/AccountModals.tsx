@@ -205,7 +205,6 @@ export function AccountModals({
                       >
                         support@careerbutton.in
                       </a>
-                      <span className="text-[10px] text-amber-700 font-sans">(under activation)</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-[#64748B]">
@@ -214,7 +213,6 @@ export function AccountModals({
                       <span className="font-mono text-xs font-medium text-[#64748B]" data-testid="modal-dispatcher-email">
                         notifications@careerbutton.in
                       </span>
-                      <span className="text-[10px] text-amber-700 font-sans">(under activation)</span>
                     </div>
                   </div>
                 </>
