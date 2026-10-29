@@ -22,6 +22,7 @@ import {
   parseLocation,
   extractSkills,
   matchCityWithAliases,
+  extractExperience,
 } from "../normalizer";
 import { computeContentFingerprint } from "../deduplication";
 import { assessJobQuality } from "../quality";
@@ -42,6 +43,14 @@ export class FreeHireAdapter extends BaseJobProvider {
   readonly rateLimitDaily = 5000;
   readonly attributionNotice = "Aggregated from official employer ATS boards via FreeHire.me";
   readonly permittedTermsUrl = "https://freehire.me/docs/api";
+  readonly supportedFilters = [
+    "keywords",
+    "country",
+    "city",
+    "workArrangement",
+    "page",
+    "pageSize",
+  ] as const;
 
   private getApiKey(): string | undefined {
     return process.env.FREEHIRE_API_KEY || undefined;
@@ -109,7 +118,7 @@ export class FreeHireAdapter extends BaseJobProvider {
     const requestedSize = params.pageSize || 20;
     // Bounded fetch window: fetch a buffer (minimum 25, maximum 50) so deduplication and filtering retain full requestedSize
     const limit = Math.min(Math.max(requestedSize, 25), 50);
-    const offset = (page - 1) * requestedSize;
+    const offset = (page - 1) * limit;
 
     const apiKey = this.getApiKey();
     const headers: Record<string, string> = {};
@@ -365,6 +374,10 @@ export class FreeHireAdapter extends BaseJobProvider {
       location: parsedLoc.city || parsedLoc.country,
     });
 
+    const extractedExp = extractExperience(`${title} ${description}`);
+    const experienceMin = raw.enrichment?.experience_years_min ?? extractedExp.experienceMin;
+    const experienceMax = raw.enrichment?.experience_years_max ?? extractedExp.experienceMax;
+
     return {
       providerId: this.id,
       externalId: String(raw.external_id || raw.public_slug || ats.requisitionId || contentFingerprint),
@@ -378,8 +391,8 @@ export class FreeHireAdapter extends BaseJobProvider {
       industry,
       employmentType,
       seniorityLevel: seniority,
-      experienceMin: raw.enrichment?.experience_years_min ?? null,
-      experienceMax: null,
+      experienceMin,
+      experienceMax,
       salaryMin: null,
       salaryMax: null,
       salaryCurrency: "USD",

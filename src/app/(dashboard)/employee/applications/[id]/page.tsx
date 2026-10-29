@@ -3,7 +3,6 @@ import { withRlsContext } from "@/lib/db/rls";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  assignApplicationAction,
   updateApplicationMaterialAction,
   transitionApplicationStatusAction,
 } from "@/lib/application/actions";
@@ -21,7 +20,11 @@ import { InternalNotesWidget } from "@/components/InternalNotesWidget";
 import type { ApplicationStatus } from "@/generated/prisma";
 import { formatSalary, getCandidateStatusPresentation } from "@/lib/utils/status-presenter";
 import { RecordHeader } from "@/components/ui/RecordHeader";
-import { ApplicationLifecycleBar } from "@/components/application/ApplicationLifecycleBar";
+import { ApplicationWorkspaceHeader } from "@/components/application/ApplicationWorkspaceHeader";
+import { ApplicationNextActionHero } from "@/components/application/ApplicationNextActionHero";
+import { ApplicationOwnershipCard } from "@/components/application/ApplicationOwnershipCard";
+import { resolveDualTrackWorkflowStatus } from "@/lib/application/workflow-status";
+import { evaluateApplicationPrerequisites } from "@/lib/application/prerequisites";
 import { TelemetryGauge } from "@/components/ui/TelemetryGauge";
 import { loadStaffApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
@@ -87,6 +90,11 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
           include: { submittedBy: true },
         },
         stateHistory: { orderBy: { createdAt: "desc" }, include: { changedBy: true } },
+        qaReviews: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: { checklistItems: true },
+        },
       },
     });
     if (!app) {
@@ -262,6 +270,36 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     [application.candidate.user.firstName, application.candidate.user.lastName].filter(Boolean).join(" ") ||
     application.candidate.user.email;
 
+  const latestQaReview = application.qaReviews?.[0] ?? null;
+  const hasPassedQa =
+    latestQaReview?.decision === "PASS" &&
+    latestQaReview.checklistItems.length === 9 &&
+    latestQaReview.checklistItems.every((item) => item.isVerified);
+
+  const workflow = resolveDualTrackWorkflowStatus({
+    status: application.status,
+    approvalStatus: application.approvalStatus,
+    submissionCount: application.submissions.length,
+    hasMaterials: Boolean(currentMaterial?.candidateDocumentId),
+    authorizationMode: application.candidate.applicationAuthorizationMode,
+    isAssigned: Boolean(application.assignedEmployeeId),
+  });
+
+  const prerequisites = evaluateApplicationPrerequisites({
+    status: application.status,
+    approvalStatus: application.approvalStatus,
+    candidateStatus: application.candidate.status,
+    candidateAuthMode: application.candidate.applicationAuthorizationMode,
+    hasResumeDocument: Boolean(currentMaterial?.candidateDocumentId),
+    resumeDocumentTitle: currentMaterial?.candidateDocument
+      ? `${currentMaterial.candidateDocument.title} (v${currentMaterial.candidateDocument.versionNumber})`
+      : null,
+    hasCoverLetter: Boolean(currentMaterial?.coverLetterText),
+    hasPassedQaReview: hasPassedQa,
+    isJobActive: application.job.status === "OPEN",
+    externalJobUrl: application.job.externalUrl,
+  });
+
   const salaryText = formatSalary(
     application.job.salaryMin,
     application.job.salaryMax,
@@ -314,208 +352,66 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     application.status === "READY" || application.status === "RESUBMISSION"
       ? "submission"
       : application.status === "PREPARING" || application.status === "REVIEW"
-        ? "materials"
+        ? "prep_review"
         : (interviewData?.rounds?.length || 0) > 0
-          ? "interviews"
+          ? "activity"
           : "overview";
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
-      {/* 1. CRM-Grade Record Header */}
-      <RecordHeader
-        breadcrumbs={[
-          { label: "Applications Console", href: "/employee/applications" },
-          { label: candidateName, href: `/employee/candidates/${application.candidateId}` },
-          { label: application.job.title },
-        ]}
-        title={application.job.title}
-        subtitle={
-          <>
-            <span>at <strong className="text-slate-800 font-semibold">{application.job.companyName}</strong></span>
-            <span>•</span>
-            <span>Created {new Date(application.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
-          </>
-        }
-        statusBadge={
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getStatusBadge(application.status)}`}>
-            {application.status.replace(/_/g, " ")}
-          </span>
-        }
-        actions={
-          application.job.externalUrl ? (
-            <a
-              href={application.job.externalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition inline-flex items-center gap-1 shadow-2xs"
-            >
-              <span>External Job Posting</span>
-              <span>↗</span>
-            </a>
-          ) : undefined
-        }
-        metaItems={[
-          {
-            label: "Candidate",
-            primary: true,
-            value: (
-              <Link href={`/employee/candidates/${application.candidateId}`} className="hover:underline font-bold text-slate-900">
-                {candidateName}
-              </Link>
-            ),
-          },
-          {
-            label: "Assignee",
-            value: ownerInactive && formerOwnerName
-              ? `Inactive · Former: ${formerOwnerName}`
-              : assigneeName,
-          },
-          {
-            label: "Location",
-            value: application.job.isRemote ? "🌐 Remote" : application.job.location || "On-site",
-          },
-          {
-            label: "Compensation",
-            value: <span className={salaryText === "Salary not disclosed" ? "text-slate-500 font-normal" : "text-emerald-700 font-semibold"}>{salaryText}</span>,
-          },
-          {
-            label: "Auth Mode",
-            value: (
-              <span className={`font-semibold ${application.candidate.applicationAuthorizationMode === "MANAGED" ? "text-indigo-700" : "text-slate-700"}`}>
-                {application.candidate.applicationAuthorizationMode}
-              </span>
-            ),
-          },
-          {
-            label: "Employment",
-            value: application.job.employmentType.replace(/_/g, " "),
-          },
-        ]}
+      {/* 1. Concise Enterprise Application Header */}
+      <ApplicationWorkspaceHeader
+        applicationId={application.id}
+        candidateId={application.candidateId}
+        candidateName={candidateName}
+        jobTitle={application.job.title}
+        companyName={application.job.companyName}
+        createdAt={new Date(application.createdAt).toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
+        ownerDisplayName={assigneeName}
+        ownerInactive={ownerInactive}
+        continuityOutsideScope={continuityOutsideScope}
+        isRemote={application.job.isRemote}
+        location={application.job.location}
+        salaryText={salaryText}
+        employmentType={application.job.employmentType}
+        externalJobUrl={application.job.externalUrl}
+        status={application.status}
+        workflow={workflow}
+        prerequisites={prerequisites}
       />
 
-      {/* 2. Linear Operational Lifecycle Progression Bar */}
-      <ApplicationLifecycleBar currentStatus={application.status} />
-
-      {/* Authorization Policy & Candidate Projection Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Authorization Policy Banner */}
-        <div className={`p-3.5 rounded-xl border text-xs flex items-center justify-between gap-3 ${
-          application.candidate.applicationAuthorizationMode === "MANAGED"
-            ? "bg-indigo-50/60 border-indigo-200 text-indigo-950"
-            : "bg-slate-50 border-slate-200 text-slate-800"
-        }`}>
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[10px] shrink-0 ${
-              application.candidate.applicationAuthorizationMode === "MANAGED"
-                ? "bg-indigo-600 text-white"
-                : "bg-slate-700 text-white"
-            }`}>
-              {application.candidate.applicationAuthorizationMode === "MANAGED" ? "Managed Submission" : "Review Required"}
-            </span>
-            <span className="text-[11px] font-medium leading-tight">
-              {application.candidate.applicationAuthorizationMode === "MANAGED"
-                ? "Candidate authorized managed submissions within approved preferences."
-                : "Candidate mandates per-application review before external submission."}
-            </span>
-          </div>
-        </div>
-
-        {/* Candidate Live Perspective Projection */}
-        <div className="bg-slate-900 text-white p-3.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-              Candidate View
-            </span>
-            <span className="text-slate-300 text-[11px]">
-              Candidate sees status: <strong className="text-white">{getCandidateStatusPresentation(application.status).label}</strong>
-              {application.status === "AWAITING_APPROVAL" && (
-                <span className="text-amber-400 font-bold ml-1.5">(Sign-off Pending)</span>
-              )}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Waiting responsibility + Next Action (Phase 5T — informational, not stuck/SLA) */}
-      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
-        <div>
-          <div className="font-bold text-slate-900 uppercase text-[10px] tracking-wide mb-0.5">
-            Waiting For
-          </div>
-          <div className="font-medium text-slate-800" aria-label={`Waiting for ${waitingAttribution.waitingForLabel}`}>
-            {waitingAttribution.waitingForLabel}
-          </div>
-        </div>
-        <div>
-          <div className="font-bold text-slate-900 uppercase text-[10px] tracking-wide mb-0.5">
-            Waiting Since
-          </div>
-          <div className="font-medium text-slate-800">
-            {waitingAttribution.waitingAgeKind === "AGE" && waitingAttribution.waitingSince
-              ? `${new Date(waitingAttribution.waitingSince).toLocaleDateString([], {
-                  month: "short",
-                  day: "numeric",
-                })} · ${waitingAttribution.waitingAgeLabel}`
-              : "AGE_UNAVAILABLE"}
-          </div>
-        </div>
-        <div>
-          <div className="font-bold text-slate-900 uppercase text-[10px] tracking-wide mb-0.5">
-            Next Action
-          </div>
-          <div className="font-medium text-slate-800">
-            {deriveNextActionGuidance(application.status)}
-          </div>
-        </div>
-      </div>
-
-      {/* Prominent READY Operational Banner */}
-      {application.status === "READY" && (
-        <div className="bg-sky-50/90 border-2 border-sky-400 rounded-xl p-5 shadow-2xs space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-sky-600" />
-                <h3 className="text-sm font-bold text-sky-950 uppercase tracking-wide">
-                  READY TO APPLY — MANUAL EXTERNAL SUBMISSION
-                </h3>
-              </div>
-              <p className="text-xs text-sky-900 mt-1 leading-relaxed">
-                Open the external job posting and complete the application on behalf of the candidate. This action opens the external website. OOS does not submit the application itself. After completing the external submission, record the submission details below.
-              </p>
-            </div>
-            {application.job.externalUrl && (
-              <a
-                href={application.job.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm inline-flex items-center gap-2 transition"
-              >
-                <span>OPEN EXTERNAL JOB</span>
-                <span>↗</span>
-              </a>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-sky-200/80 text-[11px]">
-            <div className="flex items-center gap-1.5 text-sky-950 font-medium">
-              <span className="text-emerald-600 font-bold">✓</span> Candidate Auth Active
-            </div>
-            <div className="flex items-center gap-1.5 text-sky-950 font-medium">
-              <span className="text-emerald-600 font-bold">✓</span> Materials Prepared
-            </div>
-            <div className="flex items-center gap-1.5 text-sky-950 font-medium">
-              <span className="text-emerald-600 font-bold">✓</span> QA Verification Passed
-            </div>
-            <div className="flex items-center gap-1.5 text-sky-950 font-medium">
-              <span className="text-emerald-600 font-bold">✓</span> Service Consent Verified
-            </div>
-            <div className="flex items-center gap-1.5 text-sky-950 font-medium">
-              <span className="text-emerald-600 font-bold">✓</span> Listing Active
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 2. Dominant Next-Action Hero & 4-Stage Lifecycle Progress */}
+      <ApplicationNextActionHero
+        applicationId={application.id}
+        status={application.status}
+        workflow={workflow}
+        prerequisites={prerequisites}
+        /* Telemetry: Waiting For */
+        waitingForLabel={waitingAttribution.waitingForLabel}
+        waitingAgeLabel={
+          waitingAttribution.waitingAgeKind === "AGE"
+            ? waitingAttribution.waitingAgeLabel
+            : "AGE_UNAVAILABLE"
+        }
+        /* Telemetry: Waiting Since */
+        waitingSinceFormatted={
+          waitingAttribution.waitingAgeKind === "AGE" && waitingAttribution.waitingSince
+            ? new Date(waitingAttribution.waitingSince).toLocaleDateString([], {
+                month: "short",
+                day: "numeric",
+              })
+            : null
+        }
+        ownerDisplayName={assigneeName}
+        ownerInactive={ownerInactive}
+        candidateName={candidateName}
+        candidateAuthMode={application.candidate.applicationAuthorizationMode}
+        externalJobUrl={application.job.externalUrl}
+      />
 
       {/* Tabbed Operational Workbench Layout */}
       <ApplicationWorkbenchTabs
@@ -687,114 +583,16 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
             {/* Sidebar Column: Assignment & Notes (5 cols) */}
             <div className="lg:col-span-5 space-y-6">
               {/* Operational Assignment Control */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
-                <div className="border-b border-slate-100 pb-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Application Ownership
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Authoritative specialist assignment</p>
-                </div>
-
-                <div className="text-xs text-slate-600">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
-                    Current Assignee
-                  </span>
-                  {ownerInactive ? (
-                    <div
-                      aria-label={
-                        formerOwnerName
-                          ? `Owner inactive. Former owner: ${formerOwnerName}`
-                          : "Owner inactive"
-                      }
-                      className="p-3 bg-amber-50 rounded-xl border border-amber-200/80"
-                    >
-                      <span className="font-bold text-amber-900">Inactive</span>
-                      {formerOwnerName && (
-                        <div className="text-[11px] text-slate-600 mt-0.5">
-                          Former owner: {formerOwnerName}
-                        </div>
-                      )}
-                      <p className="text-[11px] text-amber-800 mt-1">
-                        This application needs reassignment to an active eligible employee.
-                      </p>
-                    </div>
-                  ) : assigneeName === "Unassigned" ? (
-                    <span className="font-semibold text-slate-500 italic">Unassigned</span>
-                  ) : (
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70">
-                      <span className="font-bold text-slate-900 text-sm">
-                        {assigneeName}
-                      </span>
-                      {continuityOutsideScope && (
-                        <div
-                          className="mt-1.5"
-                          aria-label="Continuity: outside current structural scope"
-                        >
-                          <div className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">
-                            Continuity Indicator
-                          </div>
-                          <p className="text-[11px] text-amber-900 mt-0.5">
-                            Outside current scope — owner remains active; reassign only if operational ownership should move.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {assigneeOptions.length === 0 && !allowUnassigned ? (
-                  <p className="text-xs text-slate-500 italic">
-                    No eligible team members are available for reassignment under your authority.
-                  </p>
-                ) : (
-                  <form
-                    action={async (formData: FormData) => {
-                      "use server";
-                      const raw = formData.get("employeeId") as string;
-                      await assignApplicationAction({
-                        applicationId: application.id,
-                        employeeId: raw ? raw : null,
-                        reason: (formData.get("reason") as string) || null,
-                      });
-                    }}
-                    className="space-y-3 pt-2 text-xs"
-                  >
-                    <label className="block font-semibold text-slate-800">Reassign Specialist</label>
-                    <select
-                      name="employeeId"
-                      defaultValue={
-                        application.assignedEmployeeId &&
-                        assigneeOptions.some((e) => e.userId === application.assignedEmployeeId)
-                          ? application.assignedEmployeeId
-                          : allowUnassigned
-                            ? ""
-                            : assigneeOptions[0]?.userId || ""
-                      }
-                      className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    >
-                      {allowUnassigned && <option value="">Unassigned</option>}
-                      {assigneeOptions.map((e) => (
-                        <option key={e.userId} value={e.userId}>
-                          {[e.firstName, e.lastName].filter(Boolean).join(" ") || e.email}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      name="reason"
-                      maxLength={500}
-                      placeholder="Reassignment reason (optional)..."
-                      className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    />
-                    <button
-                      type="submit"
-                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 rounded-xl text-xs transition shadow-xs"
-                    >
-                      Save Assignee
-                    </button>
-                  </form>
-                )}
-              </div>
+              <ApplicationOwnershipCard
+                applicationId={application.id}
+                currentAssigneeId={application.assignedEmployeeId}
+                assigneeName={assigneeName}
+                ownerInactive={ownerInactive}
+                formerOwnerName={formerOwnerName}
+                continuityOutsideScope={continuityOutsideScope}
+                assigneeOptions={assigneeOptions}
+                allowUnassigned={allowUnassigned}
+              />
 
               {/* Internal Staff Notes (Candidate Blind) */}
               <InternalNotesWidget
@@ -804,7 +602,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
             </div>
           </div>
         }
-        materialsSlot={
+        prepReviewSlot={
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Column: Preparation & Intelligence (7 cols) */}
             <div className="lg:col-span-7 space-y-6">
@@ -944,7 +742,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
                           notes: notes || null,
                           checklistItems: QA_CRITERION_KEYS.map((k) => ({
                             criterionKey: k,
-                            isVerified: isPass ? true : formData.get(`check_${k}`) === "on",
+                            isVerified: formData.get(`check_${k}`) === "on",
                           })),
                         });
                       }}
@@ -1224,7 +1022,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
             )}
           </div>
         }
-        interviewsSlot={
+        activitySlot={
           <div className="space-y-6">
             <StaffInterviewPanel
               applicationId={application.id}
@@ -1244,10 +1042,7 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
               outcomes={outcomes}
               canRecord={application.submissions.length > 0}
             />
-          </div>
-        }
-        timelineSlot={
-          <div className="space-y-6">
+
             {/* Operational Quality & Audit Telemetry Strip */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">

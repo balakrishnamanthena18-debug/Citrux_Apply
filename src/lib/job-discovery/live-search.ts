@@ -16,7 +16,7 @@ import { calculateRelevance } from "./relevance";
 import { calculateDeterministicRelevance, enrichJobsWithDeepSeek } from "./ai-relevance";
 import { interpretJobSearchQuery, type InterpretedSearchPlan } from "./query-interpreter";
 import { matchCityWithAliases, CITY_ALIASES } from "./normalizer";
-import { JobSearchQuerySchema } from "./contracts";
+import { JobSearchQuerySchema, type ValidatedJobSearchQuery } from "./contracts";
 import type {
   JobSearchFilters,
   PaginatedJobSearchResponse,
@@ -31,6 +31,59 @@ import type {
 import { logger } from "@/lib/logger";
 
 const PROVIDER_TIMEOUT_MS = 5000;
+
+interface CachedSearchResult {
+  data: PaginatedJobSearchResponse;
+  expiresAtMs: number;
+}
+const SEARCH_CACHE_TTL_MS = 30000; // 30-second TTL
+const searchCache = new Map<string, CachedSearchResult>();
+
+export function clearJobSearchCache(): void {
+  searchCache.clear();
+}
+
+/**
+ * Generates a canonical, deterministic cache key incorporating all search-affecting parameters.
+ */
+export function generateJobSearchCacheKey(
+  query: ValidatedJobSearchQuery,
+  scope?: string
+): string {
+  const parts: Record<string, unknown> = {
+    q: query.query?.trim().toLowerCase() || "",
+    exact: query.exactPhrase?.trim().toLowerCase() || "",
+    not: (query.excludedKeywords || []).map((k: string) => k.trim().toLowerCase()).sort(),
+    comp: query.companyName?.trim().toLowerCase() || "",
+    skills: (query.skills || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    reqSkills: (query.requiredSkills || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    prefSkills: (query.preferredSkills || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    ind: (query.industries || []).map((i: string) => i.trim().toLowerCase()).sort(),
+    ctry: (query.countries || []).map((c: string) => c.trim().toUpperCase()).sort(),
+    st: (query.states || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    city: (query.cities || []).map((c: string) => c.trim().toLowerCase()).sort(),
+    arr: (query.workArrangements || []).slice().sort(),
+    sen: (query.seniorityLevels || []).map((s: string) => s.trim().toUpperCase()).sort(),
+    emp: (query.employmentTypes || []).slice().sort(),
+    expMin: query.experienceMin ?? null,
+    expMax: query.experienceMax ?? null,
+    expUnspec: query.experienceIncludeUnspecified ?? true,
+    salMin: query.salaryMin ?? null,
+    salMax: query.salaryMax ?? null,
+    salCurr: query.salaryCurrency || "USD",
+    salPeriod: query.salaryPeriod || "YEARLY",
+    days: query.postedWithinDays ?? null,
+    visa: query.visaSponsored ?? false,
+    ver: (query.verificationStatuses || []).slice().sort(),
+    prov: (query.providerIds || []).map((p: string) => p.trim().toLowerCase()).sort(),
+    page: query.page ?? 1,
+    pageSize: query.pageSize ?? 20,
+    sort: query.sortBy || "newest",
+    scope: scope || "GLOBAL",
+  };
+
+  return `search:${JSON.stringify(parts)}`;
+}
 
 /** Set of recognized location words for distinguishing location tokens from skill/role keywords */
 const KNOWN_LOCATION_WORDS = new Set([
@@ -85,6 +138,29 @@ export class LiveJobSearchEngine {
     const page = validated.page || 1;
     const pageSize = validated.pageSize || 20;
 
+    // Check search cache (keyed on canonical search parameters and optional user scope)
+    const cacheKey = generateJobSearchCacheKey(validated, userId);
+    const cached = searchCache.get(cacheKey);
+    if (cached && cached.expiresAtMs > Date.now() && !validated.savedOnly) {
+      checkpoints.push({
+        checkpoint: "PROVIDER_COMPLETED",
+        timestampMs: Date.now(),
+        providerId: "cache",
+        details: { status: "SUCCESS", fromCache: true },
+      });
+      return {
+        ...cached.data,
+        searchDurationMs: Date.now() - searchStartMs,
+        trace: {
+          correlationId,
+          clientSubmittedAtMs,
+          apiEntryMs,
+          serverDurationMs: Date.now() - apiEntryMs,
+          checkpoints,
+        },
+      };
+    }
+
     // 1. If savedOnly is active, serve exclusively from the user's saved jobs table
     if (validated.savedOnly) {
       return this.fetchSavedJobsOnly(validated, userId);
@@ -95,8 +171,9 @@ export class LiveJobSearchEngine {
     let targetProviders: JobProviderAdapter[] = [];
 
     if (validated.providerIds && validated.providerIds.length > 0) {
+      const requestedIds = validated.providerIds.map((id) => id.replace(/-/g, "_"));
       targetProviders = registered.filter((p) =>
-        validated.providerIds!.includes(p.id)
+        requestedIds.includes(p.id.replace(/-/g, "_"))
       );
     } else {
       // Default: query all enabled/configured providers
@@ -248,7 +325,9 @@ export class LiveJobSearchEngine {
     }
     if (validated.experienceMin !== undefined || validated.experienceMax !== undefined) {
       inMemoryFilters.push(
-        `Experience: ${validated.experienceMin ?? 0}-${validated.experienceMax ?? "any"} yrs`
+        `Experience: ${validated.experienceMin ?? 0}-${validated.experienceMax ?? "any"} yrs${
+          validated.experienceIncludeUnspecified === false ? " (explicit only)" : ""
+        }`
       );
     }
     if (validated.salaryMin !== undefined || validated.salaryMax !== undefined) {
@@ -265,6 +344,13 @@ export class LiveJobSearchEngine {
     if (validated.hideSaved) {
       inMemoryFilters.push("Hide Saved Leads: Yes");
     }
+
+    const hasRestrictedFilters = inMemoryFilters.length > 0;
+    // Bounded prefetch buffer: when in-memory filters will exclude jobs, query providers
+    // for a larger batch (up to 60) so page 1 does not starve to 1-2 jobs.
+    const providerBatchSize = hasRestrictedFilters
+      ? Math.min(Math.max(pageSize * 3, 50), 100)
+      : pageSize;
 
     const providerSearchParams: ProviderSearchParams = {
       keywords: cleanQuery || exactPhrase || undefined,
@@ -289,7 +375,7 @@ export class LiveJobSearchEngine {
           ? validated.industries[0]
           : undefined,
       page,
-      pageSize,
+      pageSize: providerBatchSize,
     };
 
     // 5. Query configured providers in parallel with bounded timeouts
@@ -629,12 +715,33 @@ export class LiveJobSearchEngine {
         return false;
       }
 
-      // Experience min/max filter
-      if (validated.experienceMin !== undefined && job.experienceMin !== null && job.experienceMin !== undefined) {
-        if (job.experienceMin < validated.experienceMin) return false;
-      }
-      if (validated.experienceMax !== undefined && job.experienceMax !== null && job.experienceMax !== undefined) {
-        if (job.experienceMax > validated.experienceMax) return false;
+      // Experience range matching rule (Overlap & Unspecified Handling)
+      const hasExperienceFilter =
+        validated.experienceMin !== undefined || validated.experienceMax !== undefined;
+
+      if (hasExperienceFilter) {
+        const hasExplicitJobExp =
+          (job.experienceMin !== null && job.experienceMin !== undefined) ||
+          (job.experienceMax !== null && job.experienceMax !== undefined);
+
+        if (!hasExplicitJobExp) {
+          // Unspecified experience: respect user configuration
+          if (validated.experienceIncludeUnspecified === false) {
+            return false;
+          }
+        } else {
+          // Mathematical Overlap Rule: [jMin, jMax] overlaps with [uMin, uMax]
+          const jMin = job.experienceMin ?? 0;
+          const jMax = job.experienceMax ?? Infinity;
+          const uMin = validated.experienceMin ?? 0;
+          const uMax = validated.experienceMax ?? Infinity;
+
+          // Two intervals [jMin, jMax] and [uMin, uMax] overlap iff:
+          // jMin <= uMax && jMax >= uMin
+          if (jMin > uMax || jMax < uMin) {
+            return false;
+          }
+        }
       }
 
       // Salary filter with normalized yearly conversion
@@ -883,17 +990,30 @@ export class LiveJobSearchEngine {
     }
 
     const estimatedTotal = authoritativeTotal;
-    const isExactTotal = false;
+    const isExactTotal = !hasRestrictedFilters && Boolean(authoritativeTotal && !anyProviderHasMore);
 
     // hasMore logic: more matching in memory OR providers report more upstream within bounds
     const hasMoreInMemory = uiResults.length > pageSize;
     const hasMoreUpstream = anyProviderHasMore && (authoritativeTotal ? (page * pageSize < authoritativeTotal) : true);
     const hasMore = hasMoreInMemory || hasMoreUpstream;
 
+    // Accurate total calculation:
+    // When in-memory filters were applied, provider's upstream total is an upper bound or estimate.
+    // Verified matches in memory represent the known verified matches.
+    const verifiedTotal = uiResults.length;
+    let computedTotal: number;
+    if (authoritativeTotal !== undefined && !hasRestrictedFilters) {
+      computedTotal = authoritativeTotal;
+    } else if (hasMore && estimatedTotal && estimatedTotal > verifiedTotal) {
+      computedTotal = estimatedTotal;
+    } else {
+      computedTotal = verifiedTotal;
+    }
+
     // Calculate realistic page count (bound max page count to prevent unpageable 400k pages)
     let totalPages = 1;
-    if (estimatedTotal && estimatedTotal > 0) {
-      totalPages = Math.max(Math.ceil(estimatedTotal / pageSize), hasMore ? page + 1 : page);
+    if (computedTotal && computedTotal > 0) {
+      totalPages = Math.max(Math.ceil(computedTotal / pageSize), hasMore ? page + 1 : page);
       totalPages = Math.min(totalPages, 50);
     } else {
       totalPages = hasMore ? page + 1 : page;
@@ -901,7 +1021,7 @@ export class LiveJobSearchEngine {
 
     const response: PaginatedJobSearchResponse = {
       jobs: enrichedResults,
-      total: enrichedResults.length,
+      total: computedTotal,
       page,
       pageSize,
       totalPages,
@@ -941,12 +1061,16 @@ export class LiveJobSearchEngine {
       },
     };
 
-    logger.info("[LiveSearch] Completed live job search", {
-      durationMs: Date.now() - searchStartMs,
-      jobsFound: uiResults.length,
-      page,
-      hasMore,
-    });
+    if (!validated.savedOnly) {
+      searchCache.set(cacheKey, {
+        data: response,
+        expiresAtMs: Date.now() + SEARCH_CACHE_TTL_MS,
+      });
+      if (searchCache.size > 200) {
+        const firstKey = searchCache.keys().next().value;
+        if (firstKey) searchCache.delete(firstKey);
+      }
+    }
 
     return response;
   }

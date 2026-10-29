@@ -391,7 +391,7 @@ export function JobCollectionAdminWorkbench({
               {runs.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400">
-                    No collection runs recorded yet. Click "Run Collection" to initiate the first run.
+                    No collection runs recorded yet. Click &ldquo;Run Collection&rdquo; to initiate the first run.
                   </td>
                 </tr>
               ) : (

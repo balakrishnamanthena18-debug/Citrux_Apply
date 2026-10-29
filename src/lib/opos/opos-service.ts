@@ -903,6 +903,11 @@ export async function verifyPlacement(
   const { offer, candidate } = await assertOfferAccess(tx, ctx, params.offerId, { requireStaffPrivilege: true });
   assertNonTerminalOffer(offer.status as OfferStatus, offer.id);
 
+  // Acquire row-level lock on offer to serialize concurrent placement verifications deterministically
+  if (typeof (tx as any).$executeRaw === "function") {
+    await (tx as any).$executeRaw`SELECT id FROM offers WHERE id = ${offer.id}::uuid FOR UPDATE`;
+  }
+
   if (offer.status !== OfferStatus.ACCEPTED) {
     throw new InvalidStateTransitionError(
       `Placement verification requires offer status '${OfferStatus.ACCEPTED}' (got '${offer.status}').`

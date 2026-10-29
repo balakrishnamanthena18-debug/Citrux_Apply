@@ -49,6 +49,7 @@ import {
 import { logger } from "@/lib/logger";
 import crypto from "crypto";
 import { assertSubmissionEvidence } from "@/lib/submission/evidence";
+import { validateSafeExternalUrl } from "@/lib/application/prerequisites";
 
 function revalidateSubmissionViews(applicationId?: string) {
   try {
@@ -150,6 +151,13 @@ export async function recordApplicationSubmissionAction(
     confirmationEvidence: parsed.data.confirmationEvidence,
     storagePath: parsed.data.storagePath,
   });
+
+  if (parsed.data.externalUrl) {
+    const safeCheck = validateSafeExternalUrl(parsed.data.externalUrl);
+    if (!safeCheck.isSafe) {
+      throw new ValidationError(`External URL failed security verification: ${safeCheck.error}`);
+    }
+  }
 
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);
@@ -610,6 +618,13 @@ export async function recordApplicationResubmissionAction(
     confirmationEvidence: parsed.data.confirmationEvidence,
     storagePath: parsed.data.storagePath,
   });
+
+  if (parsed.data.externalUrl) {
+    const safeCheck = validateSafeExternalUrl(parsed.data.externalUrl);
+    if (!safeCheck.isSafe) {
+      throw new ValidationError(`External URL failed security verification: ${safeCheck.error}`);
+    }
+  }
 
   const ctx = await getAuthenticatedContext();
   requireEmployeeOrAdmin(ctx);

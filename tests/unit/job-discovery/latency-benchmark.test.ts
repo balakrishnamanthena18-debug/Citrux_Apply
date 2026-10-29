@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { liveJobSearchEngine } from "@/lib/job-discovery/live-search";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { liveJobSearchEngine, clearJobSearchCache } from "@/lib/job-discovery/live-search";
 import { jobProviderRegistry } from "@/lib/job-discovery/registry";
 import type {
   JobProviderAdapter,
@@ -137,6 +137,7 @@ async function runBenchmarkScenario(
   const runs: BenchmarkRunResult[] = [];
 
   for (let i = 1; i <= repetitions; i++) {
+    clearJobSearchCache(); // Each run must hit the provider fresh; cache would short-circuit the slow provider
     const res = await executeTimedSearch(scenarioName, filters, i);
     runs.push(res);
   }

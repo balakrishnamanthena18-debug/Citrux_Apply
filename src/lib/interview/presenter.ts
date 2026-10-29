@@ -10,7 +10,7 @@ import {
   InterviewFormat,
   InterviewRoundOutcome,
   InterviewSentiment,
-} from "@/generated/prisma";
+} from "@/generated/prisma/enums";
 import type { PreparationBriefPayload } from "./types";
 
 export interface StatusBadgePresentation {

@@ -52,6 +52,7 @@ export const JobSearchQuerySchema = z.object({
   employmentTypes: z.array(JobEmploymentTypeSchema).optional(),
   experienceMin: z.number().nonnegative().optional(),
   experienceMax: z.number().nonnegative().optional(),
+  experienceIncludeUnspecified: z.boolean().default(true).optional(),
   salaryMin: z.number().nonnegative().optional(),
   salaryMax: z.number().nonnegative().optional(),
   salaryCurrency: z.string().max(10).optional(),
@@ -68,7 +69,18 @@ export const JobSearchQuerySchema = z.object({
   pageSize: z.number().int().min(1).max(100).default(20),
   correlationId: z.string().max(100).optional(),
   clientSubmittedAtMs: z.number().optional(),
-});
+}).refine(
+  (data) => {
+    if (data.experienceMin !== undefined && data.experienceMax !== undefined) {
+      return data.experienceMin <= data.experienceMax;
+    }
+    return true;
+  },
+  {
+    message: "Minimum experience cannot exceed maximum experience",
+    path: ["experienceMin"],
+  }
+);
 
 export type ValidatedJobSearchQuery = z.infer<typeof JobSearchQuerySchema>;
 
@@ -90,12 +102,29 @@ export const SaveJobSchema = z.object({
 });
 
 /** Promote / Import Discovered Job to Canonical Catalog */
-export const PromoteToCatalogSchema = z.object({
-  discoveredJobId: z.string().uuid("Invalid discovered job ID"),
-  visibility: z.enum(["GLOBAL", "CANDIDATE_PRIVATE"]).default("GLOBAL"),
-  ownerCandidateId: z.string().uuid().optional(),
-  qualificationNotes: z.string().max(2000).optional(),
-});
+export const PromoteToCatalogSchema = z
+  .object({
+    discoveredJobId: z.string().optional().nullable(),
+    visibility: z.enum(["GLOBAL", "CANDIDATE_PRIVATE"]).default("GLOBAL"),
+    ownerCandidateId: z.string().uuid().optional().nullable(),
+    qualificationNotes: z.string().max(2000).optional().nullable(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.visibility === "CANDIDATE_PRIVATE" && !val.ownerCandidateId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Candidate-private jobs require an owner candidate",
+        path: ["ownerCandidateId"],
+      });
+    }
+    if (val.visibility === "GLOBAL" && val.ownerCandidateId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Catalog jobs cannot have an owner candidate",
+        path: ["ownerCandidateId"],
+      });
+    }
+  });
 
 /** Provider configuration update */
 export const ProviderConfigUpdateSchema = z.object({

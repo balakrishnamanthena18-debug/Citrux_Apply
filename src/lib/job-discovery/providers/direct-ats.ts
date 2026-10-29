@@ -14,6 +14,7 @@ import {
   inferSeniority,
   parseLocation,
   extractSkills,
+  extractExperience,
 } from "../normalizer";
 import { computeContentFingerprint } from "../deduplication";
 import { assessJobQuality } from "../quality";
@@ -34,6 +35,7 @@ export class DirectAtsAdapter extends BaseJobProvider {
   readonly rateLimitDaily = 10000;
   readonly attributionNotice = "Direct official employer ATS feeds via public Greenhouse & Lever APIs";
   readonly permittedTermsUrl = "https://developers.greenhouse.io/job-board.html";
+  readonly supportedFilters = ["keywords", "department"] as const;
 
   // Sample curated partner boards across technology, health, and finance
   private sampleBoards = [
@@ -110,11 +112,16 @@ export class DirectAtsAdapter extends BaseJobProvider {
       );
     }
 
+    const page = params.page || 1;
+    const pageSize = params.pageSize || 20;
+    const offset = (page - 1) * pageSize;
+    const paged = filtered.slice(offset, offset + pageSize);
+
     return {
-      jobs: filtered,
-      // Direct ATS sample boards do not represent total matching jobs across sources
-      totalAvailable: undefined,
-      hasMore: false,
+      jobs: paged,
+      // Direct ATS sample boards represent curated live employer endpoints
+      totalAvailable: filtered.length,
+      hasMore: offset + pageSize < filtered.length,
       providerId: this.id,
       rawCount: results.length,
     };
@@ -152,6 +159,8 @@ export class DirectAtsAdapter extends BaseJobProvider {
       location: parsedLoc.city || parsedLoc.country,
     });
 
+    const extractedExp = extractExperience(`${title} ${description}`);
+
     return {
       providerId: this.id,
       externalId: String(raw.id || contentFingerprint),
@@ -165,8 +174,8 @@ export class DirectAtsAdapter extends BaseJobProvider {
       industry,
       employmentType: "FULL_TIME",
       seniorityLevel: seniority,
-      experienceMin: null,
-      experienceMax: null,
+      experienceMin: extractedExp.experienceMin,
+      experienceMax: extractedExp.experienceMax,
       salaryMin: null,
       salaryMax: null,
       salaryCurrency: "USD",

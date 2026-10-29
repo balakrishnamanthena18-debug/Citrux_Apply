@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LiveJobSearchEngine } from "@/lib/job-discovery/live-search";
+import { LiveJobSearchEngine, clearJobSearchCache } from "@/lib/job-discovery/live-search";
 import { matchCityWithAliases, CITY_ALIASES, parseLocation } from "@/lib/job-discovery/normalizer";
 import { jobProviderRegistry } from "@/lib/job-discovery/registry";
 import type { NormalizedDiscoveredJob, JobProviderAdapter, ProviderFetchResult } from "@/lib/job-discovery/types";
 
 describe("Global Job Discovery — Location Search & Accurate Counts Regression", () => {
+  beforeEach(() => {
+    clearJobSearchCache();
+    vi.restoreAllMocks();
+  });
+
   describe("City Aliases and Location Matching", () => {
     it("matches Bengaluru and Bangalore aliases interchangeably", () => {
       expect(matchCityWithAliases("Bengaluru", "bangalore")).toBe(true);

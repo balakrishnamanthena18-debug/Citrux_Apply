@@ -35,6 +35,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const excludedKeywords = searchParams.get("excludedKeywords") ? searchParams.get("excludedKeywords")!.split(",").map(s => s.trim()) : undefined;
     const experienceMin = searchParams.get("experienceMin") ? parseInt(searchParams.get("experienceMin")!, 10) : undefined;
     const experienceMax = searchParams.get("experienceMax") ? parseInt(searchParams.get("experienceMax")!, 10) : undefined;
+    const experienceIncludeUnspecified = searchParams.get("experienceIncludeUnspecified") !== null
+      ? searchParams.get("experienceIncludeUnspecified") === "true"
+      : undefined;
     const salaryMin = searchParams.get("salaryMin") ? parseInt(searchParams.get("salaryMin")!, 10) : undefined;
     const salaryMax = searchParams.get("salaryMax") ? parseInt(searchParams.get("salaryMax")!, 10) : undefined;
     const postedWithinDays = searchParams.get("postedWithinDays") ? parseInt(searchParams.get("postedWithinDays")!, 10) : undefined;
@@ -60,6 +63,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       excludedKeywords,
       experienceMin,
       experienceMax,
+      experienceIncludeUnspecified,
       salaryMin,
       salaryMax,
       postedWithinDays,

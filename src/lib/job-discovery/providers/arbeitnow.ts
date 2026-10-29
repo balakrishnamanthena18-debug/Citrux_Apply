@@ -16,6 +16,7 @@ import {
   inferSeniority,
   parseLocation,
   extractSkills,
+  extractExperience,
 } from "../normalizer";
 import { computeContentFingerprint } from "../deduplication";
 import { assessJobQuality } from "../quality";
@@ -36,6 +37,7 @@ export class ArbeitnowAdapter extends BaseJobProvider {
   readonly rateLimitDaily = 5000;
   readonly attributionNotice = "Job listings sourced via Arbeitnow Open Job Board API";
   readonly permittedTermsUrl = "https://www.arbeitnow.com/api/job-board-api";
+  readonly supportedFilters = ["keywords", "page"] as const;
 
   isConfigured(): boolean {
     return true; // Completely open public API without API keys
@@ -155,6 +157,8 @@ export class ArbeitnowAdapter extends BaseJobProvider {
       location: parsedLoc.city || parsedLoc.country,
     });
 
+    const extractedExp = extractExperience(`${title} ${description}`);
+
     return {
       providerId: this.id,
       externalId: String(raw.slug || raw.url || contentFingerprint),
@@ -168,8 +172,8 @@ export class ArbeitnowAdapter extends BaseJobProvider {
       industry,
       employmentType: "FULL_TIME",
       seniorityLevel: seniority,
-      experienceMin: null,
-      experienceMax: null,
+      experienceMin: extractedExp.experienceMin,
+      experienceMax: extractedExp.experienceMax,
       salaryMin: null,
       salaryMax: null,
       salaryCurrency: "EUR",

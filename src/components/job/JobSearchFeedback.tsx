@@ -177,17 +177,17 @@ export function JobSearchStatusBanner({
   const [elapsed, setElapsed] = useState<number>(0);
 
   useEffect(() => {
-    if (!loading) {
-      setElapsed(0);
-      return;
-    }
+    if (!loading) return;
 
     const start = Date.now();
     const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - start) / 1000));
     }, 500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      setElapsed(0);
+    };
   }, [loading]);
 
   const lifecycleMessage = getLifecycleMessage(phase, elapsed, activeLocation);
@@ -222,7 +222,7 @@ export function JobSearchStatusBanner({
 
         {activeSubmittedQuery && (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80">
-            Query: <strong className="text-slate-800">"{activeSubmittedQuery}"</strong>
+            Query: <strong className="text-slate-800">&ldquo;{activeSubmittedQuery}&rdquo;</strong>
             {activeLocation ? ` • ${activeLocation}` : ""}
           </span>
         )}

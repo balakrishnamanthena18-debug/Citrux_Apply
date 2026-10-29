@@ -10,6 +10,7 @@
 import { getAuthenticatedContext, requireAdmin, requireEmployeeOrAdmin } from "@/lib/auth/context";
 import { withRlsContext } from "@/lib/db/rls";
 import { prisma } from "@/lib/db/prisma";
+import { populateJobMatchWorkForJob } from "@/lib/job-matching/population";
 import { jobCollectionRunner } from "./runner";
 import { jobProviderRegistry } from "./registry";
 import { liveJobSearchEngine } from "./live-search";
@@ -294,12 +295,37 @@ export async function promoteDiscoveredJobToCatalogAction(params: {
       targetJobId = single.id;
     }
 
+    const visibility = params.visibility || "GLOBAL";
+    const rawOwnerId = params.ownerCandidateId?.trim() || null;
+    const ownerCandidateId = visibility === "CANDIDATE_PRIVATE" ? rawOwnerId : null;
+
+    if (visibility === "CANDIDATE_PRIVATE" && !ownerCandidateId) {
+      return {
+        success: false,
+        error: "Candidate-private jobs require an assigned candidate (ownerCandidateId).",
+      };
+    }
+
     if (!title || !companyName) {
       return { success: false, error: "Missing required job details for catalog promotion." };
     }
 
     // Create canonical Job within RLS context
     const createdJob = await withRlsContext(ctx.userId, async (tx) => {
+      if (visibility === "CANDIDATE_PRIVATE" && ownerCandidateId) {
+        const candidate = await tx.candidate.findFirst({
+          where: {
+            id: ownerCandidateId,
+            organizationId: ctx.organizationId,
+            status: { not: "ARCHIVED" },
+          },
+          select: { id: true },
+        });
+        if (!candidate) {
+          throw new Error("Selected candidate was not found in your organization or is archived.");
+        }
+      }
+
       const job = await tx.job.create({
         data: {
           organizationId: ctx.organizationId,
@@ -316,14 +342,38 @@ export async function promoteDiscoveredJobToCatalogAction(params: {
           externalUrl,
           qualificationNotes: params.qualificationNotes || null,
           status: "OPEN",
-          visibility: params.visibility || "GLOBAL",
-          ownerCandidateId:
-            params.visibility === "CANDIDATE_PRIVATE"
-              ? params.ownerCandidateId || null
-              : null,
+          visibility,
+          ownerCandidateId,
           createdById: ctx.userId,
         },
       });
+
+      if (visibility === "CANDIDATE_PRIVATE" && ownerCandidateId) {
+        await tx.candidateJobOpportunity.create({
+          data: {
+            organizationId: ctx.organizationId,
+            candidateId: ownerCandidateId,
+            jobId: job.id,
+            discoveredById: ctx.userId,
+            status: "ACTIVE",
+            notes: params.qualificationNotes || null,
+          },
+        });
+
+        await populateJobMatchWorkForJob(tx, {
+          organizationId: job.organizationId,
+          jobId: job.id,
+          reason: "PRIVATE_JOB_CREATED",
+          requestedById: ctx.userId,
+        });
+      } else {
+        await populateJobMatchWorkForJob(tx, {
+          organizationId: job.organizationId,
+          jobId: job.id,
+          reason: "GLOBAL_JOB_CREATED",
+          requestedById: ctx.userId,
+        });
+      }
 
       if (targetJobId && targetJobId.length === 36 && !targetJobId.startsWith("live_")) {
         await tx.discoveredJob.update({
@@ -342,8 +392,8 @@ export async function promoteDiscoveredJobToCatalogAction(params: {
           entityId: job.id,
           details: {
             discoveredJobId: targetJobId,
-            visibility: params.visibility || "GLOBAL",
-            ownerCandidateId: params.ownerCandidateId,
+            visibility,
+            ownerCandidateId,
             jobTitle: title,
             companyName,
           },

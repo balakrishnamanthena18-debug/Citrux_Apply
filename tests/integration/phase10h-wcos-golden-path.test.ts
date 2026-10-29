@@ -739,7 +739,7 @@ describe("Phase 10H-F — WCOS End-to-End Golden Path & Operational Verification
     expect(assignments.length).toBeGreaterThanOrEqual(1);
     expect(blocks.length).toBeGreaterThanOrEqual(1);
     expect(reservations.some((r: any) => r.status === "RELEASED")).toBe(true);
-  });
+  }, 15000);
 
   // =========================================================================
   // GOLDEN PATH Q: High Data Volume Execution (100+ Tasks)

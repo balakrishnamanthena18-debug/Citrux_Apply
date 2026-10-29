@@ -15,6 +15,7 @@ import {
   inferSeniority,
   normalizeEmploymentType,
   extractSkills,
+  extractExperience,
 } from "../normalizer";
 import { computeContentFingerprint } from "../deduplication";
 import { assessJobQuality } from "../quality";
@@ -35,6 +36,7 @@ export class JobicyAdapter extends BaseJobProvider {
   readonly rateLimitDaily = 2000;
   readonly attributionNotice = "Remote job listings sourced from Jobicy Public API";
   readonly permittedTermsUrl = "https://jobicy.com/jobs-rss-feed";
+  readonly supportedFilters = ["keywords", "country", "industry"] as const;
 
   isConfigured(): boolean {
     return true; // Free public API
@@ -66,14 +68,43 @@ export class JobicyAdapter extends BaseJobProvider {
   }
 
   async fetchJobs(params: ProviderSearchParams): Promise<ProviderFetchResult> {
+    const page = params.page || 1;
+    if (page > 1) {
+      return {
+        jobs: [],
+        totalAvailable: undefined,
+        hasMore: false,
+        providerId: this.id,
+        rawCount: 0,
+      };
+    }
+
     const count = Math.min(params.pageSize || 20, 50);
     const url = new URL(this.defaultBaseUrl);
     url.searchParams.set("count", String(count));
+    if (params.keywords) {
+      const cleanTag = params.keywords.trim().split(/\s+/)[0]?.toLowerCase();
+      if (cleanTag) {
+        url.searchParams.set("tag", cleanTag);
+      }
+    }
     if (params.country) {
       url.searchParams.set("geo", params.country.toLowerCase());
     }
     if (params.industry) {
-      url.searchParams.set("industry", params.industry.toLowerCase());
+      const industryLower = params.industry.toLowerCase();
+      const industryMap: Record<string, string> = {
+        technology: "dev",
+        data_ai: "data",
+        sales_marketing: "marketing",
+        finance_banking: "business",
+        it_support: "supporting",
+        hr_admin: "supporting",
+      };
+      const mapped = industryMap[industryLower] || (["dev", "design", "marketing", "business", "supporting", "data", "smm", "product"].includes(industryLower) ? industryLower : undefined);
+      if (mapped) {
+        url.searchParams.set("industry", mapped);
+      }
     }
 
     try {
@@ -157,6 +188,8 @@ export class JobicyAdapter extends BaseJobProvider {
       location: raw.jobGeo || "Remote",
     });
 
+    const extractedExp = extractExperience(`${title} ${description}`);
+
     return {
       providerId: this.id,
       externalId: String(raw.id || raw.url || contentFingerprint),
@@ -170,8 +203,8 @@ export class JobicyAdapter extends BaseJobProvider {
       industry,
       employmentType,
       seniorityLevel: seniority,
-      experienceMin: null,
-      experienceMax: null,
+      experienceMin: extractedExp.experienceMin,
+      experienceMax: extractedExp.experienceMax,
       salaryMin,
       salaryMax,
       salaryCurrency: raw.salaryCurrency || "USD",

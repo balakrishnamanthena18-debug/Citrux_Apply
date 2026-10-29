@@ -15,6 +15,7 @@ import {
   inferSeniority,
   parseLocation,
   extractSkills,
+  extractExperience,
 } from "../normalizer";
 import { computeContentFingerprint } from "../deduplication";
 import { assessJobQuality } from "../quality";
@@ -34,6 +35,16 @@ export class UsaJobsAdapter extends BaseJobProvider {
   readonly rateLimitDaily = 10000;
   readonly attributionNotice = "Official public vacancy announcements from the US Office of Personnel Management";
   readonly permittedTermsUrl = "https://developer.usajobs.gov/API-Reference";
+  readonly supportedFilters = [
+    "keywords",
+    "country",
+    "city",
+    "workArrangement",
+    "salaryMin",
+    "salaryMax",
+    "page",
+    "pageSize",
+  ] as const;
 
   isConfigured(): boolean {
     return !!process.env.USAJOBS_API_KEY;
@@ -86,7 +97,10 @@ export class UsaJobsAdapter extends BaseJobProvider {
 
   async fetchJobs(params: ProviderSearchParams): Promise<ProviderFetchResult> {
     if (!this.isConfigured()) {
-      return this.fetchMockFederalVacancies(params);
+      if (process.env.VITEST || process.env.NODE_ENV === "test") {
+        return this.fetchMockFederalVacancies(params);
+      }
+      throw new Error("USAJOBS provider unconfigured: missing USAJOBS_API_KEY environment variable");
     }
 
     const page = params.page || 1;
@@ -108,7 +122,10 @@ export class UsaJobsAdapter extends BaseJobProvider {
       });
 
       if (!res.ok) {
-        return this.fetchMockFederalVacancies(params);
+        if (process.env.VITEST || process.env.NODE_ENV === "test") {
+          return this.fetchMockFederalVacancies(params);
+        }
+        throw new Error(`USAJOBS API returned HTTP ${res.status}`);
       }
 
       const json = await res.json();
@@ -122,8 +139,11 @@ export class UsaJobsAdapter extends BaseJobProvider {
         providerId: this.id,
         rawCount: items.length,
       };
-    } catch {
-      return this.fetchMockFederalVacancies(params);
+    } catch (err: any) {
+      if (process.env.VITEST || process.env.NODE_ENV === "test") {
+        return this.fetchMockFederalVacancies(params);
+      }
+      throw err;
     }
   }
 
@@ -164,6 +184,8 @@ export class UsaJobsAdapter extends BaseJobProvider {
       location: parsedLoc.city || "US",
     });
 
+    const extractedExp = extractExperience(`${title} ${summary}`);
+
     return {
       providerId: this.id,
       externalId: String(desc.PositionID || contentFingerprint),
@@ -177,8 +199,8 @@ export class UsaJobsAdapter extends BaseJobProvider {
       industry: "public_sector",
       employmentType: "FULL_TIME",
       seniorityLevel: inferSeniority(title),
-      experienceMin: null,
-      experienceMax: null,
+      experienceMin: extractedExp.experienceMin,
+      experienceMax: extractedExp.experienceMax,
       salaryMin,
       salaryMax,
       salaryCurrency: "USD",

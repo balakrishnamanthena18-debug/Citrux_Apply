@@ -35,6 +35,7 @@ import {
   unsaveDiscoveredJobAction,
   promoteDiscoveredJobToCatalogAction,
 } from "@/lib/job-discovery/actions";
+import { searchDeskCandidatesAction } from "@/lib/application/actions";
 import type {
   DiscoveredJobSearchResult,
   JobSearchFilters,
@@ -104,7 +105,7 @@ const AVAILABLE_PROVIDERS = [
   { id: "arbeitnow", name: "Arbeitnow Open Board" },
   { id: "jobicy", name: "Jobicy Remote Feed" },
   { id: "usajobs", name: "USAJOBS Federal API" },
-  { id: "direct-ats", name: "Direct ATS Career Feeds" },
+  { id: "direct_ats", name: "Direct ATS Career Feeds" },
 ];
 
 interface SearchPreset {
@@ -156,6 +157,145 @@ const BUILT_IN_PRESETS: SearchPreset[] = [
   },
 ];
 
+interface FilterChipsBarProps {
+  query: string;
+  exactPhrase: string;
+  excludedKeywordsInput: string;
+  companyName: string;
+  requiredSkillsInput: string;
+  selectedIndustry: string;
+  selectedCountry: string;
+  selectedArrangement: string;
+  selectedSeniority: string;
+  selectedEmploymentType: string;
+  salaryMin: string;
+  experienceMin?: string;
+  experienceMax?: string;
+  experienceIncludeUnspecified?: boolean;
+  postedWithinDays: string;
+  visaSponsored: boolean;
+  hideSaved: boolean;
+  savedOnly: boolean;
+  onRemoveQuery: () => void;
+  onRemoveExactPhrase: () => void;
+  onRemoveExcludedKeywords: () => void;
+  onRemoveCompanyName: () => void;
+  onRemoveRequiredSkills: () => void;
+  onRemoveIndustry: () => void;
+  onRemoveCountry: () => void;
+  onRemoveArrangement: () => void;
+  onRemoveSeniority: () => void;
+  onRemoveEmploymentType: () => void;
+  onRemoveSalaryMin: () => void;
+  onRemoveExperience?: () => void;
+  onRemovePostedWithinDays: () => void;
+  onRemoveVisaSponsored: () => void;
+  onRemoveHideSaved: () => void;
+  onRemoveSavedOnly: () => void;
+  onResetAll: () => void;
+}
+
+function FilterChipsBar(props: FilterChipsBarProps) {
+  const chips: Array<{ label: string; onRemove: () => void }> = [];
+
+  if (props.query) {
+    chips.push({ label: `Keywords: "${props.query}"`, onRemove: props.onRemoveQuery });
+  }
+  if (props.exactPhrase) {
+    chips.push({ label: `Exact: "${props.exactPhrase}"`, onRemove: props.onRemoveExactPhrase });
+  }
+  if (props.excludedKeywordsInput) {
+    chips.push({ label: `Exclude: -${props.excludedKeywordsInput}`, onRemove: props.onRemoveExcludedKeywords });
+  }
+  if (props.companyName) {
+    chips.push({ label: `Company: "${props.companyName}"`, onRemove: props.onRemoveCompanyName });
+  }
+  if (props.requiredSkillsInput) {
+    chips.push({ label: `Skills: ${props.requiredSkillsInput}`, onRemove: props.onRemoveRequiredSkills });
+  }
+  if (props.selectedIndustry !== "ALL") {
+    const match = INDUSTRIES.find((i) => i.value === props.selectedIndustry);
+    chips.push({ label: `Industry: ${match?.label || props.selectedIndustry}`, onRemove: props.onRemoveIndustry });
+  }
+  if (props.selectedCountry !== "ALL") {
+    const match = COUNTRIES.find((c) => c.value === props.selectedCountry);
+    chips.push({ label: `Country: ${match?.label || props.selectedCountry}`, onRemove: props.onRemoveCountry });
+  }
+  if (props.selectedArrangement !== "ALL") {
+    chips.push({ label: `Mode: ${props.selectedArrangement}`, onRemove: props.onRemoveArrangement });
+  }
+  if (props.selectedSeniority !== "ALL") {
+    const match = SENIORITIES.find((s) => s.value === props.selectedSeniority);
+    chips.push({ label: `Seniority: ${match?.label || props.selectedSeniority}`, onRemove: props.onRemoveSeniority });
+  }
+  if (props.selectedEmploymentType !== "ALL") {
+    const match = EMPLOYMENT_TYPES.find((e) => e.value === props.selectedEmploymentType);
+    chips.push({ label: `Type: ${match?.label || props.selectedEmploymentType}`, onRemove: props.onRemoveEmploymentType });
+  }
+  if (props.experienceMin || props.experienceMax) {
+    let label = "Experience: ";
+    if (props.experienceMin && props.experienceMax) {
+      label += `${props.experienceMin}–${props.experienceMax} yrs`;
+    } else if (props.experienceMin) {
+      label += `≥ ${props.experienceMin} yrs`;
+    } else {
+      label += `≤ ${props.experienceMax} yrs`;
+    }
+    if (props.experienceIncludeUnspecified === false) {
+      label += " (explicit only)";
+    }
+    if (props.onRemoveExperience) {
+      chips.push({ label, onRemove: props.onRemoveExperience });
+    }
+  }
+  if (props.salaryMin) {
+    chips.push({ label: `Min Salary: $${props.salaryMin}`, onRemove: props.onRemoveSalaryMin });
+  }
+  if (props.postedWithinDays !== "ALL") {
+    chips.push({ label: `Posted: <${props.postedWithinDays}d`, onRemove: props.onRemovePostedWithinDays });
+  }
+  if (props.visaSponsored) {
+    chips.push({ label: "Visa Sponsored", onRemove: props.onRemoveVisaSponsored });
+  }
+  if (props.hideSaved) {
+    chips.push({ label: "Hide Saved", onRemove: props.onRemoveHideSaved });
+  }
+  if (props.savedOnly) {
+    chips.push({ label: "Saved Only", onRemove: props.onRemoveSavedOnly });
+  }
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap pt-1">
+      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active:</span>
+      {chips.map((chip, idx) => (
+        <span
+          key={idx}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#0B3B2C]/5 text-[#0B3B2C] border border-[#0B3B2C]/15"
+        >
+          <span>{chip.label}</span>
+          <button
+            type="button"
+            onClick={chip.onRemove}
+            className="hover:text-rose-600 rounded-full p-0.5 transition"
+            title="Remove filter"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={props.onResetAll}
+        className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 underline pl-1"
+      >
+        Clear all
+      </button>
+    </div>
+  );
+}
+
 interface Props {
   initialQuery?: string;
   onPromoted?: (jobId: string) => void;
@@ -172,7 +312,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
   const [savedOnly, setSavedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "relevance" | "salary_desc" | "quality">("relevance");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(20);
 
   // Advanced Search Controls
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -186,6 +326,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
   const [selectedEmploymentType, setSelectedEmploymentType] = useState<string>("ALL");
   const [experienceMin, setExperienceMin] = useState<string>("");
   const [experienceMax, setExperienceMax] = useState<string>("");
+  const [experienceIncludeUnspecified, setExperienceIncludeUnspecified] = useState<boolean>(true);
   const [salaryMin, setSalaryMin] = useState<string>("");
   const [salaryMax, setSalaryMax] = useState<string>("");
   const [salaryCurrency, setSalaryCurrency] = useState("USD");
@@ -246,24 +387,55 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
   const [detailJob, setDetailJob] = useState<DiscoveredJobSearchResult | null>(null);
   const [promoteJob, setPromoteJob] = useState<DiscoveredJobSearchResult | null>(null);
   const [promoteVisibility, setPromoteVisibility] = useState<"GLOBAL" | "CANDIDATE_PRIVATE">("GLOBAL");
+  const [promoteCandidateId, setPromoteCandidateId] = useState("");
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
+  const [candidateOptions, setCandidateOptions] = useState<
+    Array<{ id: string; fullName: string; email: string }>
+  >([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [promoteNotes, setPromoteNotes] = useState("");
   const [promoteStatus, setPromoteStatus] = useState<string | null>(null);
 
   const [isPending, startTransition] = useTransition();
 
+  // Load candidate options dynamically when visibility is set to CANDIDATE_PRIVATE
+  useEffect(() => {
+    if (!promoteJob || promoteVisibility !== "CANDIDATE_PRIVATE") return;
+    let isCancelled = false;
+    const fetchCandidates = async () => {
+      setLoadingCandidates(true);
+      try {
+        const res = await searchDeskCandidatesAction(candidateSearchQuery);
+        if (!isCancelled && res.success && res.data) {
+          setCandidateOptions(res.data);
+        }
+      } finally {
+        if (!isCancelled) setLoadingCandidates(false);
+      }
+    };
+    const timer = setTimeout(fetchCandidates, candidateSearchQuery ? 200 : 0);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [promoteJob, promoteVisibility, candidateSearchQuery]);
+
   // Load custom presets from localStorage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("oos_job_search_presets");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSavedPresets([...BUILT_IN_PRESETS, ...parsed]);
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem("oos_job_search_presets");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSavedPresets([...BUILT_IN_PRESETS, ...parsed]);
+          }
         }
+      } catch {
+        // ignore localStorage errors
       }
-    } catch {
-      // ignore localStorage errors
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // Compute active advanced filters count
@@ -278,6 +450,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     selectedEmploymentType !== "ALL",
     experienceMin,
     experienceMax,
+    !experienceIncludeUnspecified,
     salaryMin,
     salaryMax,
     postedWithinDays !== "ALL",
@@ -287,7 +460,9 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
   ].filter(Boolean).length;
 
   const queryRef = useRef(query);
-  queryRef.current = query;
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
   const searchRequestIdRef = useRef(0);
   const [currentTrace, setCurrentTrace] = useState<SearchTraceData | null>(null);
   const latestTraceRef = useRef<SearchTraceData | null>(null);
@@ -349,8 +524,9 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
       seniorityLevels: selectedSeniority !== "ALL" ? [selectedSeniority] : undefined,
       employmentTypes: selectedEmploymentType !== "ALL" ? [selectedEmploymentType as JobEmploymentType] : undefined,
       verificationStatuses: selectedVerification !== "ALL" ? [selectedVerification as JobVerificationStatus] : undefined,
-      experienceMin: experienceMin ? parseFloat(experienceMin) : undefined,
-      experienceMax: experienceMax ? parseFloat(experienceMax) : undefined,
+      experienceMin: experienceMin && (!experienceMax || parseFloat(experienceMin) <= parseFloat(experienceMax)) ? parseFloat(experienceMin) : undefined,
+      experienceMax: experienceMax && (!experienceMin || parseFloat(experienceMin) <= parseFloat(experienceMax)) ? parseFloat(experienceMax) : undefined,
+      experienceIncludeUnspecified,
       salaryMin: salaryMin ? parseFloat(salaryMin) : undefined,
       salaryMax: salaryMax ? parseFloat(salaryMax) : undefined,
       salaryCurrency,
@@ -450,6 +626,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     selectedVerification,
     experienceMin,
     experienceMax,
+    experienceIncludeUnspecified,
     salaryMin,
     salaryMax,
     salaryCurrency,
@@ -465,7 +642,10 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
   ]);
 
   useEffect(() => {
-    fetchJobs();
+    const timer = setTimeout(() => {
+      void fetchJobs();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchJobs]);
 
   const handleToggleSave = async (job: DiscoveredJobSearchResult) => {
@@ -491,8 +671,23 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     }
   };
 
+  const handleClosePromoteModal = () => {
+    setPromoteJob(null);
+    setPromoteVisibility("GLOBAL");
+    setPromoteCandidateId("");
+    setCandidateSearchQuery("");
+    setPromoteNotes("");
+    setPromoteStatus(null);
+  };
+
   const handleExecutePromote = async () => {
     if (!promoteJob) return;
+
+    if (promoteVisibility === "CANDIDATE_PRIVATE" && !promoteCandidateId) {
+      setPromoteStatus("Please select an active candidate for candidate-private job leads.");
+      return;
+    }
+
     setPromoteStatus("Importing vacancy into canonical catalog...");
 
     startTransition(async () => {
@@ -501,6 +696,8 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
           discoveredJobId: promoteJob.id,
           jobData: promoteJob,
           visibility: promoteVisibility,
+          ownerCandidateId:
+            promoteVisibility === "CANDIDATE_PRIVATE" ? promoteCandidateId : undefined,
           qualificationNotes: promoteNotes || undefined,
         });
 
@@ -513,9 +710,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
           );
           if (onPromoted) onPromoted(res.jobId);
           setTimeout(() => {
-            setPromoteJob(null);
-            setPromoteStatus(null);
-            setPromoteNotes("");
+            handleClosePromoteModal();
           }, 1200);
         } else {
           setPromoteStatus(res.error || "Promotion failed.");
@@ -543,6 +738,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     setSelectedVerification("ALL");
     setExperienceMin("");
     setExperienceMax("");
+    setExperienceIncludeUnspecified(true);
     setSalaryMin("");
     setSalaryMax("");
     setPostedWithinDays("ALL");
@@ -572,6 +768,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     setSelectedVerification(preset.filters.verificationStatuses?.[0] || "ALL");
     setExperienceMin(preset.filters.experienceMin ? String(preset.filters.experienceMin) : "");
     setExperienceMax(preset.filters.experienceMax ? String(preset.filters.experienceMax) : "");
+    setExperienceIncludeUnspecified(preset.filters.experienceIncludeUnspecified ?? true);
     setSalaryMin(preset.filters.salaryMin ? String(preset.filters.salaryMin) : "");
     setSalaryMax(preset.filters.salaryMax ? String(preset.filters.salaryMax) : "");
     setPostedWithinDays(preset.filters.postedWithinDays ? String(preset.filters.postedWithinDays) : "ALL");
@@ -666,116 +863,13 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     }
   };
 
-  // Render applied filter chips
-  const renderFilterChips = () => {
-    const chips: Array<{ label: string; onRemove: () => void }> = [];
+  const handleRemoveQueryChip = useCallback(() => {
+    setQuery("");
+    setPage(1);
+    void fetchJobs({ query: "", page: 1 });
+  }, [fetchJobs]);
 
-    if (query) {
-      chips.push({
-        label: `Keywords: "${query}"`,
-        onRemove: () => {
-          setQuery("");
-          setPage(1);
-          fetchJobs({ query: "", page: 1 });
-        },
-      });
-    }
-    if (exactPhrase) {
-      chips.push({ label: `Exact: "${exactPhrase}"`, onRemove: () => setExactPhrase("") });
-    }
-    if (excludedKeywordsInput) {
-      chips.push({ label: `Exclude: -${excludedKeywordsInput}`, onRemove: () => setExcludedKeywordsInput("") });
-    }
-    if (companyName) {
-      chips.push({ label: `Company: "${companyName}"`, onRemove: () => setCompanyName("") });
-    }
-    if (requiredSkillsInput) {
-      chips.push({ label: `Skills: ${requiredSkillsInput}`, onRemove: () => setRequiredSkillsInput("") });
-    }
-    if (selectedIndustry !== "ALL") {
-      const match = INDUSTRIES.find((i) => i.value === selectedIndustry);
-      chips.push({
-        label: `Industry: ${match?.label || selectedIndustry}`,
-        onRemove: () => setSelectedIndustry("ALL"),
-      });
-    }
-    if (selectedCountry !== "ALL") {
-      const match = COUNTRIES.find((c) => c.value === selectedCountry);
-      chips.push({
-        label: `Country: ${match?.label || selectedCountry}`,
-        onRemove: () => setSelectedCountry("ALL"),
-      });
-    }
-    if (selectedArrangement !== "ALL") {
-      chips.push({
-        label: `Mode: ${selectedArrangement}`,
-        onRemove: () => setSelectedArrangement("ALL"),
-      });
-    }
-    if (selectedSeniority !== "ALL") {
-      const match = SENIORITIES.find((s) => s.value === selectedSeniority);
-      chips.push({
-        label: `Seniority: ${match?.label || selectedSeniority}`,
-        onRemove: () => setSelectedSeniority("ALL"),
-      });
-    }
-    if (selectedEmploymentType !== "ALL") {
-      const match = EMPLOYMENT_TYPES.find((e) => e.value === selectedEmploymentType);
-      chips.push({
-        label: `Type: ${match?.label || selectedEmploymentType}`,
-        onRemove: () => setSelectedEmploymentType("ALL"),
-      });
-    }
-    if (salaryMin) {
-      chips.push({ label: `Min Salary: $${salaryMin}`, onRemove: () => setSalaryMin("") });
-    }
-    if (postedWithinDays !== "ALL") {
-      chips.push({
-        label: `Posted: <${postedWithinDays}d`,
-        onRemove: () => setPostedWithinDays("ALL"),
-      });
-    }
-    if (visaSponsored) {
-      chips.push({ label: "Visa Sponsored", onRemove: () => setVisaSponsored(false) });
-    }
-    if (hideSaved) {
-      chips.push({ label: "Hide Saved", onRemove: () => setHideSaved(false) });
-    }
-    if (savedOnly) {
-      chips.push({ label: "Saved Only", onRemove: () => setSavedOnly(false) });
-    }
 
-    if (chips.length === 0) return null;
-
-    return (
-      <div className="flex items-center gap-2 flex-wrap pt-1">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active:</span>
-        {chips.map((chip, idx) => (
-          <span
-            key={idx}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#0B3B2C]/5 text-[#0B3B2C] border border-[#0B3B2C]/15"
-          >
-            <span>{chip.label}</span>
-            <button
-              type="button"
-              onClick={chip.onRemove}
-              className="hover:text-rose-600 rounded-full p-0.5 transition"
-              title="Remove filter"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          onClick={resetAllFilters}
-          className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 underline pl-1"
-        >
-          Clear all
-        </button>
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -1170,37 +1264,137 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
                 />
               </div>
 
-              {/* Experience Range */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Experience (Years)
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    max="30"
-                    value={experienceMin}
-                    onChange={(e) => {
-                      setExperienceMin(e.target.value);
-                      setPage(1);
-                    }}
-                    placeholder="Min"
-                    className="w-1/2 px-2 py-1.5 bg-slate-50 border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium"
-                  />
-                  <span className="text-slate-400">-</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="30"
-                    value={experienceMax}
-                    onChange={(e) => {
-                      setExperienceMax(e.target.value);
-                      setPage(1);
-                    }}
-                    placeholder="Max"
-                    className="w-1/2 px-2 py-1.5 bg-slate-50 border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium"
-                  />
+              {/* Experience Range Selector (Enterprise Upgrade) */}
+              <div className="col-span-1 sm:col-span-2 bg-slate-50/70 p-3 rounded-[12px] border border-[#DDE5E0] space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                      Experience Range (0–30 Years)
+                    </label>
+                    {(experienceMin || experienceMax) && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#12A150]/10 text-[#0B3B2C] border border-[#12A150]/20">
+                        {experienceMin && experienceMax
+                          ? `${experienceMin}–${experienceMax} yrs`
+                          : experienceMin
+                          ? `≥ ${experienceMin} yrs`
+                          : `≤ ${experienceMax} yrs`}
+                      </span>
+                    )}
+                  </div>
+                  {(experienceMin || experienceMax) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExperienceMin("");
+                        setExperienceMax("");
+                        setPage(1);
+                      }}
+                      className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { id: "any", label: "Any", min: "", max: "" },
+                    { id: "entry", label: "Entry (0–2)", min: "0", max: "2" },
+                    { id: "junior", label: "Junior (0–3)", min: "0", max: "3" },
+                    { id: "mid", label: "Mid (3–7)", min: "3", max: "7" },
+                    { id: "senior", label: "Senior (7–15)", min: "7", max: "15" },
+                    { id: "lead", label: "Lead (10–30)", min: "10", max: "30" },
+                  ].map((preset) => {
+                    const isSelected =
+                      preset.id === "any"
+                        ? !experienceMin && !experienceMax
+                        : experienceMin === preset.min && experienceMax === preset.max;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          setExperienceMin(preset.min);
+                          setExperienceMax(preset.max);
+                          setPage(1);
+                        }}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition cursor-pointer ${
+                          isSelected
+                            ? "bg-[#0B3B2C] text-white border-[#0B3B2C] shadow-2xs"
+                            : "bg-white text-slate-600 border-[#DDE5E0] hover:bg-slate-100"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Range Inputs */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={experienceMin}
+                        onChange={(e) => {
+                          setExperienceMin(e.target.value);
+                          setPage(1);
+                        }}
+                        placeholder="Min (0–30)"
+                        className="w-full px-2.5 py-1 bg-white border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#12A150]"
+                      />
+                      <span className="absolute right-2 top-1 text-[10px] text-slate-400 pointer-events-none">
+                        yrs
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-slate-400 text-xs font-semibold">to</span>
+                  <div className="flex-1">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={experienceMax}
+                        onChange={(e) => {
+                          setExperienceMax(e.target.value);
+                          setPage(1);
+                        }}
+                        placeholder="Max (0–30)"
+                        className="w-full px-2.5 py-1 bg-white border border-[#DDE5E0] rounded-[8px] text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#12A150]"
+                      />
+                      <span className="absolute right-2 top-1 text-[10px] text-slate-400 pointer-events-none">
+                        yrs
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Validation notice if min > max */}
+                {experienceMin && experienceMax && parseFloat(experienceMin) > parseFloat(experienceMax) && (
+                  <p className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Warning: Minimum ({experienceMin}) cannot exceed Maximum ({experienceMax}).
+                  </p>
+                )}
+
+                {/* Unspecified experience inclusion checkbox */}
+                <div className="pt-1">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer text-slate-600 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={experienceIncludeUnspecified}
+                      onChange={(e) => {
+                        setExperienceIncludeUnspecified(e.target.checked);
+                        setPage(1);
+                      }}
+                      className="rounded text-[#12A150] focus:ring-[#12A150] w-3.5 h-3.5"
+                    />
+                    <span>Include jobs with unspecified experience requirements</span>
+                  </label>
                 </div>
               </div>
 
@@ -1340,7 +1534,48 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
         )}
 
         {/* Applied Filter Chips */}
-        {renderFilterChips()}
+        <FilterChipsBar
+          query={query}
+          exactPhrase={exactPhrase}
+          excludedKeywordsInput={excludedKeywordsInput}
+          companyName={companyName}
+          requiredSkillsInput={requiredSkillsInput}
+          selectedIndustry={selectedIndustry}
+          selectedCountry={selectedCountry}
+          selectedArrangement={selectedArrangement}
+          selectedSeniority={selectedSeniority}
+          selectedEmploymentType={selectedEmploymentType}
+          experienceMin={experienceMin}
+          experienceMax={experienceMax}
+          experienceIncludeUnspecified={experienceIncludeUnspecified}
+          salaryMin={salaryMin}
+          postedWithinDays={postedWithinDays}
+          visaSponsored={visaSponsored}
+          hideSaved={hideSaved}
+          savedOnly={savedOnly}
+          onRemoveQuery={handleRemoveQueryChip}
+          onRemoveExactPhrase={() => setExactPhrase("")}
+          onRemoveExcludedKeywords={() => setExcludedKeywordsInput("")}
+          onRemoveCompanyName={() => setCompanyName("")}
+          onRemoveRequiredSkills={() => setRequiredSkillsInput("")}
+          onRemoveIndustry={() => setSelectedIndustry("ALL")}
+          onRemoveCountry={() => setSelectedCountry("ALL")}
+          onRemoveArrangement={() => setSelectedArrangement("ALL")}
+          onRemoveSeniority={() => setSelectedSeniority("ALL")}
+          onRemoveEmploymentType={() => setSelectedEmploymentType("ALL")}
+          onRemoveExperience={() => {
+            setExperienceMin("");
+            setExperienceMax("");
+            setExperienceIncludeUnspecified(true);
+            setPage(1);
+          }}
+          onRemoveSalaryMin={() => setSalaryMin("")}
+          onRemovePostedWithinDays={() => setPostedWithinDays("ALL")}
+          onRemoveVisaSponsored={() => setVisaSponsored(false)}
+          onRemoveHideSaved={() => setHideSaved(false)}
+          onRemoveSavedOnly={() => setSavedOnly(false)}
+          onResetAll={resetAllFilters}
+        />
       </div>
 
       {/* Search Lifecycle, Active Scope & Provider Diagnostics Status Banner */}
@@ -1650,17 +1885,27 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
       )}
 
       {/* Pagination Controls */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-[16px] border border-[#E5EAE7]">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="px-3.5 py-1.5 rounded-lg border border-[#DDE5E0] text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
-
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-[16px] border border-[#E5EAE7]">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="px-3.5 py-1.5 rounded-lg border border-[#DDE5E0] text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            disabled={!hasMore && page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-3.5 py-1.5 rounded-lg border border-[#DDE5E0] text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
           <span className="text-xs font-medium text-slate-600">
             Page {page} {isExactTotal ? (totalPages > 1 ? `of ${totalPages}` : "") : (totalPages > 1 ? `of ${totalPages}+` : "")}
           </span>
@@ -1671,14 +1916,22 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
           )}
         </div>
 
-        <button
-          type="button"
-          disabled={!hasMore && page >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          className="px-3.5 py-1.5 rounded-lg border border-[#DDE5E0] text-xs font-semibold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
+        {/* Page Size Selector */}
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <span className="text-[11px] font-medium text-slate-500">Per page:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            className="bg-slate-50 border border-[#DDE5E0] rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#12A150]"
+          >
+            <option value={20}>20</option>
+            <option value={30}>30</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
       </div>
 
       {/* Save Preset Modal */}
@@ -1863,7 +2116,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
               </div>
               <button
                 type="button"
-                onClick={() => setPromoteJob(null)}
+                onClick={handleClosePromoteModal}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-4 h-4" />
@@ -1883,13 +2136,63 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
                 </label>
                 <select
                   value={promoteVisibility}
-                  onChange={(e) => setPromoteVisibility(e.target.value as any)}
+                  onChange={(e) => {
+                    const nextVal = e.target.value as "GLOBAL" | "CANDIDATE_PRIVATE";
+                    setPromoteVisibility(nextVal);
+                    if (nextVal === "GLOBAL") {
+                      setPromoteCandidateId("");
+                    }
+                    setPromoteStatus(null);
+                  }}
                   className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
                 >
                   <option value="GLOBAL">Global Requisition (All recruiters & operations)</option>
                   <option value="CANDIDATE_PRIVATE">Candidate Private Lead (Dedicated sourcing)</option>
                 </select>
               </div>
+
+              {promoteVisibility === "CANDIDATE_PRIVATE" && (
+                <div className="space-y-2 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-amber-900">
+                      Target Candidate <span className="text-rose-500">*</span>
+                    </label>
+                    {loadingCandidates && (
+                      <span className="text-[10px] text-amber-700 font-medium">Searching...</span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={candidateSearchQuery}
+                    onChange={(e) => setCandidateSearchQuery(e.target.value)}
+                    placeholder="Search candidate by name or email..."
+                    className="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <select
+                    value={promoteCandidateId}
+                    onChange={(e) => {
+                      setPromoteCandidateId(e.target.value);
+                      setPromoteStatus(null);
+                    }}
+                    className="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value="">-- Choose Candidate --</option>
+                    {candidateOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.fullName} ({c.email})
+                      </option>
+                    ))}
+                  </select>
+                  {candidateOptions.length === 0 && !loadingCandidates && (
+                    <p className="text-[10px] text-slate-500 italic">
+                      No active candidates found. Try searching by name or email.
+                    </p>
+                  )}
+                  <p className="text-[10px] text-amber-800">
+                    Candidate private leads are strictly isolated to the selected candidate.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
@@ -1920,7 +2223,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setPromoteJob(null)}
+                onClick={handleClosePromoteModal}
                 className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
               >
                 Cancel

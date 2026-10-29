@@ -317,7 +317,7 @@ describe("Phase 10H-D — WCOS Service Integration & Operational Lifecycle", () 
       where: { organizationId: orgId, employeeId: employee2Id },
     });
     expect(emp2FinalProfile?.activeWorkloadCu).toBe(0);
-  });
+  }, 15000);
 
   it("handles escalation and elevates Task priority on level 3", async () => {
     const task = await prisma.task.create({

@@ -23,6 +23,7 @@ export abstract class BaseJobProvider implements JobProviderAdapter {
   abstract readonly rateLimitDaily: number;
   abstract readonly attributionNotice: string;
   abstract readonly permittedTermsUrl?: string;
+  abstract readonly supportedFilters?: readonly string[];
 
   protected timeoutMs = 5000;
   protected maxResponseBytes = 10 * 1024 * 1024; // 10MB limit

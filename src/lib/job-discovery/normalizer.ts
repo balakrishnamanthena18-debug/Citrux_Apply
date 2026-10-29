@@ -214,11 +214,15 @@ export function detectWorkArrangement(
 export function inferIndustry(
   title: string,
   description?: string | null,
-  explicitCategory?: string | null
+  explicitCategory?: string | string[] | null
 ): JobIndustry {
+  const categoryStr = Array.isArray(explicitCategory)
+    ? explicitCategory.filter(Boolean).join(" ")
+    : explicitCategory;
+
   // If explicit category matches known industry, return normalized
-  if (explicitCategory) {
-    const norm = explicitCategory.toLowerCase().trim();
+  if (categoryStr && typeof categoryStr === "string") {
+    const norm = categoryStr.toLowerCase().trim();
     for (const rule of INDUSTRY_RULES) {
       if (rule.industry === norm || norm.includes(rule.industry)) {
         return rule.industry;
@@ -252,9 +256,9 @@ export function inferSeniority(title: string): JobSeniority | null {
 }
 
 /** Normalize employment type */
-export function normalizeEmploymentType(raw?: string | null): JobEmploymentType {
+export function normalizeEmploymentType(raw?: string | string[] | null): JobEmploymentType {
   if (!raw) return "FULL_TIME";
-  const s = raw.toLowerCase().trim();
+  const s = (Array.isArray(raw) ? raw.join(" ") : String(raw)).toLowerCase().trim();
   if (s.includes("part") || s === "pt") return "PART_TIME";
   if (s.includes("contract") || s.includes("temp") || s.includes("freelance") || s.includes("c2c")) return "CONTRACT";
   if (s.includes("intern") || s.includes("coop") || s.includes("co-op")) return "INTERNSHIP";
@@ -580,4 +584,127 @@ export function extractSkills(text: string): string[] {
     }
   }
   return found;
+}
+
+const WORD_TO_NUM: Record<string, number> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  fifteen: 15,
+  twenty: 20,
+};
+
+function parseExperienceNumber(raw?: string): number | null {
+  if (!raw) return null;
+  const clean = raw.toLowerCase().trim();
+  if (/^\d+$/.test(clean)) {
+    const n = parseInt(clean, 10);
+    return n >= 0 && n <= 30 ? n : null;
+  }
+  if (clean in WORD_TO_NUM) {
+    return WORD_TO_NUM[clean] ?? null;
+  }
+  return null;
+}
+
+export interface ExtractedExperience {
+  experienceMin: number | null;
+  experienceMax: number | null;
+  isExplicit: boolean;
+}
+
+/**
+ * Deterministically extracts explicit experience requirements in years from job text.
+ * Preserves unknown state (null) when text does not contain explicit requirements.
+ * Avoids false positives from company founding years or unrelated tenure claims.
+ */
+export function extractExperience(text?: string | null): ExtractedExperience {
+  if (!text) {
+    return { experienceMin: null, experienceMax: null, isExplicit: false };
+  }
+
+  const clean = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+
+  // 1. Entry level / No experience patterns
+  if (
+    /\b(no prior experience required|no experience required|no experience necessary|0 years of experience|entry[- ]level position|freshers? (?:welcome|can apply))\b/i.test(
+      clean
+    )
+  ) {
+    return { experienceMin: 0, experienceMax: 1, isExplicit: true };
+  }
+
+  const numPat = "(?:\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)";
+  const yrPat = "(?:years?|yrs?)";
+  const expKeywordPat = "(?:experience|exp|in a similar role|relevant experience|professional experience|working experience|hands-on experience|background)";
+
+  // 2. Range: "X to Y years (of experience)" or "between X and Y years"
+  // e.g. "3-5 years of experience", "3 to 5 yrs", "between 2 and 4 years"
+  const rangeRegex = new RegExp(
+    `\\b(?:between\\s+)?(${numPat})\\s*(?:-|to|–|—)\\s*(${numPat})\\s*(?:\\+?\\s*)?${yrPat}(?:\\s+of)?(?:\\s+${expKeywordPat})?\\b`,
+    "i"
+  );
+  const rangeMatch = clean.match(rangeRegex);
+  if (rangeMatch) {
+    const min = parseExperienceNumber(rangeMatch[1]);
+    const max = parseExperienceNumber(rangeMatch[2]);
+    if (min !== null && max !== null && min <= max && max <= 30) {
+      return { experienceMin: min, experienceMax: max, isExplicit: true };
+    }
+  }
+
+  // 3. Minimum / Plus patterns:
+  // e.g. "5+ years of experience", "at least 3 years", "minimum 4 years", "min 2 yrs"
+  const minPlusRegex = new RegExp(
+    `\\b(?:(?:at\\s+least|minimum|min\\.?|requires?|requiring|with)\\s+(?:of\\s+)?(${numPat})\\+?\\s*${yrPat}|(${numPat})\\+\\s*${yrPat})(?:\\s+of)?(?:\\s+${expKeywordPat})?\\b`,
+    "i"
+  );
+  const minMatch = clean.match(minPlusRegex);
+  if (minMatch) {
+    const rawVal = minMatch[1] || minMatch[2];
+    const min = parseExperienceNumber(rawVal);
+    if (min !== null && min <= 30) {
+      return { experienceMin: min, experienceMax: null, isExplicit: true };
+    }
+  }
+
+  // 4. Maximum / Up to patterns:
+  // e.g. "up to 3 years of experience", "maximum 2 years"
+  const maxRegex = new RegExp(
+    `\\b(?:up\\s+to|maximum(?:\\s+of)?|max\\.?|no\\s+more\\s+than)\\s+(${numPat})\\s*${yrPat}(?:\\s+of)?(?:\\s+${expKeywordPat})?\\b`,
+    "i"
+  );
+  const maxMatch = clean.match(maxRegex);
+  if (maxMatch) {
+    const max = parseExperienceNumber(maxMatch[1]);
+    if (max !== null && max <= 30) {
+      return { experienceMin: 0, experienceMax: max, isExplicit: true };
+    }
+  }
+
+  // 5. Explicit single number followed directly by experience:
+  // e.g. "3 years experience", "4 years of relevant experience"
+  const singleExpRegex = new RegExp(
+    `\\b(${numPat})\\s*${yrPat}\\s+(?:of\\s+)?(?:relevant|professional|hands-on|work(?:ing)?|software)?\\s*${expKeywordPat}\\b`,
+    "i"
+  );
+  const singleMatch = clean.match(singleExpRegex);
+  if (singleMatch) {
+    const val = parseExperienceNumber(singleMatch[1]);
+    if (val !== null && val <= 30) {
+      return { experienceMin: val, experienceMax: null, isExplicit: true };
+    }
+  }
+
+  return { experienceMin: null, experienceMax: null, isExplicit: false };
 }

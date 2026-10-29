@@ -151,6 +151,7 @@ export interface JobProviderAdapter {
   readonly rateLimitDaily: number;
   readonly attributionNotice: string;
   readonly permittedTermsUrl?: string;
+  readonly supportedFilters?: readonly string[];
 
   isConfigured(): boolean;
   fetchJobs(params: ProviderSearchParams): Promise<ProviderFetchResult>;
@@ -175,6 +176,7 @@ export interface JobSearchFilters {
   employmentTypes?: JobEmploymentType[];
   experienceMin?: number;
   experienceMax?: number;
+  experienceIncludeUnspecified?: boolean;
   salaryMin?: number;
   salaryMax?: number;
   salaryCurrency?: string;
