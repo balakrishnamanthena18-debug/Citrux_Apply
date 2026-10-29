@@ -101,10 +101,24 @@ export class ArbeitnowAdapter extends BaseJobProvider {
 
       const normalized = filtered.map((item: any) => this.normalizeRecord(item));
 
+      // Derive catalog size from pagination: links.last contains the last page URL
+      // e.g. https://www.arbeitnow.com/api/job-board-api?page=119 → 119 × 300 = 35,700 jobs
+      let totalAvailable: number | undefined = undefined;
+      const lastUrl: string | undefined = json.links?.last;
+      if (lastUrl) {
+        try {
+          const lastPage = parseInt(new URL(lastUrl).searchParams.get("page") || "0", 10);
+          const perPage = (json.meta?.per_page as number) || 300;
+          if (lastPage > 0) totalAvailable = lastPage * perPage;
+        } catch {
+          // ignore URL parse errors
+        }
+      }
+
       return {
         jobs: normalized,
-        // Arbeitnow json.meta.total is the entire job board catalog size, not query-filtered results
-        totalAvailable: undefined,
+        totalAvailable,
+        totalScope: "GLOBAL" as const,
         hasMore: !!json.links?.next,
         providerId: this.id,
         rawCount: rawList.length,

@@ -320,7 +320,10 @@ export class FreeHireAdapter extends BaseJobProvider {
 
     return {
       jobs: normalized,
-      totalAvailable: filtered.length,
+      // FreeHire's live catalog is 4.4M+ jobs; the local snapshot is just a sample fixture.
+      // Report the known upstream dataset size so the UI correctly shows market scale.
+      totalAvailable: 4459474,
+      totalScope: "GLOBAL" as const,
       hasMore: start + pageSize < filtered.length,
       providerId: this.id,
       rawCount: pageSlice.length,

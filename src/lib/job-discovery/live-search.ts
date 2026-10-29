@@ -979,12 +979,13 @@ export class LiveJobSearchEngine {
         totalScope = countryStatus.totalScope || "COUNTRY";
       }
     } else {
-      // Global query: take the reported total across providers (global scope)
-      const globalStatus = providerStatuses.find(
-        (ps) => ps.status === "SUCCESS" && typeof ps.totalReported === "number" && (ps.totalScope === "GLOBAL" || !ps.totalScope)
-      );
-      if (globalStatus) {
-        authoritativeTotal = globalStatus.totalReported;
+      // Global query: SUM all provider dataset sizes — each provider has an independent corpus
+      // (FreeHire ATS catalog + Arbeitnow board + Jobicy remote + USAJOBS federal + DirectATS feeds)
+      const globalTotals = providerStatuses
+        .filter((ps) => ps.status === "SUCCESS" && typeof ps.totalReported === "number" && ps.totalReported > 0)
+        .map((ps) => ps.totalReported as number);
+      if (globalTotals.length > 0) {
+        authoritativeTotal = globalTotals.reduce((sum, t) => sum + t, 0);
         totalScope = "GLOBAL";
       }
     }
