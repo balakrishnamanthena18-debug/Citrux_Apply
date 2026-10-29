@@ -475,11 +475,7 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
     setLoading(true);
     setSearchPhase("PREPARING");
     setError(null);
-    setJobs([]);
-    setEstimatedTotal(undefined);
-    setTotalScope(undefined);
-    setReturnedBatchCount(undefined);
-    setVerifiedMatchingCount(undefined);
+    setJobs((prev) => (prev.length === 0 ? [] : prev));
     setSearchDurationMs(undefined);
 
     const activeQuery = overrideFilters?.query !== undefined ? overrideFilters.query : queryRef.current;
@@ -598,11 +594,13 @@ export function GlobalJobDiscoveryWorkbench({ initialQuery = "", onPromoted }: P
         }
       } else {
         setError(result.error || "Failed to load discovered jobs.");
+        setJobs([]);
         setSearchPhase("ERROR");
       }
     } catch (err: any) {
       if (requestId === searchRequestIdRef.current) {
         setError(err?.message || "An unexpected error occurred.");
+        setJobs([]);
         setSearchPhase("ERROR");
       }
     } finally {

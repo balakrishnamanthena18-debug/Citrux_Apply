@@ -5,8 +5,7 @@
  * Client employeeId / teamId / managerId / organizationId are never accepted.
  */
 
-import type { ApplicationStatus, Prisma } from "@/generated/prisma";
-import { Role } from "@/generated/prisma";
+import { Prisma, type ApplicationStatus, Role } from "@/generated/prisma";
 import type { AuthenticatedContext } from "@/lib/auth/context";
 import { AuthorizationError } from "@/lib/errors";
 import { sanitizePaginationLimit } from "@/lib/utils/sanitization";
@@ -234,60 +233,60 @@ async function computeCounts(
     }
   }
 
-  const statusGroups = await tx.application.groupBy({
-    by: ["status"],
-    where: orgWhere,
-    _count: { _all: true },
-  });
-
-  const mine = await tx.application.count({
-    where: { ...orgWhere, assignedEmployeeId: ctx.userId },
-  });
-
-  const unassigned = await tx.application.count({
-    where: { ...orgWhere, assignedEmployeeId: null },
-  });
-
-  const team =
+  const teamAssigneeIds =
     teamScope.authorized && teamScope.assigneeUserIds.length > 0
-      ? await tx.application.count({
-          where: {
-            ...orgWhere,
-            assignedEmployeeId: { in: teamScope.assigneeUserIds },
-          },
-        })
-      : 0;
-
-  const manager =
+      ? teamScope.assigneeUserIds
+      : [];
+  const managerAssigneeIds =
     managerScope.authorized && managerScope.assigneeUserIds.length > 0
-      ? await tx.application.count({
-          where: {
-            ...orgWhere,
-            assignedEmployeeId: { in: managerScope.assigneeUserIds },
-          },
-        })
-      : 0;
+      ? managerScope.assigneeUserIds
+      : [];
+
+  const inProgList = [...IN_PROGRESS_STATUSES];
+  const needsAttnList = [...NEEDS_ATTENTION_STATUSES];
+
+  const rows = await tx.$queryRaw<Array<{
+    total: bigint;
+    mine: bigint;
+    unassigned: bigint;
+    team: bigint;
+    manager: bigint;
+    ready: bigint;
+    submitted: bigint;
+    failed: bigint;
+    in_progress: bigint;
+    needs_attention: bigint;
+  }>>`
+    SELECT
+      COUNT(*)::bigint AS total,
+      COUNT(*) FILTER (WHERE "assignedEmployeeId" = ${ctx.userId}::uuid)::bigint AS mine,
+      COUNT(*) FILTER (WHERE "assignedEmployeeId" IS NULL)::bigint AS unassigned,
+      COUNT(*) FILTER (WHERE ${teamAssigneeIds.length > 0 ? Prisma.sql`"assignedEmployeeId" = ANY(${teamAssigneeIds}::uuid[])` : Prisma.sql`FALSE`})::bigint AS team,
+      COUNT(*) FILTER (WHERE ${managerAssigneeIds.length > 0 ? Prisma.sql`"assignedEmployeeId" = ANY(${managerAssigneeIds}::uuid[])` : Prisma.sql`FALSE`})::bigint AS manager,
+      COUNT(*) FILTER (WHERE status = 'READY')::bigint AS ready,
+      COUNT(*) FILTER (WHERE status = 'SUBMITTED')::bigint AS submitted,
+      COUNT(*) FILTER (WHERE status = 'FAILED')::bigint AS failed,
+      COUNT(*) FILTER (WHERE status::text = ANY(${inProgList}::text[]))::bigint AS in_progress,
+      COUNT(*) FILTER (WHERE status::text = ANY(${needsAttnList}::text[]))::bigint AS needs_attention
+    FROM applications
+    WHERE "organizationId" = ${ctx.organizationId}::uuid
+  `;
 
   const orphaned = orphanedWhere
     ? await tx.application.count({ where: orphanedWhere })
     : 0;
 
-  const countByStatus = Object.fromEntries(
-    statusGroups.map((g) => [g.status, g._count._all])
-  ) as Record<string, number>;
-
-  const total = statusGroups.reduce((sum, g) => sum + g._count._all, 0);
-  const ready = countByStatus.READY || 0;
-  const submitted = countByStatus.SUBMITTED || 0;
-  const failed = countByStatus.FAILED || 0;
-  const inProgress = IN_PROGRESS_STATUSES.reduce(
-    (s, st) => s + (countByStatus[st] || 0),
-    0
-  );
-  const needsAttention = NEEDS_ATTENTION_STATUSES.reduce(
-    (s, st) => s + (countByStatus[st] || 0),
-    0
-  );
+  const r = rows[0];
+  const total = Number(r?.total ?? 0);
+  const mine = Number(r?.mine ?? 0);
+  const unassigned = Number(r?.unassigned ?? 0);
+  const team = Number(r?.team ?? 0);
+  const manager = Number(r?.manager ?? 0);
+  const ready = Number(r?.ready ?? 0);
+  const submitted = Number(r?.submitted ?? 0);
+  const failed = Number(r?.failed ?? 0);
+  const inProgress = Number(r?.in_progress ?? 0);
+  const needsAttention = Number(r?.needs_attention ?? 0);
 
   return {
     total,

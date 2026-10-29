@@ -1,0 +1,168 @@
+{
+  "Scenario_A_Dashboard": {
+    "scenario": "Scenario A: Main Dashboard / Operations Queue Summary",
+    "coldMs": 1537.2,
+    "warmRunsMs": [
+      1536.8,
+      1177.1,
+      1431.7,
+      1636.9,
+      1397.6
+    ],
+    "medianWarmMs": 1431.7,
+    "p95WarmMs": 1636.9,
+    "details": {
+      "totalCount": 29,
+      "counts": {
+        "total": 29,
+        "mine": 16,
+        "unassigned": 5,
+        "team": 0,
+        "manager": 0,
+        "orphaned": 0,
+        "continuity": 0,
+        "ready": 6,
+        "inProgress": 11,
+        "submitted": 6,
+        "needsAttention": 2,
+        "failed": 0
+      }
+    }
+  },
+  "Scenario_B_ApplicationList": {
+    "scenario": "Scenario B: Application List Page Operations Data",
+    "coldMs": 1730.5,
+    "warmRunsMs": [
+      1689.4,
+      1297.5,
+      775.7,
+      686.4,
+      600.1
+    ],
+    "medianWarmMs": 775.7,
+    "p95WarmMs": 1689.4,
+    "details": {
+      "itemsCount": 25,
+      "candsCount": 14,
+      "jobsCount": 20
+    }
+  },
+  "Scenario_C_ApplicationDetail": {
+    "scenario": "Scenario C: Application Detail Page (9 Sequential DB Queries)",
+    "coldMs": 1082,
+    "warmRunsMs": [
+      1111.3,
+      1078.1,
+      1050.9,
+      1050.9,
+      1049.6
+    ],
+    "medianWarmMs": 1050.9,
+    "p95WarmMs": 1111.3,
+    "details": {
+      "found": true,
+      "docsCount": 0,
+      "outcomesCount": 0
+    }
+  },
+  "Scenario_D_NormalSearch": {
+    "scenario": "Scenario D: Normal Global Job Search (Un-cached Live Providers)",
+    "coldMs": 1637.8,
+    "warmRunsMs": [
+      629.1,
+      586.1,
+      1315.3,
+      1327.3,
+      1127.9
+    ],
+    "medianWarmMs": 1127.9,
+    "p95WarmMs": 1327.3,
+    "details": {
+      "total": 266268,
+      "jobsCount": 20,
+      "providerStatuses": [
+        {
+          "id": "arbeitnow",
+          "ms": 306,
+          "status": "SUCCESS",
+          "count": 45
+        },
+        {
+          "id": "direct_ats",
+          "ms": 386,
+          "status": "SUCCESS",
+          "count": 0
+        },
+        {
+          "id": "freehire",
+          "ms": 763,
+          "status": "SUCCESS",
+          "count": 25
+        },
+        {
+          "id": "jobicy",
+          "ms": 1580,
+          "status": "SUCCESS",
+          "count": 6
+        }
+      ]
+    }
+  },
+  "Scenario_E_AdvancedSearch": {
+    "scenario": "Scenario E: Advanced Search (Experience 3-7 yrs, Live Providers)",
+    "coldMs": 737.9,
+    "warmRunsMs": [
+      621.5,
+      1610.6,
+      1536.4,
+      1441,
+      708.9
+    ],
+    "medianWarmMs": 1441,
+    "p95WarmMs": 1610.6,
+    "details": {
+      "total": 266268,
+      "jobsCount": 20
+    }
+  },
+  "Scenario_F_Pagination": {
+    "scenario": "Scenario F: Search Pagination (Page 2)",
+    "coldMs": 604.6,
+    "warmRunsMs": [
+      409,
+      411.7,
+      1421.9,
+      1230.8,
+      1842.5
+    ],
+    "medianWarmMs": 1230.8,
+    "p95WarmMs": 1842.5,
+    "details": {
+      "page": 2,
+      "jobsCount": 20,
+      "hasMore": true
+    }
+  },
+  "Scenario_J_WarmCacheHits": {
+    "scenario": "Scenario J: Warm In-Memory Search Cache (10 consecutive hits)",
+    "coldMs": 0,
+    "warmRunsMs": [
+      0.38,
+      0.06,
+      0.15,
+      0.28,
+      0.06,
+      0.04,
+      0.04,
+      0.04,
+      0.04,
+      0.03
+    ],
+    "medianWarmMs": 0.04,
+    "p95WarmMs": 0.38,
+    "details": {
+      "cacheTtlMs": 30000,
+      "hits": 10
+    }
+  }
+}
