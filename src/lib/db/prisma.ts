@@ -16,13 +16,13 @@ function getAdapter(): PrismaPg {
   if (globalForPrisma.adapter) {
     return globalForPrisma.adapter;
   }
+  const poolMax = process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 5;
   const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL,
-    // Keep per-instance pool small: Supabase Free session pooler caps ~15
-    // clients globally across all serverless isolates.
-    max: 3,
+    // Per-instance pool allows concurrent worker/RSC transactions while respecting session limits
+    max: Number.isFinite(poolMax) && poolMax > 0 ? poolMax : 5,
     idleTimeoutMillis: 5000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
   });
   globalForPrisma.adapter = adapter;
   return adapter;

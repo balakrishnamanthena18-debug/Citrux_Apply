@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LiveJobSearchEngine } from "@/lib/job-discovery/live-search";
+import { LiveJobSearchEngine, clearJobSearchCache } from "@/lib/job-discovery/live-search";
 import { prisma } from "@/lib/db/prisma";
 import { jobProviderRegistry } from "@/lib/job-discovery/registry";
 import type { NormalizedDiscoveredJob } from "@/lib/job-discovery/types";
@@ -60,6 +60,7 @@ describe("Live Job Search Engine (Zero-Bulk-Storage)", () => {
   };
 
   beforeEach(() => {
+    clearJobSearchCache();
     engine = new LiveJobSearchEngine();
     vi.clearAllMocks();
   });

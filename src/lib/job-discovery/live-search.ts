@@ -36,11 +36,38 @@ interface CachedSearchResult {
   data: PaginatedJobSearchResponse;
   expiresAtMs: number;
 }
+interface CachedJobPool {
+  deduplicatedJobs: NormalizedDiscoveredJob[];
+  uiResults: DiscoveredJobSearchResult[];
+  providerStatuses: LiveProviderExecutionStatus[];
+  rawProviderCounts: Record<string, number>;
+  authoritativeTotal: number | undefined;
+  totalScope: "CITY" | "STATE" | "COUNTRY" | "GLOBAL";
+  hasRestrictedFilters: boolean;
+  anyProviderHasMore: boolean;
+  interpretedPlan: {
+    intentSummary: string;
+    role?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    workArrangement?: string;
+    salaryMin?: number;
+    salaryCurrency?: string;
+    isAiInterpreted: boolean;
+  };
+  providerSideFilters: string[];
+  inMemoryFilters: string[];
+  expiresAtMs: number;
+}
+
 const SEARCH_CACHE_TTL_MS = 30000; // 30-second TTL
 const searchCache = new Map<string, CachedSearchResult>();
+const searchPoolCache = new Map<string, CachedJobPool>();
 
 export function clearJobSearchCache(): void {
   searchCache.clear();
+  searchPoolCache.clear();
 }
 
 /**
@@ -83,6 +110,48 @@ export function generateJobSearchCacheKey(
   };
 
   return `search:${JSON.stringify(parts)}`;
+}
+
+/**
+ * Generates a canonical cache key for the full candidate pool of a query,
+ * omitting page and pageSize so pagination and page-size changes can slice
+ * directly from the verified candidate pool in memory.
+ */
+export function generateJobSearchPoolCacheKey(
+  query: ValidatedJobSearchQuery,
+  scope?: string
+): string {
+  const parts: Record<string, unknown> = {
+    q: query.query?.trim().toLowerCase() || "",
+    exact: query.exactPhrase?.trim().toLowerCase() || "",
+    not: (query.excludedKeywords || []).map((k: string) => k.trim().toLowerCase()).sort(),
+    comp: query.companyName?.trim().toLowerCase() || "",
+    skills: (query.skills || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    reqSkills: (query.requiredSkills || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    prefSkills: (query.preferredSkills || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    ind: (query.industries || []).map((i: string) => i.trim().toLowerCase()).sort(),
+    ctry: (query.countries || []).map((c: string) => c.trim().toUpperCase()).sort(),
+    st: (query.states || []).map((s: string) => s.trim().toLowerCase()).sort(),
+    city: (query.cities || []).map((c: string) => c.trim().toLowerCase()).sort(),
+    arr: (query.workArrangements || []).slice().sort(),
+    sen: (query.seniorityLevels || []).map((s: string) => s.trim().toUpperCase()).sort(),
+    emp: (query.employmentTypes || []).slice().sort(),
+    expMin: query.experienceMin ?? null,
+    expMax: query.experienceMax ?? null,
+    expUnspec: query.experienceIncludeUnspecified ?? true,
+    salMin: query.salaryMin ?? null,
+    salMax: query.salaryMax ?? null,
+    salCurr: query.salaryCurrency || "USD",
+    salPeriod: query.salaryPeriod || "YEARLY",
+    days: query.postedWithinDays ?? null,
+    visa: query.visaSponsored ?? false,
+    ver: (query.verificationStatuses || []).slice().sort(),
+    prov: (query.providerIds || []).map((p: string) => p.trim().toLowerCase()).sort(),
+    sort: query.sortBy || "newest",
+    scope: scope || "GLOBAL",
+  };
+
+  return `pool:${JSON.stringify(parts)}`;
 }
 
 /** Set of recognized location words for distinguishing location tokens from skill/role keywords */
@@ -159,6 +228,93 @@ export class LiveJobSearchEngine {
           checkpoints,
         },
       };
+    }
+
+    // Check candidate pool cache (keyed on canonical criteria without page/pageSize)
+    const poolKey = generateJobSearchPoolCacheKey(validated, userId);
+    const cachedPool = searchPoolCache.get(poolKey);
+    if (cachedPool && cachedPool.expiresAtMs > Date.now() && !validated.savedOnly) {
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      if (startIndex < cachedPool.uiResults.length) {
+        const pagedResults = cachedPool.uiResults.slice(startIndex, endIndex);
+        const hasMoreInMemory = cachedPool.uiResults.length > endIndex;
+        const hasMoreUpstream = cachedPool.anyProviderHasMore && (cachedPool.authoritativeTotal ? (page * pageSize < cachedPool.authoritativeTotal) : true);
+        const hasMore = hasMoreInMemory || hasMoreUpstream;
+
+        let computedTotal: number;
+        if (cachedPool.authoritativeTotal !== undefined && !cachedPool.hasRestrictedFilters) {
+          computedTotal = cachedPool.authoritativeTotal;
+        } else if (hasMore && cachedPool.authoritativeTotal && cachedPool.authoritativeTotal > cachedPool.uiResults.length) {
+          computedTotal = cachedPool.authoritativeTotal;
+        } else {
+          computedTotal = cachedPool.uiResults.length;
+        }
+
+        let totalPages = 1;
+        if (computedTotal && computedTotal > 0) {
+          totalPages = Math.max(Math.ceil(computedTotal / pageSize), hasMore ? page + 1 : page);
+          totalPages = Math.min(totalPages, 50);
+        } else {
+          totalPages = hasMore ? page + 1 : page;
+        }
+
+        checkpoints.push({
+          checkpoint: "PROVIDER_COMPLETED",
+          timestampMs: Date.now(),
+          providerId: "pool_cache",
+          details: { status: "SUCCESS", fromPoolCache: true, page, pageSize },
+        });
+
+        const poolResponse: PaginatedJobSearchResponse = {
+          jobs: pagedResults,
+          total: computedTotal,
+          page,
+          pageSize,
+          totalPages,
+          hasMore,
+          estimatedTotal: cachedPool.authoritativeTotal,
+          providerReportedTotal: cachedPool.authoritativeTotal,
+          totalScope: cachedPool.totalScope,
+          returnedBatchCount: cachedPool.deduplicatedJobs.length,
+          verifiedMatchingCount: cachedPool.uiResults.length,
+          isExactTotal: !cachedPool.hasRestrictedFilters && Boolean(cachedPool.authoritativeTotal && !cachedPool.anyProviderHasMore),
+          isLive: true,
+          searchDurationMs: Date.now() - searchStartMs,
+          providerStatuses: cachedPool.providerStatuses,
+          rawProviderCounts: cachedPool.rawProviderCounts,
+          uniqueCount: cachedPool.deduplicatedJobs.length,
+          interpretedPlan: {
+            intentSummary: cachedPool.interpretedPlan.intentSummary,
+            role: cachedPool.interpretedPlan.role,
+            city: cachedPool.interpretedPlan.city,
+            state: cachedPool.interpretedPlan.state,
+            country: cachedPool.interpretedPlan.country,
+            workArrangement: cachedPool.interpretedPlan.workArrangement,
+            salaryMin: cachedPool.interpretedPlan.salaryMin,
+            salaryCurrency: cachedPool.interpretedPlan.salaryCurrency,
+            isAiInterpreted: cachedPool.interpretedPlan.isAiInterpreted,
+          },
+          appliedFiltersSummary: {
+            providerSide: cachedPool.providerSideFilters,
+            inMemory: cachedPool.inMemoryFilters,
+          },
+          trace: {
+            correlationId,
+            clientSubmittedAtMs,
+            apiEntryMs,
+            serverDurationMs: Date.now() - apiEntryMs,
+            checkpoints,
+          },
+        };
+
+        searchCache.set(cacheKey, {
+          data: poolResponse,
+          expiresAtMs: Date.now() + SEARCH_CACHE_TTL_MS,
+        });
+
+        return poolResponse;
+      }
     }
 
     // 1. If savedOnly is active, serve exclusively from the user's saved jobs table
@@ -1070,6 +1226,35 @@ export class LiveJobSearchEngine {
       if (searchCache.size > 200) {
         const firstKey = searchCache.keys().next().value;
         if (firstKey) searchCache.delete(firstKey);
+      }
+
+      searchPoolCache.set(poolKey, {
+        deduplicatedJobs,
+        uiResults,
+        providerStatuses,
+        rawProviderCounts,
+        authoritativeTotal,
+        totalScope,
+        hasRestrictedFilters,
+        anyProviderHasMore,
+        interpretedPlan: {
+          intentSummary: interpretedPlan.intentSummary || "",
+          role: interpretedPlan.role,
+          city: interpretedPlan.city,
+          state: interpretedPlan.state,
+          country: interpretedPlan.country,
+          workArrangement: interpretedPlan.workArrangement,
+          salaryMin: interpretedPlan.salaryMin,
+          salaryCurrency: interpretedPlan.salaryCurrency,
+          isAiInterpreted: Boolean(interpretedPlan.isAiInterpreted),
+        },
+        providerSideFilters,
+        inMemoryFilters,
+        expiresAtMs: Date.now() + SEARCH_CACHE_TTL_MS,
+      });
+      if (searchPoolCache.size > 100) {
+        const firstPoolKey = searchPoolCache.keys().next().value;
+        if (firstPoolKey) searchPoolCache.delete(firstPoolKey);
       }
     }
 

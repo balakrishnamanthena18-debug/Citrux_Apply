@@ -26,7 +26,7 @@ import { ApplicationOwnershipCard } from "@/components/application/ApplicationOw
 import { resolveDualTrackWorkflowStatus } from "@/lib/application/workflow-status";
 import { evaluateApplicationPrerequisites } from "@/lib/application/prerequisites";
 import { TelemetryGauge } from "@/components/ui/TelemetryGauge";
-import { loadStaffApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
+import { loadAuthorizedApplicationIntelligence } from "@/lib/application-intelligence/load-application-intelligence";
 import type { ApplicationIntelligenceViewModel } from "@/lib/application-intelligence/presentation";
 import { ApplicationIntelligencePanel } from "@/components/application-intelligence/ApplicationIntelligencePanel";
 import { ResumeReviewPanel } from "@/components/resume-intelligence/ResumeReviewPanel";
@@ -164,12 +164,11 @@ export default async function EmployeeApplicationWorkbenchPage({ params }: Props
     let intel: ApplicationIntelligenceViewModel | null = null;
     let intelFailed = false;
     try {
-      const loaded = await loadStaffApplicationIntelligence({
+      intel = await loadAuthorizedApplicationIntelligence({
         db: tx,
         applicationId: app.id,
-        organizationId: ctx.organizationId,
+        viewer: "STAFF",
       });
-      intel = loaded.ok ? loaded.view : null;
     } catch {
       intelFailed = true;
     }
